@@ -53,3 +53,22 @@ jwtvcrop() {
   esac
 }
 
+
+jwrandnumgen()
+{
+    if [ $# -ne 1 ]; then
+        echo
+        echo "${FUNCNAME[0]} LICZBA"
+        echo
+        echo "    Skrypt generuje losowa liczbe z zakresu [1, LICZBA]."
+        echo
+        return 1
+    fi
+    
+    python3 -c \
+    "import sys;
+LICZBA=sys.argv[1];
+from random import randint;
+print(randint(0, int(LICZBA)))" $1
+}
+

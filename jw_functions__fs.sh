@@ -1,6 +1,5 @@
 jwodspacjacz ()
 {
-
     if [ $# -ne 0 ]
     then
 cat 1>&2 <<EOF
@@ -20,6 +19,30 @@ return 1
         if [ "$plik" != "$nowa_nazwa" ]
         then
             mv -i -v "$plik" "$nowa_nazwa"
+        fi
+    done
+}
+
+jwodspacjaczRekursywny()
+{
+    if [ $# -ne 0 ]
+    then
+cat 1>&2 <<EOF
+
+./$FUNCNAME
+
+	Skrypt odspacjowywuje nazwy plikow i katalogow od biezacej lokalizacji rekursywnie w dol.
+
+EOF
+return 1
+    fi
+
+    jwodspacjacz
+    ls -1 | while read plikLubFolder; do
+        if [ -d "$plikLubFolder" ]; then
+            cd "$plikLubFolder"
+            jwodspacjaczRekursywny
+            cd ..
         fi
     done
 }

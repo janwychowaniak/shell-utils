@@ -793,3 +793,23 @@ jwmpgrotateCCW ()
 }
 
 
+jwcropclip ()
+{
+  if [ $# -ne 3 ]; then
+    echo
+    echo " *** $0 KLIP OD DO"
+    echo "     (w miejscu!)"
+    echo
+    return 1
+  fi
+
+  local PLIK=$1
+  local OD=$2
+  local DO=$3
+  local EXT="${PLIK##*.}"
+
+  local TEMP="temp-$$.$EXT"
+
+  echo "ffmpeg -i \"$PLIK\" -ss $OD -to $DO -c:v copy -c:a copy $TEMP && mv $TEMP \"$PLIK\""
+}
+

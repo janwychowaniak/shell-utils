@@ -134,10 +134,13 @@ jwbitrateEXT() {
 
 alias jwbitrate='jwbitrateEXT mp3'
 alias jwbitrate_mp3='jwbitrateEXT mp3'
-alias jwbitrate_wav='jwbitrateEXT wav'
-alias jwbitrate_ogg='jwbitrateEXT ogg'
-alias jwbitrate_mp4='jwbitrateEXT mp4'
+alias jwbitrate_avi='jwbitrateEXT avi'
 alias jwbitrate_m4a='jwbitrateEXT m4a'
+alias jwbitrate_mkv='jwbitrateEXT mkv'
+alias jwbitrate_mp4='jwbitrateEXT mp4'
+alias jwbitrate_ogg='jwbitrateEXT ogg'
+alias jwbitrate_ogv='jwbitrateEXT ogv'
+alias jwbitrate_wav='jwbitrateEXT wav'
 alias jwbitrate_webm='jwbitrateEXT webm'
 
 
@@ -192,11 +195,13 @@ jwaudioparamsEXT() {
 
 alias jwaudioparams='jwaudioparamsEXT mp3'
 alias jwaudioparams_mp3='jwaudioparamsEXT mp3'
-alias jwaudioparams_wav='jwaudioparamsEXT wav'
-alias jwaudioparams_ogg='jwaudioparamsEXT ogg'
-alias jwaudioparams_mp4='jwaudioparamsEXT mp4'
 alias jwaudioparams_avi='jwaudioparamsEXT avi'
 alias jwaudioparams_m4a='jwaudioparamsEXT m4a'
+alias jwaudioparams_mkv='jwaudioparamsEXT mkv'
+alias jwaudioparams_mp4='jwaudioparamsEXT mp4'
+alias jwaudioparams_ogg='jwaudioparamsEXT ogg'
+alias jwaudioparams_ogv='jwaudioparamsEXT ogv'
+alias jwaudioparams_wav='jwaudioparamsEXT wav'
 alias jwaudioparams_webm='jwaudioparamsEXT webm'
 
 
@@ -214,10 +219,11 @@ jwvideoparamsEXT() {
   done
 }
 
-alias jwvideoparams_wav='jwvideoparamsEXT wav'
-alias jwvideoparams_ogg='jwvideoparamsEXT ogg'
-alias jwvideoparams_mp4='jwvideoparamsEXT mp4'
 alias jwvideoparams_avi='jwvideoparamsEXT avi'
+alias jwvideoparams_mkv='jwvideoparamsEXT mkv'
+alias jwvideoparams_mp4='jwvideoparamsEXT mp4'
+alias jwvideoparams_ogv='jwvideoparamsEXT ogv'
+alias jwvideoparams_webm='jwvideoparamsEXT webm'
 
 
 jwffprobe ()

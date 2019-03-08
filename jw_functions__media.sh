@@ -424,6 +424,85 @@ szum (redukuj):
 EOF
 }
 
+
+jwffcutframe()
+{
+
+    if [ $# -ne 1 ]; then
+cat 1>&2 <<EOF
+
+ ./$FUNCNAME  clip_name
+
+   Cuts frame from clip at 10s, 60s and 5m (if long enough).
+
+EOF
+        return 1
+    fi
+
+
+    local CLIP=$1
+
+    local CMD_TEMPLATE="ffmpeg -i __INPUT__ -ss __POINT__ -t 1 -q:v 0 -r 1 -f image2 __OUTPUT__"
+
+    local POINT1=10
+    local POINT2=60
+    local POINT3=300
+
+    local _filename=$(basename -- "$CLIP")
+    local CLIP_FILENAME="${_filename%.*}"
+
+    local LEN_FRAC=`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 $CLIP`
+    local LEN_S=`echo $LEN_FRAC | awk '{print int($1)}'`
+
+
+    for pnt in $POINT1 $POINT2 $POINT3 ; do
+
+        if [ $LEN_S -gt $pnt ] ; then
+
+            echo $CMD_TEMPLATE | sed "s/__INPUT__/$CLIP/" \
+                               | sed "s/__POINT__/$pnt/" \
+                               | sed "s/__OUTPUT__/$CLIP_FILENAME-frame$pnt.jpg/"
+
+        fi
+
+    done
+
+}
+
+jwffcropfilter ()
+{
+
+    if [ $# -ne 4 ]; then
+cat 1>&2 <<EOF
+
+ Crop filter for ffmpeg.
+
+ -filter:v "crop=w:h:x:y"
+
+  w:    the width of the output rectangle,
+  h:    the height of the output rectangle,
+  x:    the top left corner: X
+  y:    the top left corner: Y
+
+ ./$FUNCNAME  rect_width  rect_height  topleft_x  topleft_y
+
+EOF
+        return 1
+    fi
+
+
+    local W=$1
+    local H=$2
+    local X=$3
+    local Y=$4
+
+    echo
+    echo " -filter:v \"crop=$W:$H:$X:$Y\""
+    echo
+
+}
+
+
 jwblender-encode ()
 {
   if [ $# -ne 1 ]; then

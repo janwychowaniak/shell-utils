@@ -254,6 +254,7 @@ cat <<'EOF'
 
 MP4 -> AVI z kontrola jakosci:
  ffmpeg -i input.mp4 -q:v 0 -q:a 0 output.avi
+ ffmpeg -i input.mp4 -q:v 0 -r 25 -q:a 0 -ar 24000 -ac 1 output.avi
 lektura o doborze qscale: http://www.kilobitspersecond.com/2007/05/24/ffmpeg-quality-comparison/:
  autor: 5, *9*, 11
  koment: 4, 8, 10

@@ -1,4 +1,4 @@
-# A collection of media manipulation functions based on (or using) FFmpeg
+# A collection of media manipulation functions based on (or using) tools from the FFmpeg collection
 
 
 
@@ -196,19 +196,21 @@ jwffmpeg-rozne ()
 {
 cat <<'EOF'
 
-MP4 -> AVI z kontrola jakosci:
+=================== F F M P E G / F F P R O B E  (mostly) =================== (notes and command templates)
+
+MP4 -> AVI with quality setting:
  ffmpeg -i input.mp4 -q:v 0                        -q:a 0                 output.avi
  ffmpeg -i input.mp4 -q:v 0 -vf scale=960:-1 -r 25 -q:a 0 -ar 24000 -ac 1 output.avi
-lektura o doborze qscale: http://www.kilobitspersecond.com/2007/05/24/ffmpeg-quality-comparison/:
- autor: 5, *9*, 11
- koment: 4, 8, 10
+about qscale adjustment: http://www.kilobitspersecond.com/2007/05/24/ffmpeg-quality-comparison/:
+ [author: 5, *9*, 11]
+ [coment: 4, 8, 10]
  ffmpeg -i input.avi -map 0:0 -map 0:1 -qscale 8 -r 25 -ar 32000 -ab 96k -s 1024x576 output.avi
 
 
-obrazki:
+images:
 MP4 -> JPG (15/s):
  ffmpeg -i input.mp4 -q:v 0 -r 15 -f image2 image-%3d.jpg
-nazad przeistoczenie:
+back to video:
  ffmpeg -i input-%05d.jpg -r 15 -q:v 2 output.mpeg
 
 montaz video poklatkowego z arbitralnych obrazkow:
@@ -217,54 +219,54 @@ montaz video poklatkowego z arbitralnych obrazkow:
  rm output.mpeg
 
 
-przyspieszenie:
-tempo, samo video:
- ffmpeg -i input.avi -q:v 0 -vf "setpts=0.5*PTS" output_x2.avi
-sterowanie offsetem (ss) i dlugoscia (t) wyniku:
- ffmpeg -ss 23 -t 40 -i input.mp4 -vf "setpts=0.125*PTS" -qscale 0 output_x8.avi
-przyspieszenie zgodnie audio i video (x1.6 i x2):
- ffmpeg -i audiovideo.avi -filter_complex "[0:v]setpts=0.625*PTS[v];[0:a]atempo=1.6[a]" -map "[v]" -map "[a]" -q:v 0 -q:a 0 audiovideo_out.avi
- ffmpeg -i audiovideo.avi -filter_complex "[0:v]setpts=0.5*PTS[v];[0:a]atempo=2[a]"     -map "[v]" -map "[a]" -q:v 0 -q:a 0 audiovideo_out.avi
+increase tempo:
+ for video-only files:
+  ffmpeg -i input.avi -q:v 0 -vf "setpts=0.5*PTS" output_x2.avi
+ how to incorporate offset (ss) and result length (t):
+  ffmpeg -ss 23 -t 40 -i input.mp4 -vf "setpts=0.125*PTS" -qscale 0 output_x8.avi
+ increase tempo of both audio and video accordingly (x1.6 i x2):
+  ffmpeg -i audiovideo.avi -filter_complex "[0:v]setpts=0.625*PTS[v];[0:a]atempo=1.6[a]" -map "[v]" -map "[a]" -q:v 0 -q:a 0 audiovideo_out.avi
+  ffmpeg -i audiovideo.avi -filter_complex "[0:v]setpts=0.5*PTS[v];[0:a]atempo=2[a]"     -map "[v]" -map "[a]" -q:v 0 -q:a 0 audiovideo_out.avi
 
 
-wyjmowanie dzwieku i obrazu (kanaly, czy tam strumienie):
- ffmpeg -i plik.avi -map 0:0 -q:v 0 plik-V.avi    # (0:0 typowo, nie zawsze)
- ffmpeg -i plik.avi -map 0:1 -q:a 0 plik-A.wav    # (0:1 typowo, nie zawsze)
-zubozony dzwiek:
- ffmpeg -i plik.avi -map 0:1 -q:a 0 -ac 1 -ar 24000 plik-A.wav
+streams (or channels):
+ separating audio and video:
+  ffmpeg -i plik.avi -map 0:0 -q:v 0 plik-V.avi    # (0:0 typically, not always)
+  ffmpeg -i plik.avi -map 0:1 -q:a 0 plik-A.wav    # (0:1 typically, not always)
+ with decreasing audio quality:
+  ffmpeg -i plik.avi -map 0:1 -q:a 0 -ac 1 -ar 24000 plik-A.wav
+ putting it back together into a single container:
+  ffmpeg -i plik-V.avi -i plik-A.wav -map 0:0 -q:v 0 -map 1:0 -q:a 0 plik-AV.avi
 
-zlozenie z powrotem:
- ffmpeg -i plik-V.avi -i plik-A.wav -map 0:0 -q:v 0 -map 1:0 -q:a 0 plik-AV.avi
 
-
-Proste wyciaganie audio z niepotrzebnego wideo do MP3:
+simple audio extracting with discarding video (to MP3):
  ffmpeg -i input.mpeg -ab 128k output.mp3
  for p in *.mp4 ; do ffmpeg -i $p -ac 1 wav/$p.wav ; done
  fldr="ffwav"; inext="mp4"; [ ! -d $fldr ] && mkdir $fldr; for plik in *.$inext; do nn=`basename $plik .$inext`.wav ; echo "$plik -> $fldr/$nn ..."; ffmpeg -i $plik -ac 1 $fldr/$nn ; done
 
 
-volume kanalu audio:
-detekcja:
- ffmpeg -i video.avi -af "volumedetect" -f null /dev/null
- for p in *.mp4 ; do echo -en "$p\t" ; ffmpeg -i $p -af "volumedetect" -f null /dev/null 2>&1 |  grep max_volume ; done
-sterowanie:
- ffmpeg -i tmp03.avi -af "volume=1.7" -qscale 0 tmp03_louder.avi
+audio volume:
+ level detection:
+  ffmpeg -i video.avi -af "volumedetect" -f null /dev/null
+  for p in *.mp4 ; do echo -en "$p\t" ; ffmpeg -i $p -af "volumedetect" -f null /dev/null 2>&1 |  grep max_volume ; done
+ changing:
+  ffmpeg -i tmp03.avi -af "volume=1.7" -qscale 0 tmp03_louder.avi
 
 
 crop:
  ffmpeg -i input.avi -filter:v "crop=1280:1024:x:y" -q:v 0 -q:a 0 output.avi
-lektura 1: http://video.stackexchange.com/questions/4563/how-can-i-crop-a-video-with-ffmpeg
+www 1: http://video.stackexchange.com/questions/4563/how-can-i-crop-a-video-with-ffmpeg
  1280:    the width of the output rectangle,
  1024:    the height,
  x and y: the top left corner
-lektura 2: http://www.renevolution.com/understanding-ffmpeg-part-iii-cropping/
-           http://www.ffmpeg.org/ffmpeg-filters.html#crop
+www 2: http://www.renevolution.com/understanding-ffmpeg-part-iii-cropping/
+       http://www.ffmpeg.org/ffmpeg-filters.html#crop
 
 
 
-concating:
+concatenating:
  ffmpeg -i "concat:input1.mpeg|input2.mpeg|input3.mpeg" -c copy output.mpg
-albo:
+or:
  ffmpeg -f concat -i concatlist -qscale 0 -c copy 321_x8.avi
   concatlist:
    file 321a.avi
@@ -277,7 +279,7 @@ join AVIs with damaged index and to MP4:
  HandBrakeCLI -Z Android -i outfile.avi -o DSCI00.mp4
  rm output.avi outfile.avi
 
-kombajn do MPEG:
+MPEG all-in-one tool:
  mpgtx [http://mpgtx.sourceforge.net/#Examples]
  np concat: mpgtx -j input1.mpg input2.mpg -o output.mpg
 
@@ -285,7 +287,7 @@ kombajn do MPEG:
 get resolution:
  ffprobe INPUT 2>&1 | egrep "Stream.*Video" | egrep -o "[[:digit:]]{3,4}x[[:digit:]]{3,4}"
 
-jedynie wyswietl resolution w folderze:
+show resolution of all AVI files in current location:
  for plik in *.AVI; do echo -en "$plik:\t"; ffprobe $plik 2>&1 | egrep "Stream.*Video" | egrep -o "[[:digit:]]{3,4}x[[:digit:]]{3,4}"; done | column -t
 
 
@@ -294,7 +296,7 @@ rotate (90, 270):
  ffmpeg -i INPUT -vf "transpose=2" -qscale 0 OUT270
 
 
-batch repare AVIs (pilot czasem):
+batch broken index repair (AVIs):
  for plik in `ls *.avi`; do mencoder -mc 0 -noskip -oac copy -ovc copy $plik -o m_$plik; done
 
 
@@ -314,7 +316,7 @@ Ultimate nice mp4 coder:
  fldr="ffmpeg"; [ ! -d $fldr ] && mkdir $fldr; for plik in INPUT; do ffmpeg -y -i $plik -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 64k -ar 44100 -ac 1 -sn -strict experimental $fldr/$plik-crf28.mp4; done
 
 
-Proste rozjasnienie MPG:
+simple brightening of MPG:
  ffmpeg -y -i input.mpg -vf "mp=eq2=1.0:2:0.5" -map 0 -qscale 0 output.mpg
  ffmpeg -y -i input.jpg -vf "lutrgb='r=1.5*val:g=1.5*val:b=1.5*val'" -map 0 -qscale 0 output.jpg
  fldr="ffmpeg"; [ ! -d $fldr ] && mkdir $fldr; for plik in INPUT; do ffmpeg -y -i $plik -vf "mp=eq2=1.0:2:0.5" -map 0 -qscale 0 $fldr/$plik; done
@@ -358,11 +360,11 @@ batch movie clips compress:
   echo ; for p in `ls` ; do echo "time ffmpeg -loglevel error -y -i \"$p\" -vf scale=`jwffgetvideoresolution \"$p\" 720` -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 128k -ar 44100 -ac 2 -sn -strict experimental \"ffmpeg/$p-crf28.mp4\" && sleep 20 &&" ; done ; echo
   echo ; for p in `ls` ; do echo "time ffmpeg -loglevel error -y -i \"$p\"                                             -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 128k -ar 44100 -ac 2 -sn -strict experimental \"ffmpeg/$p-crf28.mp4\" && sleep 20 &&" ; done ; echo
 
-cisza (wykryj, usun):
+on silence detection / removal:
  http://www.ffmpeg.org/ffmpeg-filters.html#toc-silencedetect
  http://www.ffmpeg.org/ffmpeg-filters.html#toc-silenceremove
 
-szum (redukuj):
+on noise reduction:
  http://superuser.com/questions/733061/reduce-background-noise-and-optimize-the-speech-from-an-audio-clip-using-ffmpeg
  http://www.zoharbabin.com/how-to-do-noise-reduction-using-ffmpeg-and-sox/
 

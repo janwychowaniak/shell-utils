@@ -6,45 +6,59 @@
 ### purely ffprobe based ###
 ############################
 
-jwffbitrateEXT() {
-  EXT=$1
+jwffbitrateEXT()
+{
+    if [ $# -ne 1 ]
+    then
+cat 1>&2 <<EOF
 
-  leadingws=110;
+$FUNCNAME EXT
 
-  count=0;
-  totalbr=0;
-  totalsize=0;
-  totaldur=0;
+    All files from the current location, that are of the type EXT, are examined in terms of their length and bitrate.
+    Also total duration, total file size and average bitrate are presented.
 
-  for p in *.$EXT ; do
+EOF
+        return 1
+    fi
 
-    ffpro_outp=$(ffprobe "$p" 2>&1 | grep Duration)
-    fsize=$(du "$p" | awk "{ print ( \$1 ) }")
+    local EXT=$1
 
-    printf "%$(echo $leadingws)s" "$p  ->"
-    echo " "$ffpro_outp
-    br=$(echo $ffpro_outp | awk "{ print ( \$(NF-1) ) }")
-    durstr=$(echo $ffpro_outp | awk "{ print ( \$2 ) }")    # "00:01:07.87,"
-    dursec=`python -c "import sys; DURSTR=sys.argv[1]; print sum(int(x) * 60 ** i for i,x in enumerate(reversed(DURSTR.split('.')[0].split(':'))))" $durstr`
+    local leadingws=110;
 
-    totalbr=$(echo $totalbr+$br | bc )
-    totalsize=$(echo $totalsize+$fsize | bc )
-    totaldur=$(echo $totaldur+$dursec | bc )
-    ((count++))
-  done
+    local count=0;
+    local totalbr=0;
+    local totalsize=0;
+    local totaldur=0;
 
-  avg=`echo "scale=0; $totalbr / $count" | bc`
-  totalsizeM=`echo "scale=0; $totalsize / 1024" | bc`
-  totaldurHMS=`python -c "import sys; TDURSEC=sys.argv[1]; m, s = divmod(int(TDURSEC), 60); h, m = divmod(m, 60); print \"%d:%02d:%02d\" % (h, m, s)" $totaldur`
+    for p in *.$EXT ; do
 
-  suffix=$(echo $ffpro_outp | awk "{ print ( \$(NF) ) }")
-  ffprolen=`echo ${#ffpro_outp}`
+        ffpro_outp=$(ffprobe "$p" 2>&1 | grep Duration)
+        fsize=$(du "$p" | awk "{ print ( \$1 ) }")
 
-  printf "%$(echo $leadingws)s" " "; printf '_%.0s' $(seq 1 $ffprolen); echo
+        printf "%$(echo $leadingws)s" "$p  ->"
+        echo " "$ffpro_outp
+        br=$(echo $ffpro_outp | awk "{ print ( \$(NF-1) ) }")
+        durstr=$(echo $ffpro_outp | awk "{ print ( \$2 ) }")    # "00:01:07.87,"
+        dursec=`python -c "import sys; DURSTR=sys.argv[1]; print sum(int(x) * 60 ** i for i,x in enumerate(reversed(DURSTR.split('.')[0].split(':'))))" $durstr`
 
-  printf "%$(echo $leadingws+$ffprolen | bc )s" "avg: $avg $suffix"; echo
-  printf "%$(echo $leadingws+$ffprolen | bc )s" "total size: $totalsizeM MB"; echo
-  printf "%$(echo $leadingws+$ffprolen | bc )s" "total duration: $totaldurHMS"; echo
+        totalbr=$(echo $totalbr+$br | bc )
+        totalsize=$(echo $totalsize+$fsize | bc )
+        totaldur=$(echo $totaldur+$dursec | bc )
+        ((count++))
+    done
+
+    avg=`echo "scale=0; $totalbr / $count" | bc`
+    totalsizeM=`echo "scale=0; $totalsize / 1024" | bc`
+    totaldurHMS=`python -c "import sys; TDURSEC=sys.argv[1]; m, s = divmod(int(TDURSEC), 60); h, m = divmod(m, 60); print \"%d:%02d:%02d\" % (h, m, s)" $totaldur`
+
+    suffix=$(echo $ffpro_outp | awk "{ print ( \$(NF) ) }")
+    ffprolen=`echo ${#ffpro_outp}`
+
+    printf "%$(echo $leadingws)s" " "; printf '_%.0s' $(seq 1 $ffprolen); echo
+
+    printf "%$(echo $leadingws+$ffprolen | bc )s" "avg: $avg $suffix"; echo
+    printf "%$(echo $leadingws+$ffprolen | bc )s" "total size: $totalsizeM MB"; echo
+    printf "%$(echo $leadingws+$ffprolen | bc )s" "total duration: $totaldurHMS"; echo
 }
 
 alias jwffbitrate='jwffbitrateEXT mp3'
@@ -61,8 +75,21 @@ alias jwffbitrate_webm='jwffbitrateEXT webm'
 
 jwffmeanbitrateEXT () 
 { 
-    EXT=$1;
-    CWD=$(basename $(pwd))
+    if [ $# -ne 1 ]
+    then
+cat 1>&2 <<EOF
+
+$FUNCNAME EXT
+
+    All files from the current location, that are of the type EXT, are examined in terms of their bitrate.
+    The average bitrate is presented.
+
+EOF
+        return 1
+    fi
+
+    local EXT=$1;
+    local CWD=$(basename $(pwd))
 
     ls | grep $EXT$ > /dev/null
 
@@ -73,8 +100,8 @@ jwffmeanbitrateEXT ()
         return
     fi
 
-    COUNT=0;
-    BRSUM=0;
+    local COUNT=0;
+    local BRSUM=0;
 
     for p in *.$EXT;
     do
@@ -84,8 +111,8 @@ jwffmeanbitrateEXT ()
         ((COUNT++));
     done;
 
-    BRAVG=`echo "scale=0; $BRSUM / $COUNT" | bc`;
-    SUFFIX=$(echo $FFPRO_OUTP | awk "{ print ( \$(NF) ) }");
+    local BRAVG=`echo "scale=0; $BRSUM / $COUNT" | bc`;
+    local SUFFIX=$(echo $FFPRO_OUTP | awk "{ print ( \$(NF) ) }");
 
     printf "$BRAVG $SUFFIX: $CWD";
     echo
@@ -94,18 +121,32 @@ jwffmeanbitrateEXT ()
 alias jwffmeanbitrate="jwffmeanbitrateEXT mp3"
 
 
-jwffaudioparamsEXT() {
-  EXT=$1
-  leadingws=80;
+jwffaudioparamsEXT()
+{
+    if [ $# -ne 1 ]
+    then
+cat 1>&2 <<EOF
 
-  for p in *.$EXT ; do
+$FUNCNAME EXT
 
-    ffpro_outp=$(ffprobe "$p" 2>&1 | grep Audio)
+    All files from the current location, that are of the type EXT, are examined in terms of their audio properties.
+    Information like sample rate, number of channels and bitrate is presented for each file.
 
-    printf "%$(echo $leadingws)s" "$p  ->"
-    echo " "$ffpro_outp
+EOF
+        return 1
+    fi
 
-  done
+    local EXT=$1
+    local leadingws=80;
+
+    for p in *.$EXT ; do
+
+        ffpro_outp=$(ffprobe "$p" 2>&1 | grep Audio)
+
+        printf "%$(echo $leadingws)s" "$p  ->"
+        echo " "$ffpro_outp
+
+    done
 }
 
 alias jwffaudioparams='jwffaudioparamsEXT mp3'
@@ -120,18 +161,32 @@ alias jwffaudioparams_wav='jwffaudioparamsEXT wav'
 alias jwffaudioparams_webm='jwffaudioparamsEXT webm'
 
 
-jwffvideoparamsEXT() {
-  EXT=$1
-  leadingws=80;
+jwffvideoparamsEXT()
+{
+    if [ $# -ne 1 ]
+    then
+cat 1>&2 <<EOF
 
-  for p in *.$EXT ; do
+$FUNCNAME EXT
 
-    ffpro_outp=$(ffprobe "$p" 2>&1 | grep Video)
+    All files from the current location, that are of the type EXT, are examined in terms of their video properties.
+    Many bits of information are presented, including codec details, resolution, screen proportions, frame rate etc.
 
-    printf "%$(echo $leadingws)s" "$p  ->"
-    echo " "$ffpro_outp
+EOF
+        return 1
+    fi
 
-  done
+    local EXT=$1
+    local leadingws=80;
+
+    for p in *.$EXT ; do
+
+        ffpro_outp=$(ffprobe "$p" 2>&1 | grep Video)
+
+        printf "%$(echo $leadingws)s" "$p  ->"
+        echo " "$ffpro_outp
+
+    done
 }
 
 alias jwffvideoparams_avi='jwffvideoparamsEXT avi'
@@ -144,41 +199,62 @@ alias jwffvideoparams_webm='jwffvideoparamsEXT webm'
 jwffprobe ()
 {
 
-  case $# in
-  "0")
-    echo " *** " $FUNCNAME "arg[s]"
-  ;;
-  "1")
-    ffprobe "$1" 2>&1 | egrep "Duration|Stream"
-  ;;
-  *)
-    for p in $@
-    do
-      echo $p:
-      ffprobe "$p" 2>&1 | egrep "Duration|Stream"
-      echo
-    done
-  ;;
-  esac
+    case $# in
+    "0")
+        echo ""
+        echo "$FUNCNAME arg1 [arg2 [...]]"
+        echo ""
+        echo "    The function uses the ffprobe tool to extract information regarding duration,"
+        echo "    audio stream and video stream from the given argument (or set of arguments)."
+        echo ""
+        return 1
+    ;;
+    "1")
+        ffprobe "$1" 2>&1 | egrep "Duration|Stream"
+    ;;
+    *)
+        for p in $@
+        do
+            echo $p:
+            ffprobe "$p" 2>&1 | egrep "Duration|Stream"
+            echo
+        done
+    ;;
+    esac
 
 }
 
 
-jwffgetvideoresolution() 
+jwffgetvideoresolution()
 {
-  local FFOUT=`ffprobe -v quiet -print_format csv -show_streams -select_streams v $1 | awk -F "," '{print $10 " " $11}'`
-  if [ $# -eq 1 ]; then
-    echo $FFOUT
-  elif [ $# -eq 2 ]; then
-    local WIDTH=`echo $FFOUT | awk '{print $1}'`
-    local HEIGHT=`echo $FFOUT | awk '{print $2}'`
-    local NEWWIDTH=$2
-    local NEWHEIGHT=`echo "$NEWWIDTH * $HEIGHT / $WIDTH" | bc`
-    [ `echo $NEWHEIGHT%2 | bc` -ne 0 ] && let NEWHEIGHT="$NEWHEIGHT-1"	# round to even (for x264)
-    echo "$NEWWIDTH":"$NEWHEIGHT"
-  else
-    echo "getvideoresolution name [desired-width]"
-  fi
+    if [ $# -eq 0 ]
+    then
+cat 1>&2 <<EOF
+
+$FUNCNAME  NAME  [DESIRED_WIDTH]
+
+    The function helps determining the resolution of a given video file.
+    In addition, a second parameter can be given, a desired width that the file
+    is supposed to have after some kind of transformation. For this
+    the function calculates the height necessary to maintain the aspect ratio.
+
+EOF
+        return 1
+    fi
+
+    local FFOUT=`ffprobe -v quiet -print_format csv -show_streams -select_streams v $1 | awk -F "," '{print $10 " " $11}'`
+    if [ $# -eq 1 ]; then
+        echo $FFOUT
+    elif [ $# -eq 2 ]; then
+        local WIDTH=`echo $FFOUT | awk '{print $1}'`
+        local HEIGHT=`echo $FFOUT | awk '{print $2}'`
+        local NEWWIDTH=$2
+        local NEWHEIGHT=`echo "$NEWWIDTH * $HEIGHT / $WIDTH" | bc`
+        [ `echo $NEWHEIGHT%2 | bc` -ne 0 ] && let NEWHEIGHT="$NEWHEIGHT-1"  # round to even (for x264)
+        echo "$NEWWIDTH":"$NEWHEIGHT"
+    else
+        echo "getvideoresolution name [desired-width]"
+    fi
 }
 
 jwffrozdzialki ()
@@ -213,7 +289,7 @@ MP4 -> JPG (15/s):
 back to video:
  ffmpeg -i input-%05d.jpg -r 15 -q:v 2 output.mpeg
 
-montaz video poklatkowego z arbitralnych obrazkow:
+timelapse-like video composition from a set of arbitrary images:
  ffmpeg -framerate 2 -i klatka_%05d.jpg -q:v 0 -r 30 output.mpeg
  ffmpeg -i output.mpeg -q:v 0 output.avi
  rm output.mpeg
@@ -378,9 +454,10 @@ jwffcutframe()
     if [ $# -ne 1 ]; then
 cat 1>&2 <<EOF
 
- ./$FUNCNAME  clip_name
+ ./$FUNCNAME  CLIP_NAME
 
    Cuts frame from clip at 10s, 60s and 5m (if long enough).
+   Saves the results as JPG images.
 
 EOF
         return 1
@@ -422,17 +499,17 @@ jwffcropfilter ()
     if [ $# -ne 4 ]; then
 cat 1>&2 <<EOF
 
+$FUNCNAME  RECT_WIDTH  RECT_HEIGHT  TOPLEFT_X  TOPLEFT_Y
 
- Crop filter for ffmpeg.
-
- -filter:v "crop=w:h:x:y"
-
-  w:    the width of the output rectangle,
-  h:    the height of the output rectangle,
-  x:    the top left corner: X
-  y:    the top left corner: Y
-
- ./$FUNCNAME  rect_width  rect_height  topleft_x  topleft_y
+    Crop filter for ffmpeg.
+    For the video files that will be cropped this function generates the appropriate command fragment.
+   
+    -filter:v "crop=w:h:x:y"
+   
+     w:    the width of the output rectangle,
+     h:    the height of the output rectangle,
+     x:    the top left corner: X
+     y:    the top left corner: Y
 
 EOF
         return 1
@@ -451,49 +528,50 @@ EOF
 }
 
 
+# probably obsolete
 jwffblender-postencode ()
 {
   if [ $# -ne 1 ]; then
-    echo "  Nazwę pliczku podaj. Zakłada kontener AVI."
+    echo "  Filename argument required. The AVI container is assumed."
     return 1
   fi
 
-  NAZWA_PLIKU=$1
-  NAZWA_PLIKU_NOEXT=${NAZWA_PLIKU%.avi}
+  local FILENAME=$1
+  local FILENAME_NOEXT=${FILENAME%.avi}
 
   echo
 
-  echo "# rozdzielczosc nieruszana"
+  echo "# resolution not changed"
 
-  NAZWA_PLIKU_2="$NAZWA_PLIKU_NOEXT""_02.avi"
-  NAZWA_PLIKU_3="$NAZWA_PLIKU_NOEXT""_03.avi"
-  NAZWA_PLIKU_4="$NAZWA_PLIKU_NOEXT""_04.avi"
-  NAZWA_PLIKU_4MP4="$NAZWA_PLIKU_NOEXT""_04-crf.mp4"
+  local FILENAME_2="$FILENAME_NOEXT""_02.avi"
+  local FILENAME_3="$FILENAME_NOEXT""_03.avi"
+  local FILENAME_4="$FILENAME_NOEXT""_04.avi"
+  local FILENAME_4MP4="$FILENAME_NOEXT""_04-crf.mp4"
 
   echo 
 
-  echo "ffmpeg -i $NAZWA_PLIKU    -q:v 0 -q:a 0           $NAZWA_PLIKU_2"
-  echo "ffmpeg -i $NAZWA_PLIKU_2 -q:v 0 -q:a 0           $NAZWA_PLIKU_3"
-  echo "ffmpeg -i $NAZWA_PLIKU_3 -q:v 4 -q:a 0 -ar 44100 $NAZWA_PLIKU_4"
-  echo "ffmpeg -i $NAZWA_PLIKU_3 -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k -ar 44100 -ac 2 -sn -strict experimental $NAZWA_PLIKU_4MP4"
-  echo "rm $NAZWA_PLIKU_2"
-  echo "rm $NAZWA_PLIKU_3"
+  echo "ffmpeg -i $FILENAME    -q:v 0 -q:a 0           $FILENAME_2"
+  echo "ffmpeg -i $FILENAME_2 -q:v 0 -q:a 0           $FILENAME_3"
+  echo "ffmpeg -i $FILENAME_3 -q:v 4 -q:a 0 -ar 44100 $FILENAME_4"
+  echo "ffmpeg -i $FILENAME_3 -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k -ar 44100 -ac 2 -sn -strict experimental $FILENAME_4MP4"
+  echo "rm $FILENAME_2"
+  echo "rm $FILENAME_3"
   echo 
 
 
-  echo "# rozdzielczosc -> 960"
+  echo "# resolution scaled to 960:XXX"
 
-  NAZWA_PLIKU_NOEXT_960="$NAZWA_PLIKU_NOEXT""_960"
+  local FILENAME_NOEXT_960="$FILENAME_NOEXT""_960"
 
-  NAZWA_PLIKU_960_2="$NAZWA_PLIKU_NOEXT_960""_02.avi"
-  NAZWA_PLIKU_960_3="$NAZWA_PLIKU_NOEXT_960""_03.avi"
-  NAZWA_PLIKU_960_4="$NAZWA_PLIKU_NOEXT_960""_04.avi"
+  local FILENAME_960_2="$FILENAME_NOEXT_960""_02.avi"
+  local FILENAME_960_3="$FILENAME_NOEXT_960""_03.avi"
+  local FILENAME_960_4="$FILENAME_NOEXT_960""_04.avi"
 
-  echo "ffmpeg -i $NAZWA_PLIKU                         -q:v 0 -q:a 0           $NAZWA_PLIKU_960_2"
-  echo "ffmpeg -i $NAZWA_PLIKU_960_2                  -q:v 0 -q:a 0           $NAZWA_PLIKU_960_3"
-  echo "ffmpeg -i $NAZWA_PLIKU_960_3 -vf scale=960:-1 -q:v 4 -q:a 0 -ar 44100 $NAZWA_PLIKU_960_4"
-  echo "rm $NAZWA_PLIKU_960_2"
-  echo "rm $NAZWA_PLIKU_960_3"
+  echo "ffmpeg -i $FILENAME                         -q:v 0 -q:a 0           $FILENAME_960_2"
+  echo "ffmpeg -i $FILENAME_960_2                  -q:v 0 -q:a 0           $FILENAME_960_3"
+  echo "ffmpeg -i $FILENAME_960_3 -vf scale=960:-1 -q:v 4 -q:a 0 -ar 44100 $FILENAME_960_4"
+  echo "rm $FILENAME_960_2"
+  echo "rm $FILENAME_960_3"
   echo 
 }
 
@@ -502,54 +580,57 @@ jwffblender-postencode ()
 
 jwffmpgrotateCW () 
 { 
-  if [ $# -ne 1 ]; then
-    echo "  Rotating INPLACE by 90deg"
-    echo "  ${FUNCNAME[0]} plikIN.mpg" 1>&2
-    return
-  fi
-  IN=$1
-  OUT="temp_.$$.mpg"
-  echo ffmpeg -i $IN -vf "transpose=1" -qscale 0 $OUT
-  echo
-  sleep 1
-  ffmpeg -i $IN -vf "transpose=1" -qscale 0 $OUT
-  mv -v $OUT $IN
+    if [ $# -ne 1 ]; then
+        echo "  Rotating INPLACE by 90deg clockwise"
+        echo "  ${FUNCNAME[0]} plikIN.mpg" 1>&2
+        return
+    fi
+    IN=$1
+    OUT="temp_.$$.mpg"
+    echo ffmpeg -i $IN -vf "transpose=1" -qscale 0 $OUT
+    echo
+    sleep 1
+    ffmpeg -i $IN -vf "transpose=1" -qscale 0 $OUT
+    mv -v $OUT $IN
 }
 
 jwffmpgrotateCCW () 
 { 
-  if [ $# -ne 1 ]; then
-    echo "  Rotating INPLACE by 90deg"
-    echo "  ${FUNCNAME[0]} plikIN.mpg" 1>&2
-    return
-  fi
-  IN=$1
-  OUT="temp_.$$.mpg"
-  echo ffmpeg -i $IN -vf "transpose=2" -qscale 0 $OUT
-  echo
-  sleep 1
-  ffmpeg -i $IN -vf "transpose=2" -qscale 0 $OUT
-  mv -v $OUT $IN
+    if [ $# -ne 1 ]; then
+        echo "  Rotating INPLACE by 90deg counterclockwise"
+        echo "  ${FUNCNAME[0]} plikIN.mpg" 1>&2
+        return
+    fi
+    IN=$1
+    OUT="temp_.$$.mpg"
+    echo ffmpeg -i $IN -vf "transpose=2" -qscale 0 $OUT
+    echo
+    sleep 1
+    ffmpeg -i $IN -vf "transpose=2" -qscale 0 $OUT
+    mv -v $OUT $IN
 }
 
 
 jwffcropclip ()
 {
-  if [ $# -ne 3 ]; then
-    echo
-    echo " *** $0 KLIP OD DO"
-    echo "     (w miejscu!)"
-    echo
-    return 1
-  fi
+    if [ $# -ne 3 ]; then
+        echo
+        echo "$FUNCNAME  CLIPNAME  FROM  TO"
+        echo
+        echo "    A small convenience function for trimming the length of a video file,"
+        echo "    discarding some time from the beginning and the end."
+        echo "    The processing is IN PLACE."
+        echo
+        return 1
+    fi
 
-  local PLIK=$1
-  local OD=$2
-  local DO=$3
-  local EXT="${PLIK##*.}"
+    local FILENAME=$1
+    local OD=$2
+    local DO=$3
+    local EXT="${FILENAME##*.}"
 
-  local TEMP="temp-$$.$EXT"
+    local TEMP="temp-$$.$EXT"
 
-  echo "ffmpeg -i \"$PLIK\" -ss $OD -to $DO -c:v copy -c:a copy $TEMP && mv $TEMP \"$PLIK\""
+    echo "ffmpeg -i \"$FILENAME\" -ss $OD -to $DO -c:v copy -c:a copy $TEMP && mv $TEMP \"$FILENAME\""
 }
 

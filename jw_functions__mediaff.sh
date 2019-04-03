@@ -466,7 +466,7 @@ EOF
 
     local CLIP=$1
 
-    local CMD_TEMPLATE="ffmpeg -i __INPUT__ -ss __POINT__ -t 1 -q:v 0 -r 1 -f image2 __OUTPUT__"
+    local CMD_TEMPLATE="ffmpeg -i __INPUT__ -ss __POINT__ -t 1 -q:v 0 -r 1 -f image2 __OUTPUT__ ;"
 
     local POINT1=10
     local POINT2=60

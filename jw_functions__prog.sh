@@ -41,3 +41,25 @@ jwpyreverse ()
     echo
 }
 
+jwgit ()
+{
+    cat 1>&2 <<'EOF'
+
+# This is Git's per-user configuration file.
+# (od Maćka A.)
+[user]
+    email =
+    name =
+[includeif "gitdir:~/dev/work/"]
+    path = .gitconfig.work
+[alias]
+    ci = commit
+    autoci = "!f() { for i in $(seq $1);\
+do \
+    msg=$(curl -s https://whatthecommit.com/index.txt); \
+    git commit --allow-empty -m \"$msg\"; \
+done \
+}; f"
+
+EOF
+}

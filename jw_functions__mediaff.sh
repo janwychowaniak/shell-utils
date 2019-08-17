@@ -631,6 +631,10 @@ jwffcropclip ()
 
     local TEMP="temp-$$.$EXT"
 
-    echo "ffmpeg -i \"$FILENAME\" -ss $OD -to $DO -c:v copy -c:a copy $TEMP && mv $TEMP \"$FILENAME\""
+    if [ $OD == "0" ]; then
+        echo "ffmpeg -i \"$FILENAME\" -to $DO -c:v copy -c:a copy $TEMP && mv $TEMP \"$FILENAME\""
+    else
+        echo "ffmpeg -i \"$FILENAME\" -ss $OD -to $DO -c:v copy -c:a copy $TEMP && mv $TEMP \"$FILENAME\""
+    fi
 }
 

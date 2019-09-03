@@ -80,3 +80,26 @@ jwtvcrop()
     esac
 }
 
+
+jwdatereverse()
+(
+	__jwjoinby() { local IFS="$1"; shift; echo "$*"; }
+
+	IFS='-' read -r -a array <<<$1
+	
+	min=0
+	max=$(( ${#array[@]} -1 ))
+
+	while [[ min -lt max ]]
+	do
+	    # Swap current first and last elements
+	    x="${array[$min]}"
+	    array[$min]="${array[$max]}"
+	    array[$max]="$x"
+	
+	    # Move closer
+	    (( min++, max-- ))
+	done
+	
+	echo $(__jwjoinby - ${array[@]})
+)

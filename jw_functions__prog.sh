@@ -1,4 +1,5 @@
-# A collection of miscellaneous tools and convenience functions that are helpful for some programming related tasks
+# A collection of miscellaneous tools and convenience functions that are helpful for some programming related tasks.
+# Some are just notes on how to use certain tools.
 
 
 jwcincludegraph()
@@ -12,6 +13,8 @@ jwcincludegraph()
 
 jwcoflo()
 {
+    # C and C++ Control Flow Graph Generator and Analyzer
+    # [http://coflo.sourceforge.net]
     if [ $# -lt 1 ]
     then
         local NAZWA="NAZWA"
@@ -25,8 +28,13 @@ jwcoflo()
     echo "eom $NAZWA.png"
 }
 
+# python ####################################################################################################################################
+#
 jwpycallgraph ()
 {
+    echo
+    echo '  # (pip3 install pycallgraph)'
+    echo '  # [docs: http://pycallgraph.slowchop.com/]'
     echo
     echo '  pycallgraph  graphviz -- ./testing.py '
     echo '  pycallgraph --exclude "logging*" --exclude "unittest*" --exclude "re*" --exclude "sre_*" graphviz -- ./testing.py '
@@ -37,9 +45,22 @@ jwpycallgraph ()
 jwpyreverse ()
 {
     echo
-    echo '  pyreverse -o png -p project_name ./testing.py'
+    echo '  # (from pylint3)'
+    echo '  pyreverse3 -o png -p PROJECT_NAME ./testing.py'
     echo
 }
+
+jwpyan ()
+{
+    echo
+    echo '# [https://github.com/davidfraser/pyan]'
+    echo '# [git clone https://github.com/davidfraser/pyan.git]'
+    echo 'pyan.py *.py  --uses --no-defines --colored --grouped --annotated --dot > myuses.dot'
+    echo 'dot -Tsvg myuses.dot > myuses.svg'
+    echo
+}
+#
+#############################################################################################################################################
 
 jwgit ()
 {

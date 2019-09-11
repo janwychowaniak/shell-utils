@@ -59,6 +59,16 @@ jwpyan ()
     echo 'dot -Tsvg myuses.dot > myuses.svg'
     echo
 }
+
+jwautopep8 ()
+{
+    FILEPARAM=${1:-SCRIPT.py}
+    echo
+    echo '  # [https://github.com/hhatto/autopep8]'
+    echo "  autopep8 --in-place --aggressive $FILEPARAM"
+    echo "  autopep8 --in-place --aggressive --aggressive $FILEPARAM"
+    echo
+}
 #
 #############################################################################################################################################
 

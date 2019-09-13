@@ -32,31 +32,37 @@ jwcoflo()
 #
 jwpycallgraph ()
 {
+    FILEPARAM=${1:-SCRIPT.py}
     echo
-    echo '  # (pip3 install pycallgraph)'
-    echo '  # [docs: http://pycallgraph.slowchop.com/]'
+    echo "  # (pip3 install pycallgraph)"
+    echo "  # [docs: http://pycallgraph.slowchop.com/]"
     echo
-    echo '  pycallgraph  graphviz -- ./testing.py '
-    echo '  pycallgraph --exclude "logging*" --exclude "unittest*" --exclude "re*" --exclude "sre_*" graphviz -- ./testing.py '
-    echo '  pycallgraph --include "pkg_srv*" --include "pkg_shared*" --include "*module*" --exclude "unittest*" graphviz -- ./testing.py'
+    echo "pycallgraph  graphviz -- $FILEPARAM "
+    echo "pycallgraph --exclude \"logging*\" --exclude \"unittest*\" --exclude \"re*\" --exclude \"sre_*\" graphviz -- $FILEPARAM "
+    echo "pycallgraph --include \"pkg_srv*\" --include \"pkg_shared*\" --include \"*module*\" --exclude \"unittest*\" graphviz -- $FILEPARAM"
     echo
 }
 
 jwpyreverse ()
 {
+    FILEPARAM=${1:-SCRIPT.py}
+    PROJECTPARAM=${1:-PROJECT_NAME}
+    PROJECTPARAM_NOEXT=`basename $PROJECTPARAM .py`
     echo
     echo '  # (from pylint3)'
-    echo '  pyreverse3 -o png -p PROJECT_NAME ./testing.py'
+    echo "pyreverse3 -o png -p ${PROJECTPARAM_NOEXT^^} $FILEPARAM"
     echo
 }
 
 jwpyan ()
 {
+    OUTPUTPARAM=${1:-OUTPUT}
     echo
-    echo '# [https://github.com/davidfraser/pyan]'
-    echo '# [git clone https://github.com/davidfraser/pyan.git]'
-    echo 'pyan.py *.py  --uses --no-defines --colored --grouped --annotated --dot > myuses.dot'
-    echo 'dot -Tsvg myuses.dot > myuses.svg'
+    echo '  # [https://github.com/davidfraser/pyan]'
+    echo '  # [git clone https://github.com/davidfraser/pyan.git]'
+    echo
+    echo "pyan.py *.py  --uses --no-defines --colored --grouped --annotated --dot > $OUTPUTPARAM.dot"
+    echo "dot -Tsvg $OUTPUTPARAM.dot > $OUTPUTPARAM.svg"
     echo
 }
 
@@ -65,8 +71,8 @@ jwautopep8 ()
     FILEPARAM=${1:-SCRIPT.py}
     echo
     echo '  # [https://github.com/hhatto/autopep8]'
-    echo "  autopep8 --in-place --aggressive $FILEPARAM"
-    echo "  autopep8 --in-place --aggressive --aggressive $FILEPARAM"
+    echo "autopep8 --in-place --aggressive $FILEPARAM"
+    echo "autopep8 --in-place --aggressive --aggressive $FILEPARAM"
     echo
 }
 #

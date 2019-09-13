@@ -56,13 +56,17 @@ jwpyreverse ()
 
 jwpyan ()
 {
+    INPUTPARAM=${1:-*.py}
     OUTPUTPARAM=${1:-OUTPUT}
+    OUTPUTPARAM_NOEXT=`basename $OUTPUTPARAM .py`
+    OUTPUTPARAM_NOEXT_UPP=${OUTPUTPARAM_NOEXT^^}
     echo
     echo '  # [https://github.com/davidfraser/pyan]'
     echo '  # [git clone https://github.com/davidfraser/pyan.git]'
     echo
-    echo "pyan.py *.py  --uses --no-defines --colored --grouped --annotated --dot > $OUTPUTPARAM.dot"
-    echo "dot -Tsvg $OUTPUTPARAM.dot > $OUTPUTPARAM.svg"
+    echo "pyan.py $INPUTPARAM --uses --no-defines --colored --grouped --annotated --dot > $OUTPUTPARAM_NOEXT_UPP.dot"
+    echo "dot -Tsvg $OUTPUTPARAM_NOEXT_UPP.dot > $OUTPUTPARAM_NOEXT_UPP.svg"
+    echo "rm $OUTPUTPARAM_NOEXT_UPP.dot"
     echo
 }
 

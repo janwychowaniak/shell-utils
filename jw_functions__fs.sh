@@ -455,7 +455,8 @@ EOF
 jwbackupfile ()
 {
 
-  local SUFFIX="`date +%Y-%m-%d_%H:%M:%S`__.BAK"
+  local TS=$(date +%s)
+  local SUFFIX="BAK-$TS"
 
   case $# in
   "0")
@@ -465,7 +466,7 @@ jwbackupfile ()
   *)
     for p in $@ # TODO: enable the function tell the difference between a file and a directory
     do
-      cp -v "$p" "$p"__$SUFFIX
+      echo cp -v "$p" "$p.$SUFFIX ;"
     done
   ;;
   esac

@@ -82,7 +82,7 @@ jwautopep8 ()
 #
 #############################################################################################################################################
 
-jwgit ()
+jwgituserconf ()
 {
     cat 1>&2 <<'EOF'
 
@@ -103,4 +103,18 @@ done \
 }; f"
 
 EOF
+}
+
+jwgitclean ()
+{
+    if [ -f ".gitignore" ]
+    then
+        while read line; do echo "rm -r $line ;" ; done < .gitignore
+        echo "rm .gitignore ;"
+    else
+        echo "no '.gitignore'"
+    fi
+    echo
+
+    find . -name ".gitignore" -exec echo "# -> {}" \; | grep --color=auto --color=ALWAYS ".gitignore"
 }

@@ -13,6 +13,7 @@ alias jwmount_l='mount | grep ^\/dev'
 
 alias jwytgrep='grep -o [^\"]*\/\watch\?v\=[^\&\"]*'
 
-alias jwsl='screen -ls'
+alias jwsl="screen -ls | grep \"^[[:space:]]\" | tr \".\" \" \" | awk '{print \"   \" \$2}' | sort"
+alias jwsl_l='screen -ls'
 alias jwsr='screen -r'
 alias jwss='screen -S'

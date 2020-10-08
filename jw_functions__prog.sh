@@ -49,7 +49,8 @@ jwpyreverse ()
     PROJECTPARAM=${1:-PROJECT_NAME}
     PROJECTPARAM_NOEXT=`basename $PROJECTPARAM .py`
     echo
-    echo '  # (from pylint3)'
+    echo '  # UML diagram generator from pylint3.'
+    echo
     echo "pyreverse3 -o png -p ${PROJECTPARAM_NOEXT^^} $FILEPARAM"
     echo
 }
@@ -61,6 +62,7 @@ jwpyan ()
     OUTPUTPARAM_NOEXT=`basename $OUTPUTPARAM .py`
     OUTPUTPARAM_NOEXT_UPP=${OUTPUTPARAM_NOEXT^^}
     echo
+    echo '  # Approximate call graphs for Python programs based on a (rather superficial) static analysis.'
     echo '  # [https://github.com/davidfraser/pyan]'
     echo '  # [git clone https://github.com/davidfraser/pyan.git]'
     echo
@@ -74,7 +76,9 @@ jwautopep8 ()
 {
     FILEPARAM=${1:-SCRIPT.py}
     echo
+    echo '  # PEP8-style formatter.'
     echo '  # [https://github.com/hhatto/autopep8]'
+    echo
     echo "autopep8 --in-place --aggressive $FILEPARAM"
     echo "autopep8 --in-place --aggressive --aggressive $FILEPARAM"
     echo

@@ -56,28 +56,6 @@ EOF
 }
 
 
-jwfind ()
-{
-
-    if [ $# -ne 1 ] || ([ $# -eq 1 ] && ([ "$1" == "-h" ] || [ "$1" == "-help" ] || [ "$1" == "--help" ]))
-    then
-cat 1>&2 <<EOF
-
-$FUNCNAME SEARCHED_PHRASE
-
-    A convenience wrapper for the "find" program. Starts from the current location and searches
-    recursively down for items, the names of which include the given phrase.
-    The search is case insensitive.
-
-EOF
-        return 1
-    fi
-
-    SEARCHEDFOR=$1
-    find . -iname \*"$SEARCHEDFOR"\* | grep --color=ALWAYS -i "$SEARCHEDFOR"    # "--color=ALWAYS" gives highlightingof the match
-}
-
-
 jwbatchmv ()
 {
     if [ $# -ne 1 ] && [ $# -ne 2 ]
@@ -179,6 +157,186 @@ EOF
             mv -i -v "$fsitem" "$unpl_fsitem"
         fi
     done
+}
+
+
+jwscanexts ()
+{
+
+    if [ $# -ne 0 ]
+    then
+cat 1>&2 <<EOF
+
+$FUNCNAME
+
+    Prints all the extensions, that the files in the current location and recursively down end with.
+    Scans the subtree for file types, in other words.
+
+EOF
+        return 1
+    fi
+
+    find . -type f | perl -ne 'print $1 if m/\.([^.\/]+)$/' | sort -u
+
+}
+
+
+jwwysyp () 
+{
+    if [ $# -ne 0 ]
+    then
+cat 1>&2 <<EOF
+
+$FUNCNAME
+
+    The function reaches into all the directories in the current location, brings their contents
+    one level up (i.e. to the current location), then deletes those now empty directories.
+    The directory structures having existed within all that directories, from their level down, are preserved.
+
+EOF
+        return 1
+    fi
+
+    for p in `ls`;
+    do
+        [ -d "$p" ] && mv "$p"/* . && rmdir "$p";
+    done
+}
+
+
+jwlabelhere () 
+{ 
+
+    if [ $# -ne 0 ]
+    then
+cat 1>&2 <<EOF
+
+$FUNCNAME
+
+    The function prepends the names of all the files and directories
+    in the current location with the name of the current directory.
+
+EOF
+        return 1
+    fi
+
+    ### ~ mass effect: ~ ##########################################################
+    ### for f in `ls` ; do [ -d "$f" ] && cd "$f" && jwlabelhere && cd - ; done ###
+    ###############################################################################
+    for p in `ls`;
+    do
+        mv $p "$(basename `pwd`)__$p";
+    done
+
+}
+
+
+jwstats ()
+{
+    if [ $# -ne 0 ]
+    then
+cat 1>&2 <<EOF
+
+$FUNCNAME
+
+    The function presents some basic statistics of the current location:
+    the number files and directories in the subtree, as well as the disk space they occupy combined.
+
+EOF
+        return 1
+    fi
+
+    local FNUM=`find . -type f | wc -l`
+    local DNUM=`find . -type d | wc -l`
+    echo "files     : $FNUM"
+    echo "folders   : $DNUM"
+    echo "du -sh .  : `du -sh .`"
+    echo "du -sBM . : `du -sBM .`"
+
+}
+
+jwstatsl () 
+{
+
+    if [ $# -ne 0 ]
+    then
+cat 1>&2 <<EOF
+
+$FUNCNAME
+
+    The function presents some basic statistics of the current location:
+    the number files and directories in the subtree, as well as the disk space they occupy combined.
+    Additionally, each item in the current location prints its own size information.
+
+EOF
+        return 1
+    fi
+
+    local FNUM=`find . -type f | wc -l`; # TODO: duplicates code from jwstats
+    local DNUM=`find . -type d | wc -l`;
+    echo "files     : $FNUM";
+    echo "folders   : $DNUM";
+    echo "du -sh .  : `du -sh .`";
+    echo "du -sBM . : `du -sBM .`"
+    echo
+    du -ssBM *
+
+}
+
+
+jw1leveldeepfoldermielenie ()
+{
+cat 1>&2 <<'EOF'
+
+  for p in `ls`; do [ -d "$p" ] && cd $p && MIELENIE && cd - > /dev/null ; done
+
+EOF
+}
+
+
+jwbackupfile ()
+{
+
+  local TS=$(date +%s)
+  local SUFFIX="BAK-$TS"
+
+  case $# in
+  "0")
+    echo " *** $FUNCNAME arg[s]"
+    echo " Backups the given file, appending the name with current date and time."
+  ;;
+  *)
+    for p in $@ # TODO: enable the function tell the difference between a file and a directory
+    do
+      echo cp -v "$p" "$p.$SUFFIX ;"
+    done
+  ;;
+  esac
+
+}
+
+
+# --------------- finders ----------------------------------------------------------------
+
+jwfind ()
+{
+
+    if [ $# -ne 1 ] || ([ $# -eq 1 ] && ([ "$1" == "-h" ] || [ "$1" == "-help" ] || [ "$1" == "--help" ]))
+    then
+cat 1>&2 <<EOF
+
+$FUNCNAME SEARCHED_PHRASE
+
+    A convenience wrapper for the "find" program. Starts from the current location and searches
+    recursively down for items, the names of which include the given phrase.
+    The search is case insensitive.
+
+EOF
+        return 1
+    fi
+
+    SEARCHEDFOR=$1
+    find . -iname \*"$SEARCHEDFOR"\* | grep --color=ALWAYS -i "$SEARCHEDFOR"    # "--color=ALWAYS" gives highlightingof the match
 }
 
 
@@ -317,159 +475,35 @@ EOF
 }
 
 
-
-jwscanexts ()
-{
-
+jwfindnewestfiles() {
+    # [https://www.shellhacks.com/bash-colors/]
+    # [https://misc.flogisoft.com/bash/tip_colors_and_formatting]
     if [ $# -ne 0 ]
     then
 cat 1>&2 <<EOF
 
 $FUNCNAME
 
-    Prints all the extensions, that the files in the current location and recursively down end with.
-    Scans the subtree for file types, in other words.
+    This function searches for files only, ordering results by modification time,
+    then displaying a couple of the most recently modified.
+    The search is performed from the current location recursively down. No changes are made.
 
 EOF
         return 1
     fi
 
-    find . -type f | perl -ne 'print $1 if m/\.([^.\/]+)$/' | sort -u
+    local NEWEST=`find . -type f -printf "%T@ %TY-%Tm-%Td %TT  %p\n" | sort -nr | cut -d' ' -f 2- |  head -n 1`
+    local NEWEST_NAME=`echo $NEWEST | awk '{print $3}'`
+    local NEWEST_MTIME_D=`echo $NEWEST | awk '{print $1}'`
+    local NEWEST_MTIME_Thms=`echo $NEWEST | awk '{print $2}' | cut -d'.' -f 1`
+    local NEWEST_MTIME_Tss=`echo $NEWEST | awk '{print $2}' | cut -d'.' -f 2`
+    local NEWEST_MTIME_Tss3=`echo $(expr substr "${NEWEST_MTIME_Tss}" 1 3)`
 
+    local TOPX="5"
+
+    echo -en "Newest: \e[1;37m$NEWEST_NAME\e[0m  "
+    echo -e "[$NEWEST_MTIME_D $NEWEST_MTIME_Thms\e[2m.$NEWEST_MTIME_Tss3\e[22m]"
+
+    echo "------- <top $TOPX>:"
+    find . -type f -printf "%T@ [%TY-%Tm-%Td %TT]  %p\n" | sort -nr | cut -d' ' -f 2- |  head -n $TOPX
 }
-
-
-jwwysyp () 
-{
-    if [ $# -ne 0 ]
-    then
-cat 1>&2 <<EOF
-
-$FUNCNAME
-
-    The function reaches into all the directories in the current location, brings their contents
-    one level up (i.e. to the current location), then deletes those now empty directories.
-    The directory structures having existed within all that directories, from their level down, are preserved.
-
-EOF
-        return 1
-    fi
-
-    for p in `ls`;
-    do
-        [ -d "$p" ] && mv "$p"/* . && rmdir "$p";
-    done
-}
-
-
-jwlabelhere () 
-{ 
-
-    if [ $# -ne 0 ]
-    then
-cat 1>&2 <<EOF
-
-$FUNCNAME
-
-    The function prepends the names of all the files and directories
-    in the current location with the name of the current directory.
-
-EOF
-        return 1
-    fi
-
-    ### ~ mass effect: ~ ##########################################################
-    ### for f in `ls` ; do [ -d "$f" ] && cd "$f" && jwlabelhere && cd - ; done ###
-    ###############################################################################
-    for p in `ls`;
-    do
-        mv $p "$(basename `pwd`)__$p";
-    done
-
-}
-
-
-jwstats ()
-{
-    if [ $# -ne 0 ]
-    then
-cat 1>&2 <<EOF
-
-$FUNCNAME
-
-    The function presents some basic statistics of the current location:
-    the number files and directories in the subtree, as well as the disk space they occupy combined.
-
-EOF
-        return 1
-    fi
-
-    local FNUM=`find . -type f | wc -l`
-    local DNUM=`find . -type d | wc -l`
-    echo "files     : $FNUM"
-    echo "folders   : $DNUM"
-    echo "du -sh .  : `du -sh .`"
-    echo "du -sBM . : `du -sBM .`"
-
-}
-
-jwstats_l () 
-{
-
-    if [ $# -ne 0 ]
-    then
-cat 1>&2 <<EOF
-
-$FUNCNAME
-
-    The function presents some basic statistics of the current location:
-    the number files and directories in the subtree, as well as the disk space they occupy combined.
-    Additionally, each item in the current location prints its own size information.
-
-EOF
-        return 1
-    fi
-
-    local FNUM=`find . -type f | wc -l`; # TODO: duplicates code from jwstats
-    local DNUM=`find . -type d | wc -l`;
-    echo "files     : $FNUM";
-    echo "folders   : $DNUM";
-    echo "du -sh .  : `du -sh .`";
-    echo "du -sBM . : `du -sBM .`"
-    echo
-    du -ssBM *
-
-}
-
-
-jw1leveldeepfoldermielenie ()
-{
-cat 1>&2 <<'EOF'
-
-  for p in `ls`; do [ -d "$p" ] && cd $p && MIELENIE && cd - > /dev/null ; done
-
-EOF
-}
-
-
-jwbackupfile ()
-{
-
-  local TS=$(date +%s)
-  local SUFFIX="BAK-$TS"
-
-  case $# in
-  "0")
-    echo " *** $FUNCNAME arg[s]"
-    echo " Backups the given file, appending the name with current date and time."
-  ;;
-  *)
-    for p in $@ # TODO: enable the function tell the difference between a file and a directory
-    do
-      echo cp -v "$p" "$p.$SUFFIX ;"
-    done
-  ;;
-  esac
-
-}
-

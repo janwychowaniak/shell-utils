@@ -4,6 +4,7 @@
 export EDITOR=vim
 
 alias diff='colordiff'
+alias jwwdiff="wdiff -n -w $'\033[30;41m' -x $'\033[0m'  -y $'\033[30;42m' -z $'\033[0m'"
 alias jwdate='date +%Y-%m-%d'
 alias jwdate_l='echo && echo -n "Today:  " && date +%Y-%m-%d && echo && ncal -M && echo'
 alias grep='grep --color=auto'

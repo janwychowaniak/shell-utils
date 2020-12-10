@@ -316,7 +316,10 @@ jwbackupfile ()
 }
 
 
+
+# ----------------------------------------------------------------------------------------
 # --------------- finders ----------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 
 jwfind ()
 {
@@ -478,11 +481,11 @@ EOF
 jwfindnewestfiles() {
     # [https://www.shellhacks.com/bash-colors/]
     # [https://misc.flogisoft.com/bash/tip_colors_and_formatting]
-    if [ $# -ne 0 ]
+    if [ $# -ne 0 ] && [ $# -ne 1 ]
     then
 cat 1>&2 <<EOF
 
-$FUNCNAME
+$FUNCNAME  [top_results]
 
     This function searches for files only, ordering results by modification time,
     then displaying a couple of the most recently modified.
@@ -492,6 +495,13 @@ EOF
         return 1
     fi
 
+    #
+    local white="\e[1;37m"
+    local wnc="\e[0m"
+    local dgrey="\e[2m"
+    local dgwnc="\e[22m"
+    #
+
     local NEWEST=`find . -type f -printf "%T@ %TY-%Tm-%Td %TT  %p\n" | sort -nr | cut -d' ' -f 2- |  head -n 1`
     local NEWEST_NAME=`echo $NEWEST | awk '{print $3}'`
     local NEWEST_MTIME_D=`echo $NEWEST | awk '{print $1}'`
@@ -499,10 +509,10 @@ EOF
     local NEWEST_MTIME_Tss=`echo $NEWEST | awk '{print $2}' | cut -d'.' -f 2`
     local NEWEST_MTIME_Tss3=`echo $(expr substr "${NEWEST_MTIME_Tss}" 1 3)`
 
-    local TOPX="5"
+    local TOPX=${1:-8}
 
-    echo -en "Newest: \e[1;37m$NEWEST_NAME\e[0m  "
-    echo -e "[$NEWEST_MTIME_D $NEWEST_MTIME_Thms\e[2m.$NEWEST_MTIME_Tss3\e[22m]"
+    echo -en "Newest: $white$NEWEST_NAME$wnc  "
+    echo -e "[$white$NEWEST_MTIME_D$wnc $NEWEST_MTIME_Thms$dgrey.$NEWEST_MTIME_Tss3$dgwnc]"
 
     echo "------- <top $TOPX>:"
     find . -type f -printf "%T@ [%TY-%Tm-%Td %TT]  %p\n" | sort -nr | cut -d' ' -f 2- |  head -n $TOPX

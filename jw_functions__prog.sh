@@ -57,7 +57,7 @@ jwpyreverse ()
 
 jwpyan ()
 {
-    INPUTPARAM=${1:-*.py}
+    INPUTPARAM=${@:-*.py}
     OUTPUTPARAM=${1:-OUTPUT}
     OUTPUTPARAM_NOEXT=`basename $OUTPUTPARAM .py`
     OUTPUTPARAM_NOEXT_UPP=${OUTPUTPARAM_NOEXT^^}

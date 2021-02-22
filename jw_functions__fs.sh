@@ -1,6 +1,10 @@
 # A collection of miscellaneous file naming manipulation and file system related functions
 
 
+jwdiff() {
+    wdiff -n $1 $2 | colordiff
+}
+
 jwodspacjacz ()
 {
     if [ $# -ne 0 ]

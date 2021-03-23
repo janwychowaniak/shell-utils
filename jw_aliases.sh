@@ -11,6 +11,7 @@ alias grep='grep --color=auto'
 alias jwshred='shred --iterations=0 --zero --remove --verbose'
 alias jwmount="mount | grep ^\/dev | awk '{print \$1 \" -> \" \$3}'"
 alias jwmountl='mount | grep ^\/dev'
+alias jwdf4='df -hT | grep ext4'
 
 alias jwytgrep='grep -o [^\"]*\/\watch\?v\=[^\&\"]*'
 

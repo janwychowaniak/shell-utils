@@ -2,6 +2,12 @@
 # Some are just notes on how to use certain tools.
 
 
+alias jwvv="python3 -m venv venv"
+alias jwva="source venv/bin/activate"
+
+# ------------------------------------
+
+
 jwcincludegraph()
 {
     jwcinclude2dot > includegraph.$$.dot

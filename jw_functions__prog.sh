@@ -2,12 +2,14 @@
 # Some are just notes on how to use certain tools.
 
 
-alias jwvv="python3 -m venv venv"
-alias jwva="source venv/bin/activate"
+alias jwvec__create-virtualenv="python3 -m venv venv"
+alias jwvea__activate-virtualenv="source venv/bin/activate"
 
-# ------------------------------------
+# --------------------------------------------------------
 
 
+# C and C++ #################################################################################################################################
+#
 jwcincludegraph()
 {
     jwcinclude2dot > includegraph.$$.dot
@@ -33,10 +35,10 @@ jwcoflo()
     echo "dot -Tpng $NAZWA.dot -o $NAZWA.png &&"
     echo "eom $NAZWA.png"
 }
-
+#
 # python ####################################################################################################################################
 #
-jwpycallgraph ()
+jwpyc__pycallgraph()
 {
     FILEPARAM=${1:-SCRIPT.py}
     echo
@@ -49,7 +51,7 @@ jwpycallgraph ()
     echo
 }
 
-jwpyreverse ()
+jwpyr__pyreverse()
 {
     FILEPARAM=${1:-SCRIPT.py}
     PROJECTPARAM=${1:-PROJECT_NAME}
@@ -61,7 +63,7 @@ jwpyreverse ()
     echo
 }
 
-jwpyan ()
+jwpya__pyan()
 {
     INPUTPARAM=${@:-*.py}
     OUTPUTPARAM=${1:-OUTPUT}
@@ -78,7 +80,7 @@ jwpyan ()
     echo
 }
 
-jwautopep8 ()
+jwpy8__autopep8()
 {
     FILEPARAM=${1:-SCRIPT.py}
     echo
@@ -90,13 +92,13 @@ jwautopep8 ()
     echo
 }
 #
-#############################################################################################################################################
-
-jwgituserconf ()
+# git #######################################################################################################################################
+#
+jwgiu__git-user-config()
 {
     cat 1>&2 <<'EOF'
 
-# This is Git's per-user configuration file.
+# This is Git's per-user configuration file example bits (~/.gitconfig).
 # (od Maćka A.)
 [user]
     email =
@@ -115,7 +117,7 @@ done \
 EOF
 }
 
-jwgitclean ()
+jwgic__git-clean-ignored()
 {
     if [ -f ".gitignore" ]
     then
@@ -128,3 +130,5 @@ jwgitclean ()
 
     find . -name ".gitignore" -exec echo "# -> {}" \; | grep --color=auto --color=ALWAYS ".gitignore"
 }
+#
+#############################################################################################################################################

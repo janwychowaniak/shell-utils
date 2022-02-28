@@ -4,6 +4,7 @@
 
 alias jwvec__create-virtualenv="python3 -m venv venv"
 alias jwvea__activate-virtualenv="source venv/bin/activate"
+alias jwpyl__pylint3-dRC="pylint3 -d R,C"
 
 # --------------------------------------------------------
 

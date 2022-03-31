@@ -4,7 +4,7 @@
 # --------------------------------------------------------------------------------------
 
 
-jwmogrify ()
+jwimmogrify ()
 {
 cat 1>&2 <<'EOF'
 
@@ -185,7 +185,7 @@ EOF
 }
 
 
-jwcompressjpg65 () 
+jwimcompressjpg65 () 
 {
     if [ $# -ne 0 ]
     then
@@ -202,4 +202,39 @@ EOF
 
     for p in *.jpg; do echo "$p"; mogrify -strip -interlace Plane -quality 65% "$p"; done
 }
+
+
+jwimconvertbrightnesscontrast ()
+{
+    if [ $# -ne 1 ]; then
+cat 1>&2 <<EOF
+
+$FUNCNAME SRCFILE
+
+    A couple of versions of the input file specified by SRCFILE are generated,
+    varying in the levels of brightness and contrast.
+
+EOF
+        return 1
+    fi
+
+    local SRCFILE=$1
+
+    local extension="${SRCFILE##*.}"
+    local filename_noext="${SRCFILE%.*}"
+
+    echo "filename_noext : $filename_noext"
+    echo "extension      : $extension"
+
+    convert -brightness-contrast  0x0  "$SRCFILE" /tmp/"${filename_noext}__00x00.${extension}" && echo " -> /tmp/${filename_noext}__00x00.${extension}"
+    convert -brightness-contrast 10x10 "$SRCFILE" /tmp/"${filename_noext}__10x10.${extension}" && echo " -> /tmp/${filename_noext}__10x10.${extension}"
+    convert -brightness-contrast 20x20 "$SRCFILE" /tmp/"${filename_noext}__20x20.${extension}" && echo " -> /tmp/${filename_noext}__20x20.${extension}"
+    convert -brightness-contrast 30x30 "$SRCFILE" /tmp/"${filename_noext}__30x30.${extension}" && echo " -> /tmp/${filename_noext}__30x30.${extension}"
+    convert -brightness-contrast 40x40 "$SRCFILE" /tmp/"${filename_noext}__40x40.${extension}" && echo " -> /tmp/${filename_noext}__40x40.${extension}"
+    convert -brightness-contrast 50x50 "$SRCFILE" /tmp/"${filename_noext}__50x50.${extension}" && echo " -> /tmp/${filename_noext}__50x50.${extension}"
+    convert -brightness-contrast 60x60 "$SRCFILE" /tmp/"${filename_noext}__60x60.${extension}" && echo " -> /tmp/${filename_noext}__60x60.${extension}"
+    convert -brightness-contrast 70x70 "$SRCFILE" /tmp/"${filename_noext}__70x70.${extension}" && echo " -> /tmp/${filename_noext}__70x70.${extension}"
+    convert -brightness-contrast 80x80 "$SRCFILE" /tmp/"${filename_noext}__80x80.${extension}" && echo " -> /tmp/${filename_noext}__80x80.${extension}"
+}
+
 

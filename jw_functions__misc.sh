@@ -1,4 +1,6 @@
-# A collection of miscellaneous functions that are hard to categorize otherwise
+# A collection of miscellaneous functions that are hard to categorize elsewhere
+
+# ---------------------------------------------------------------------------
 
 
 jwgoogle()
@@ -11,13 +13,35 @@ cat 1>&2 <<'EOF'
  newer_than:1d
  newer_than:3d  older_than:2d 
  after:2016/12/31  before:2017/1/7
- after:2017/2/8  before:2017/2/9         <- dokladnie z 8-go
-
- after:2016/1/1   before:2017/1/1         <- caly 2016
- after:2016/12/1  before:2017/1/1         <- caly grudzien 2016
 
 EOF
 
+    local today=$(date +'%Y/%m/%d')
+    local yesterday=$(date --date='yesterday' +'%Y/%m/%d')
+
+    local week_this=$(date --date='last Monday' +'%Y/%m/%d')
+    local week_last=$(date --date='last Monday -1 week' +'%Y/%m/%d')
+
+    local month_this=$(date --date="$(date +'%Y/%m/15')" +'%Y/%m/01')
+    local month_last=$(date --date="$(date +'%Y/%m/15') last month" +'%Y/%m/01')
+
+    local year_this=$(date +'%Y/01/01')
+    local year_last=$(date --date='last year' +'%Y/01/01')
+
+
+    echo
+    echo "after:$today                            <- today"
+    echo "after:$yesterday  before:$today         <- yesterday"
+    echo
+    echo "after:$week_this                            <- week: this"
+    echo "after:$week_last  before:$week_this         <- week: last"
+    echo
+    echo "after:$month_this                            <- month: this"
+    echo "after:$month_last  before:$month_this         <- month: last"
+    echo
+    echo "after:$year_this                            <- year: this"
+    echo "after:$year_last  before:$year_this         <- year: last"
+    echo
 }
 
 
@@ -36,14 +60,39 @@ jwrandnumgen()
     "import sys;
 LIMIT=sys.argv[1];
 from random import randint;
-print(randint(0, int(LIMIT)))" $1
+print(randint(0, int(LIMIT)))" "$1"
 }
 
 
+jwdatereverse()
+(
+    __jwjoinby() { local IFS="$1"; shift; echo "$*"; }
+
+    IFS='-' read -r -a array <<< "$1"
+    
+    min=0
+    max=$(( ${#array[@]} -1 ))
+
+    while [[ min -lt max ]]
+    do
+        # Swap current first and last elements
+        x="${array[$min]}"
+        array[$min]="${array[$max]}"
+        array[$max]="$x"
+    
+        # Move closer
+        (( min++, max-- ))
+    done
+    
+    echo $(__jwjoinby - ${array[@]})
+)
+
+
+# ---------------------------------------------------------------------------
 
 jwtvnames()
 {
-    DATEHASH=`date +%Y%m%d`
+    DATEHASH=$(date +%Y%m%d)
     SEED=$(( ( RANDOM % 100000 ) + 10000 ))
     NUMER="$DATEHASH$SEED"
     echo "skocznie-$NUMER"
@@ -64,42 +113,18 @@ jwtvcrop()
     "1")
         local PLIK_IN=$1
         local PLIK_TEMP="$$-"$PLIK_IN
-        convert $PLIK_IN -crop 1812x823+56+165 $PLIK_TEMP
-        mv $PLIK_TEMP $PLIK_IN
+        convert "$PLIK_IN" -crop 1812x823+56+165 "$PLIK_TEMP"
+        mv "$PLIK_TEMP" "$PLIK_IN"
     ;;
     *)
         for p in $@
         do
-            echo $p
+            echo "$p"
             local PLIK_IN=$p
             local PLIK_TEMP="$$-"$PLIK_IN
-            convert $PLIK_IN -crop 1812x823+56+165 $PLIK_TEMP
-            mv $PLIK_TEMP $PLIK_IN
+            convert "$PLIK_IN" -crop 1812x823+56+165 "$PLIK_TEMP"
+            mv "$PLIK_TEMP" "$PLIK_IN"
         done
     ;;
     esac
 }
-
-
-jwdatereverse()
-(
-	__jwjoinby() { local IFS="$1"; shift; echo "$*"; }
-
-	IFS='-' read -r -a array <<<$1
-	
-	min=0
-	max=$(( ${#array[@]} -1 ))
-
-	while [[ min -lt max ]]
-	do
-	    # Swap current first and last elements
-	    x="${array[$min]}"
-	    array[$min]="${array[$max]}"
-	    array[$max]="$x"
-	
-	    # Move closer
-	    (( min++, max-- ))
-	done
-	
-	echo $(__jwjoinby - ${array[@]})
-)

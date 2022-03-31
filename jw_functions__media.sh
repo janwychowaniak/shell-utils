@@ -98,7 +98,6 @@ EOF
 
 jwgetimageresolution ()
 {
-
     if [[ $# -lt 1 ]] || [[ $# -gt 2 ]] ; then
         echo
         echo "$FUNCNAME EXT [min-mpix]"
@@ -119,28 +118,26 @@ jwgetimageresolution ()
         MINMPIX=$2 # TODO
     fi
 
-    for p in *.$EXT
+    for p in *."$EXT"
     do
         exift_size=$(exiftool "$p" | grep "Image Size" | awk '{print $4}' | grep -v ':' )
-        exift_w=$(echo $exift_size | tr "x" " " | awk '{print $1}')
-        exift_h=$(echo $exift_size | tr "x" " " | awk '{print $2}')
+        exift_w=$(echo "$exift_size" | tr "x" " " | awk '{print $1}')
+        exift_h=$(echo "$exift_size" | tr "x" " " | awk '{print $2}')
         mpix=$(echo "scale=2 ; $exift_w * $exift_h / 1000000" | bc)
 
         if [ $# -eq 1 ]; then
-            echo -e "$p\t: $exift_w*$exift_h  [$mpix mpix]"
+            echo -e "$p\\t: $exift_w*$exift_h  [$mpix mpix]"
         elif [ $# -eq 2 ]; then
             if [ $(echo $mpix'>'$MINMPIX | bc -l) -eq 1 ] ; then
-                echo -e "$p\t: $exift_w*$exift_h  [$mpix mpix]"
+                echo -e "$p\\t: $exift_w*$exift_h  [$mpix mpix]"
             fi
         fi
     done
-
 }
 
 
 jwcompressmp3sox_CMPR_FAC ()
 {
-
     if [ $# -ne 1 ]
     then
 cat 1>&2 <<EOF
@@ -166,12 +163,11 @@ EOF
     for plik in *.mp3
     do
         echo "$plik -> $fldr ..."
-        sox $plik -C -$CMPR_FAC.01 $fldr/$plik
+        sox "$plik" -C -$CMPR_FAC.01 "$fldr/$plik"
     done
     mv $fldr/* . ; rmdir $fldr
     echo
     jwffbitrateEXT mp3
-
 }
 
 alias jwcompressmp3sox='jwcompressmp3sox_CMPR_FAC 4'

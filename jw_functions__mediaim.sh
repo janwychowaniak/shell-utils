@@ -187,7 +187,6 @@ EOF
 
 jwcompressjpg65 () 
 {
-
     if [ $# -ne 0 ]
     then
 cat 1>&2 <<EOF
@@ -201,7 +200,6 @@ EOF
         return 1
     fi
 
-    for p in *.jpg; do echo $p; mogrify -strip -interlace Plane -quality 65% $p; done
-    
+    for p in *.jpg; do echo "$p"; mogrify -strip -interlace Plane -quality 65% "$p"; done
 }
 

@@ -29,18 +29,25 @@ EOF
     local year_last=$(date --date='last year' +'%Y/01/01')
 
 
+    local argsstr=""
+
+    if [ $# -gt 0 ]; then
+        argsstr+="$@  "
+    fi
+
+
     echo
-    echo "after:$today                            <- today"
-    echo "after:$yesterday  before:$today         <- yesterday"
+    echo "$argsstr""after:$today                            <- today"
+    echo "$argsstr""after:$yesterday  before:$today         <- yesterday"
     echo
-    echo "after:$week_this                            <- week: this"
-    echo "after:$week_last  before:$week_this         <- week: last"
+    echo "$argsstr""after:$week_this                            <- week: this"
+    echo "$argsstr""after:$week_last  before:$week_this         <- week: last"
     echo
-    echo "after:$month_this                            <- month: this"
-    echo "after:$month_last  before:$month_this         <- month: last"
+    echo "$argsstr""after:$month_this                            <- month: this"
+    echo "$argsstr""after:$month_last  before:$month_this         <- month: last"
     echo
-    echo "after:$year_this                            <- year: this"
-    echo "after:$year_last  before:$year_this         <- year: last"
+    echo "$argsstr""after:$year_this                            <- year: this"
+    echo "$argsstr""after:$year_last  before:$year_this         <- year: last"
     echo
 }
 

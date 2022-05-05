@@ -95,6 +95,26 @@ jwdatereverse()
 )
 
 
+jwnotatki()
+{
+    local STEM="__notatki__"
+    local MODAL=${1:-""}
+    [[ -n $MODAL ]] && MODAL+="__"
+    local FINAL="$STEM$MODAL"
+
+    echo
+    echo "touch $FINAL"
+    echo "touch $FINAL.md"
+    echo
+    echo "mkdir $FINAL"
+    echo
+
+    echo "__komendy__"
+    echo "__komendy__.md"
+    echo
+}
+
+
 # ---------------------------------------------------------------------------
 
 jwtvnames()

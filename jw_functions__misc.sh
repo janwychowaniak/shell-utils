@@ -112,6 +112,10 @@ jwnotatki()
     echo "__komendy__"
     echo "__komendy__.md"
     echo
+
+    echo "locate $STEM | grep $STEM"
+    echo "locate __komendy__ | grep __komendy__"
+    echo
 }
 
 

@@ -97,24 +97,29 @@ jwdatereverse()
 
 jwnotatki()
 {
-    local STEM="__notatki__"
+    local STEM_N="__notatki__"
+    local STEM_K="__komendy__"
+
     local MODAL=${1:-""}
     [[ -n $MODAL ]] && MODAL+="__"
-    local FINAL="$STEM$MODAL"
+
+    local FINAL_N="$STEM_N$MODAL"
+    local FINAL_K="$STEM_K$MODAL"
 
     echo
-    echo "touch $FINAL"
-    echo "touch $FINAL.md"
-    echo
-    echo "mkdir $FINAL"
-    echo
+    echo "touch $FINAL_N"
+    echo "touch $FINAL_N.md"
+    echo "mkdir $FINAL_N"
 
-    echo "__komendy__"
-    echo "__komendy__.md"
     echo
+    echo "touch $FINAL_K"
+    echo "touch $FINAL_K.md"
+    echo "mkdir $FINAL_K"
 
-    echo "locate $STEM | grep $STEM"
-    echo "locate __komendy__ | grep __komendy__"
+    echo
+    echo "locate $STEM_N | grep $STEM_N"
+    echo "locate $STEM_K | grep $STEM_K"
+
     echo
 }
 

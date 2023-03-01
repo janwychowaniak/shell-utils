@@ -345,6 +345,8 @@ EOF
 }
 
 
+# ------------------------------
+
 jwfindplchars ()
 {
     if [ $# -ne 0 ]
@@ -480,6 +482,8 @@ EOF
 }
 
 
+# ------------------------------
+
 jwfindnewestfiles() {
     # [https://www.shellhacks.com/bash-colors/]
     # [https://misc.flogisoft.com/bash/tip_colors_and_formatting]
@@ -490,7 +494,7 @@ cat 1>&2 <<EOF
 $FUNCNAME  [top_results]
 
     This function searches for files only, ordering results by modification time,
-    then displaying a couple of the most recently modified.
+    then displaying a couple of the MOST recently modified.
     The search is performed from the current location recursively down. No changes are made.
 
 EOF
@@ -504,18 +508,59 @@ EOF
     local dgwnc="\e[22m"
     #
 
-    local NEWEST=`find . -type f -printf "%T@ %TY-%Tm-%Td %TT  %p\n" | sort -nr | cut -d' ' -f 2- |  head -n 1`
-    local NEWEST_NAME=`echo $NEWEST | awk '{print $3}'`
-    local NEWEST_MTIME_D=`echo $NEWEST | awk '{print $1}'`
-    local NEWEST_MTIME_Thms=`echo $NEWEST | awk '{print $2}' | cut -d'.' -f 1`
-    local NEWEST_MTIME_Tss=`echo $NEWEST | awk '{print $2}' | cut -d'.' -f 2`
-    local NEWEST_MTIME_Tss3=`echo $(expr substr "${NEWEST_MTIME_Tss}" 1 3)`
+    local TARGETS=`find . -type f -printf "%T@ %TY-%Tm-%Td %TT  %p\n" | sort -nr | cut -d' ' -f 2- | head -n 1`
+    local TARGETS_NAME=`echo $TARGETS | awk '{print $3}'`
+    local TARGETS_MTIME_D=`echo $TARGETS | awk '{print $1}'`
+    local TARGETS_MTIME_Thms=`echo $TARGETS | awk '{print $2}' | cut -d'.' -f 1`
+    local TARGETS_MTIME_Tss=`echo $TARGETS | awk '{print $2}' | cut -d'.' -f 2`
+    local TARGETS_MTIME_Tss3=`echo $(expr substr "${TARGETS_MTIME_Tss}" 1 3)`
 
     local TOPX=${1:-8}
 
-    echo -en "Newest: $white$NEWEST_NAME$wnc  "
-    echo -e "[$white$NEWEST_MTIME_D$wnc $NEWEST_MTIME_Thms$dgrey.$NEWEST_MTIME_Tss3$dgwnc]"
+    echo -en "Top result: $white$TARGETS_NAME$wnc  "
+    echo -e "[$white$TARGETS_MTIME_D$wnc $TARGETS_MTIME_Thms$dgrey.$TARGETS_MTIME_Tss3$dgwnc]"
 
     echo "------- <top $TOPX>:"
-    find . -type f -printf "%T@ [%TY-%Tm-%Td %TT]  %p\n" | sort -nr | cut -d' ' -f 2- |  head -n $TOPX
+    find . -type f -printf "%T@ [%TY-%Tm-%Td %TT]  %p\n" | sort -nr | cut -d' ' -f 2- | head -n $TOPX
+}
+
+
+jwfindoldestfiles() {
+    # [https://www.shellhacks.com/bash-colors/]
+    # [https://misc.flogisoft.com/bash/tip_colors_and_formatting]
+    if [ $# -ne 0 ] && [ $# -ne 1 ]
+    then
+cat 1>&2 <<EOF
+
+$FUNCNAME  [top_results]
+
+    This function searches for files only, ordering results by modification time,
+    then displaying a couple of the LEAST recently modified.
+    The search is performed from the current location recursively down. No changes are made.
+
+EOF
+        return 1
+    fi
+
+    #
+    local white="\e[1;37m"
+    local wnc="\e[0m"
+    local dgrey="\e[2m"
+    local dgwnc="\e[22m"
+    #
+
+    local TARGETS=`find . -type f -printf "%T@ %TY-%Tm-%Td %TT  %p\n" | sort -n | cut -d' ' -f 2- | head -n 1`
+    local TARGETS_NAME=`echo $TARGETS | awk '{print $3}'`
+    local TARGETS_MTIME_D=`echo $TARGETS | awk '{print $1}'`
+    local TARGETS_MTIME_Thms=`echo $TARGETS | awk '{print $2}' | cut -d'.' -f 1`
+    local TARGETS_MTIME_Tss=`echo $TARGETS | awk '{print $2}' | cut -d'.' -f 2`
+    local TARGETS_MTIME_Tss3=`echo $(expr substr "${TARGETS_MTIME_Tss}" 1 3)`
+
+    local TOPX=${1:-8}
+
+    echo -en "Top result: $white$TARGETS_NAME$wnc  "
+    echo -e "[$white$TARGETS_MTIME_D$wnc $TARGETS_MTIME_Thms$dgrey.$TARGETS_MTIME_Tss3$dgwnc]"
+
+    echo "------- <top $TOPX>:"
+    find . -type f -printf "%T@ [%TY-%Tm-%Td %TT]  %p\n" | sort -n | cut -d' ' -f 2- | head -n $TOPX
 }

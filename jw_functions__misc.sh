@@ -120,6 +120,10 @@ jwnotatki()
     echo "locate $STEM_N | grep $STEM_N"
     echo "locate $STEM_K | grep $STEM_K"
 
+    [[ -n $MODAL ]] && echo
+    [[ -n $MODAL ]] && echo "locate $STEM_N | grep $MODAL"
+    [[ -n $MODAL ]] && echo "locate $STEM_K | grep $MODAL"
+
     echo
 }
 

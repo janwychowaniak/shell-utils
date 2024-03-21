@@ -128,6 +128,28 @@ jwnotatki()
 }
 
 
+jwwhois_creat() {
+    # The function presents the creation date of a domain from its WHOIS information
+
+    local whois_output=$(whois "$1")
+    echo
+
+    echo "-----[ First grep (creat|date): ]----------------"
+    echo "$whois_output" | grep -Ei "creat|date"
+    echo
+
+    echo "-----[ Second grep (creat): ]--------------------"
+    local creation_output=$(echo "$whois_output" | grep -i creat)
+    echo "$creation_output"
+    echo
+
+    echo "-----[ Third step (creat, reduced x2): ]---------"
+    echo "$creation_output" | awk '{print $1, $2, $3}' | awk -F'T' '{print $1}' | uniq
+    echo "$creation_output" | awk '{print $1, $2, substr($3, 1, 10)}' | uniq
+    echo
+}
+
+
 # ---------------------------------------------------------------------------
 
 jwtvnames()

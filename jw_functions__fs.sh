@@ -298,23 +298,19 @@ EOF
 }
 
 
-jwbackupfile ()
-{
+jwbackupfile () {
   local TS=$(date +%Y%m%d)
-  local SUFFIX="-$TS.BAK"
+  local SUFFIX="--$TS.JWBAK"
 
-  case $# in
-  "0")
-    echo " *** $FUNCNAME arg[s]"
-    echo " Backups the given file, appending the name with current date and time."
-  ;;
-  *)
-    for p in $@ # TODO: enable the function tell the difference between a file and a directory
-    do
-      echo cp -a "$p" "$p$SUFFIX ;"
-    done
-  ;;
-  esac
+  if [ $# -eq 0 ]; then
+    printf " *** %s arg[s]\n" "$FUNCNAME"
+    printf " Backups the given file, appending the name with current date and time.\n"
+    return 1
+  fi
+
+  for p in "$@"; do
+    printf "cp -a %s %s%s\n" "$p" "$p" "$SUFFIX"
+  done
 }
 
 

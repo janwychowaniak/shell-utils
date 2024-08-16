@@ -22,33 +22,31 @@ EOF
     local week_this=$(date --date='last Monday' +'%Y/%m/%d')
     local week_last=$(date --date='last Monday -1 week' +'%Y/%m/%d')
 
-    local month_this=$(date --date="$(date +'%Y/%m/15')" +'%Y/%m/01')
-    local month_last=$(date --date="$(date +'%Y/%m/15') last month" +'%Y/%m/01')
+    local reference_day=$(date +'%Y/%m/15')
+    local month_this=$(date --date="$reference_day" +'%Y/%m/01')
+    local month_last=$(date --date="$reference_day last month" +'%Y/%m/01')
 
     local year_this=$(date +'%Y/01/01')
     local year_last=$(date --date='last year' +'%Y/01/01')
 
+    local month_this_extended=$(date --date="$month_this +4 days" +'%Y/%m/%d')
+    local month_last_extended=$(date --date="$month_last -6 days" +'%Y/%m/%d')
 
-    local argsstr=""
+    local argsstr="${*:+$*  }"  # Handle optional arguments more concisely
 
-    if [ $# -gt 0 ]; then
-        argsstr+="$@  "
-    fi
+    # Print the output with consistent formatting
+    printf "\n%safter:%s                            <- today\n" "$argsstr" "$today"
+    printf "%safter:%s  before:%s         <- yesterday\n\n" "$argsstr" "$yesterday" "$today"
 
+    printf "%safter:%s                            <- week: this\n" "$argsstr" "$week_this"
+    printf "%safter:%s  before:%s         <- week: last\n\n" "$argsstr" "$week_last" "$week_this"
 
-    echo
-    echo "$argsstr""after:$today                            <- today"
-    echo "$argsstr""after:$yesterday  before:$today         <- yesterday"
-    echo
-    echo "$argsstr""after:$week_this                            <- week: this"
-    echo "$argsstr""after:$week_last  before:$week_this         <- week: last"
-    echo
-    echo "$argsstr""after:$month_this                            <- month: this"
-    echo "$argsstr""after:$month_last  before:$month_this         <- month: last"
-    echo
-    echo "$argsstr""after:$year_this                            <- year: this"
-    echo "$argsstr""after:$year_last  before:$year_this         <- year: last"
-    echo
+    printf "%safter:%s                            <- month: this\n" "$argsstr" "$month_this"
+    printf "%safter:%s  before:%s         <- month: last\n" "$argsstr" "$month_last" "$month_this"
+    printf "%safter:%s  before:%s         <- month: last (extended)\n\n" "$argsstr" "$month_last_extended" "$month_this_extended"
+
+    printf "%safter:%s                            <- year: this\n" "$argsstr" "$year_this"
+    printf "%safter:%s  before:%s         <- year: last\n\n" "$argsstr" "$year_last" "$year_this"
 }
 
 

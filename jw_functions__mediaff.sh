@@ -268,8 +268,7 @@ jwffrozdzialki ()
 ### ffmpeg {,and ffprobe} based ###
 ###################################
 
-jwffmpeg-rozne ()
-{
+jwffmpeg-rozne () {
 cat <<'EOF'
 
 =================== F F M P E G / F F P R O B E  (mostly) =================== (notes and command templates)
@@ -277,10 +276,6 @@ cat <<'EOF'
 MP4 -> AVI with quality setting:
  ffmpeg -i input.mp4 -q:v 0                        -q:a 0                 output.avi
  ffmpeg -i input.mp4 -q:v 0 -vf scale=960:-1 -r 25 -q:a 0 -ar 24000 -ac 1 output.avi
-about qscale adjustment: http://www.kilobitspersecond.com/2007/05/24/ffmpeg-quality-comparison/:
- [author: 5, *9*, 11]
- [coment: 4, 8, 10]
- ffmpeg -i input.avi -map 0:0 -map 0:1 -qscale 8 -r 25 -ar 32000 -ab 96k -s 1024x576 output.avi
 
 
 images:

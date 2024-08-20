@@ -191,7 +191,7 @@ jwwysyp ()
     then
 cat 1>&2 <<EOF
 
-$FUNCNAME
+${FUNCNAME[0]}
 
     The function reaches into all the directories in the current location, brings their contents
     one level up (i.e. to the current location), then deletes those now empty directories.
@@ -201,9 +201,16 @@ EOF
         return 1
     fi
 
-    for p in `ls`;
-    do
-        [ -d "$p" ] && mv "$p"/* . && rmdir "$p";
+    if [ "$(pwd)" = "$HOME" ]; then echo "Don't use it in HOME!" && return; fi
+    for p in *; do
+        if [ -d "$p" ]; then
+            if mv "$p"/* . 2>/dev/null; then
+                rmdir "$p"
+            else
+                echo "Directory '$p' was empty."
+                rmdir "$p"
+            fi
+        fi
     done
 }
 

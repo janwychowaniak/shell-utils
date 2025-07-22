@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 alias jwdlf="docker logs -f"
 alias jwdockerfindcontainerbyip="docker ps -q | xargs -n 1 docker inspect -f '{{.Id}} {{.Name}}  -  {{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' | grep"
 alias jwdockerps="jwdockerpsup"
@@ -127,6 +128,113 @@ jwdockerport() {
         echo "---[ Ports for $CONTAINER ]------------------------"
         docker port "$CONTAINER"
         echo
+    fi
+}
+
+
+# ---------------------------------------------------------------------------------
+# container lifecycle management
+# ---------------------------------------------------------------------------------
+
+jwdockerstart() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps --filter status=exited --filter status=created --format "{{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    echo "Starting container: $CONTAINER"
+    docker start "$CONTAINER"
+    
+    # Show status after starting
+    sleep 1
+    docker ps --filter name="^${CONTAINER}$" --format "table {{.Names}}\t{{.Status}}"
+}
+
+
+jwdockerstop() {
+    if [ $# -eq 0 ]; then
+        local running_containers
+        running_containers=$(docker ps --filter status=running --format "{{.Names}}")
+        
+        if [ -z "$running_containers" ]; then
+            echo "No running containers found."
+            return 0
+        fi
+        
+        echo "Currently running:"
+        echo "$running_containers" | sed 's/^/ - /'
+        echo -n "Stop all? [y/N] "
+        read -r response
+        
+        if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+            echo "Stopping all running containers..."
+            echo "$running_containers" | while read -r container; do
+                [ -n "$container" ] && docker stop --time=20 "$container"
+            done
+            echo "All containers stopped."
+        else
+            echo "Operation cancelled."
+        fi
+        return 0
+    fi
+
+    local CONTAINER=$1
+    local TIMEOUT=${2:-20}
+    
+    echo "Stopping container: $CONTAINER (timeout: ${TIMEOUT}s)"
+    docker stop --time="$TIMEOUT" "$CONTAINER"
+    
+    # Show status after stopping
+    docker ps -a --filter name="^${CONTAINER}$" --format "table {{.Names}}\t{{.Status}}"
+}
+
+
+jwdockerrestart() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps -a --format "{{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local TIMEOUT=${2:-20}
+    
+    echo "Restarting container: $CONTAINER (timeout: ${TIMEOUT}s)"
+    docker restart --time="$TIMEOUT" "$CONTAINER"
+    
+    # Show status after restarting
+    sleep 1
+    docker ps --filter name="^${CONTAINER}$" --format "table {{.Names}}\t{{.Status}}"
+}
+
+
+jwdockerremove() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps -a --filter status=exited --filter status=created --format "{{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local FORCE=${2:-false}
+    
+    # Safety check - don't remove running containers without force flag
+    if docker ps --filter name="^${CONTAINER}$" --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        if [ "$FORCE" != "force" ] && [ "$FORCE" != "-f" ]; then
+            echo "Error: Container '$CONTAINER' is running. Stop it first or use 'force' flag."
+            echo "Usage: jwdockerremove $CONTAINER force"
+            return 1
+        fi
+        echo "Force removing running container: $CONTAINER"
+        docker rm -f "$CONTAINER"
+    else
+        echo "Removing stopped container: $CONTAINER"
+        docker rm "$CONTAINER"
     fi
 }
 

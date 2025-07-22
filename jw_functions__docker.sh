@@ -193,7 +193,9 @@ jwdockerstop() {
         fi
         
         echo "Currently running:"
-        echo "$running_containers" | sed 's/^/ - /'
+        while IFS= read -r container; do
+            echo " - $container"
+        done <<< "$running_containers"
         echo -n "Stop all? [y/N] "
         read -r response
         
@@ -324,10 +326,8 @@ jwdockerbuild() {
     echo "Build context: $CONTEXT"
     echo
     
-    docker build -t "$TAG" -f "$DOCKERFILE" "$CONTEXT"
-    
     # Show the built image info
-    if [ $? -eq 0 ]; then
+    if docker build -t "$TAG" -f "$DOCKERFILE" "$CONTEXT"; then
         echo
         echo "---[ Built Image Info ]----------------------------"
         docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -1
@@ -354,7 +354,9 @@ jwdockerrmi() {
     if [ -n "$using_containers" ]; then
         if [ "$FORCE" != "force" ] && [ "$FORCE" != "-f" ]; then
             echo "Error: Image '$IMAGE' is being used by containers:"
-            echo "$using_containers" | sed 's/^/ - /'
+            while IFS= read -r container; do
+                echo " - $container"
+            done <<< "$using_containers"
             echo "Remove containers first or use 'force' flag."
             echo "Usage: jwdockerrmi $IMAGE force"
             return 1
@@ -438,7 +440,9 @@ jwdockervolumeinspect() {
     local using_containers
     using_containers=$(docker ps -a --filter volume="$VOLUME" --format "{{.Names}}")
     if [ -n "$using_containers" ]; then
-        echo "$using_containers" | sed 's/^/ - /'
+        while IFS= read -r container; do
+            echo " - $container"
+        done <<< "$using_containers"
     else
         echo "  (not currently used by any containers)"
     fi
@@ -463,20 +467,19 @@ jwdockervolumecreate() {
     
     echo "Creating volume: $VOLUME_NAME"
     echo "Driver: $DRIVER"
+    # Show the created volume info
     if [ -n "$OPTIONS" ]; then
         echo "Options: $OPTIONS"
+        # shellcheck disable=SC2086
         docker volume create --driver "$DRIVER" $OPTIONS "$VOLUME_NAME"
     else
         docker volume create --driver "$DRIVER" "$VOLUME_NAME"
-    fi
-    
-    # Show the created volume info
-    if [ $? -eq 0 ]; then
+    fi && {
         echo
         echo "---[ Created Volume Info ]-------------------------"
         docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | head -1
         docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | grep "^$VOLUME_NAME"
-    fi
+    }
 }
 
 
@@ -498,7 +501,9 @@ jwdockervolumeremove() {
     if [ -n "$using_containers" ]; then
         if [ "$FORCE" != "force" ] && [ "$FORCE" != "-f" ]; then
             echo "Error: Volume '$VOLUME' is being used by containers:"
-            echo "$using_containers" | sed 's/^/ - /'
+            while IFS= read -r container; do
+                echo " - $container"
+            done <<< "$using_containers"
             echo "Remove containers first or use 'force' flag."
             echo "Usage: jwdockervolumeremove $VOLUME force"
             return 1
@@ -561,20 +566,19 @@ jwdockernetworkcreate() {
     
     echo "Creating network: $NETWORK_NAME"
     echo "Driver: $DRIVER"
+    # Show the created network info
     if [ -n "$OPTIONS" ]; then
         echo "Options: $OPTIONS"
+        # shellcheck disable=SC2086
         docker network create --driver "$DRIVER" $OPTIONS "$NETWORK_NAME"
     else
         docker network create --driver "$DRIVER" "$NETWORK_NAME"
-    fi
-    
-    # Show the created network info
-    if [ $? -eq 0 ]; then
+    fi && {
         echo
         echo "---[ Created Network Info ]------------------------"
         docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | head -1
         docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | grep "^$NETWORK_NAME"
-    fi
+    }
 }
 
 
@@ -634,19 +638,18 @@ jwdockernetworkconnect() {
     local OPTIONS="$*"
     
     echo "Connecting container '$CONTAINER' to network '$NETWORK'"
+    # Show the connection info
     if [ -n "$OPTIONS" ]; then
         echo "Options: $OPTIONS"
+        # shellcheck disable=SC2086
         docker network connect $OPTIONS "$NETWORK" "$CONTAINER"
     else
         docker network connect "$NETWORK" "$CONTAINER"
-    fi
-    
-    # Show the connection info
-    if [ $? -eq 0 ]; then
+    fi && {
         echo
         echo "---[ Connection Info ]-----------------------------"
         docker inspect "$CONTAINER" --format '{{ range $key, $value := .NetworkSettings.Networks }}{{printf "%s: %s\n" $key .IPAddress}}{{ end }}' | grep "$NETWORK"
-    fi
+    }
 }
 
 

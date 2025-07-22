@@ -240,6 +240,132 @@ jwdockerremove() {
 
 
 # ---------------------------------------------------------------------------------
+# image management
+# ---------------------------------------------------------------------------------
+
+jwdockerimages() {
+    if [ $# -eq 0 ]; then
+        # Show all images with clean formatting
+        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}"
+    else
+        # Filter images by repository name
+        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -1
+        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | grep -i "$1"
+    fi
+}
+
+
+jwdockerpull() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockerpull <image[:tag]>"
+        echo "Examples:"
+        echo "  jwdockerpull nginx"
+        echo "  jwdockerpull nginx:alpine"
+        echo "  jwdockerpull ubuntu:20.04"
+        return 1
+    fi
+
+    local IMAGE=$1
+    echo "Pulling image: $IMAGE"
+    docker pull "$IMAGE"
+    
+    # Show the pulled image info
+    echo
+    echo "---[ Pulled Image Info ]---------------------------"
+    docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -1
+    docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | grep "$(echo "$IMAGE" | cut -d: -f1)"
+}
+
+
+jwdockerbuild() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockerbuild <tag> [dockerfile_path] [build_context]"
+        echo "Examples:"
+        echo "  jwdockerbuild myapp:latest"
+        echo "  jwdockerbuild myapp:v1.0 ./Dockerfile ."
+        echo "  jwdockerbuild myapp:dev ./docker/Dockerfile.dev ./src"
+        return 1
+    fi
+
+    local TAG=$1
+    local DOCKERFILE=${2:-Dockerfile}
+    local CONTEXT=${3:-.}
+    
+    echo "Building image: $TAG"
+    echo "Dockerfile: $DOCKERFILE"
+    echo "Build context: $CONTEXT"
+    echo
+    
+    docker build -t "$TAG" -f "$DOCKERFILE" "$CONTEXT"
+    
+    # Show the built image info
+    if [ $? -eq 0 ]; then
+        echo
+        echo "---[ Built Image Info ]----------------------------"
+        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -1
+        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | grep "$(echo "$TAG" | cut -d: -f1)"
+    fi
+}
+
+
+jwdockerrmi() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker images --format "{{.Repository}}:{{.Tag}}"
+        echo
+        return 1
+    fi
+
+    local IMAGE=$1
+    local FORCE=${2:-false}
+    
+    # Safety check - don't remove images that are being used by containers
+    local using_containers
+    using_containers=$(docker ps -a --filter ancestor="$IMAGE" --format "{{.Names}}")
+    
+    if [ -n "$using_containers" ]; then
+        if [ "$FORCE" != "force" ] && [ "$FORCE" != "-f" ]; then
+            echo "Error: Image '$IMAGE' is being used by containers:"
+            echo "$using_containers" | sed 's/^/ - /'
+            echo "Remove containers first or use 'force' flag."
+            echo "Usage: jwdockerrmi $IMAGE force"
+            return 1
+        fi
+        echo "Force removing image used by containers: $IMAGE"
+        docker rmi -f "$IMAGE"
+    else
+        echo "Removing image: $IMAGE"
+        docker rmi "$IMAGE"
+    fi
+}
+
+
+jwdockerimagehistory() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        echo "Usage: jwdockerimagehistory <image> [--no-trunc]"
+        echo "Available images:"
+        docker images --format "{{.Repository}}:{{.Tag}}"
+        echo
+        return 1
+    fi
+
+    local IMAGE=$1
+    local TRUNC_FLAG=""
+    
+    # Check if second parameter is --no-trunc
+    if [ "$2" = "--no-trunc" ]; then
+        TRUNC_FLAG="--no-trunc"
+    fi
+
+    echo
+    echo "---[ Image History: $IMAGE ]----------------------"
+    docker history $TRUNC_FLAG --format "table {{.CreatedBy}}\t{{.Size}}\t{{.CreatedSince}}" "$IMAGE"
+    echo
+}
+
+
+# ---------------------------------------------------------------------------------
 # inspectors
 # ---------------------------------------------------------------------------------
 

@@ -698,6 +698,262 @@ jwdockernetworkprune() {
 
 
 # ---------------------------------------------------------------------------------
+# system cleanup & maintenance
+# ---------------------------------------------------------------------------------
+
+jwdockerdiskusage() {
+    echo
+    echo "---[ Docker Disk Usage ]---------------------------"
+    docker system df
+    echo
+    echo "---[ Detailed Breakdown ]-------------------------"
+    docker system df -v
+    echo
+}
+
+
+jwdockersysteminfo() {
+    echo
+    echo "---[ Docker System Information ]-------------------"
+    docker version --format "Client Version: {{.Client.Version}}"
+    docker version --format "Server Version: {{.Server.Version}}"
+    echo
+    docker info --format "Containers: {{.Containers}} ({{.ContainersRunning}} running, {{.ContainersPaused}} paused, {{.ContainersStopped}} stopped)"
+    docker info --format "Images: {{.Images}}"
+    docker info --format "Server Version: {{.ServerVersion}}"
+    docker info --format "Storage Driver: {{.Driver}}"
+    docker info --format "Docker Root Dir: {{.DockerRootDir}}"
+    echo
+    echo "---[ Resource Usage ]------------------------------"
+    docker system df --format "table {{.Type}}\t{{.Total}}\t{{.Active}}\t{{.Size}}\t{{.Reclaimable}}"
+    echo
+}
+
+
+jwdockerprune() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockerprune [containers|images|volumes|networks|system|all]"
+        echo "Examples:"
+        echo "  jwdockerprune containers  # Remove stopped containers"
+        echo "  jwdockerprune images      # Remove unused images"
+        echo "  jwdockerprune volumes     # Remove unused volumes"
+        echo "  jwdockerprune networks    # Remove unused networks"
+        echo "  jwdockerprune system      # Remove containers, networks, images (not volumes)"
+        echo "  jwdockerprune all         # Remove everything unused (including volumes)"
+        return 1
+    fi
+
+    local TYPE=$1
+    
+    case $TYPE in
+        containers)
+            echo "This will remove all stopped containers."
+            echo -n "Are you sure? [y/N] "
+            read -r response
+            if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                echo "Pruning stopped containers..."
+                docker container prune -f
+                echo "Container pruning complete."
+            else
+                echo "Operation cancelled."
+            fi
+            ;;
+        images)
+            echo "This will remove all unused images (not referenced by any container)."
+            echo -n "Are you sure? [y/N] "
+            read -r response
+            if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                echo "Pruning unused images..."
+                docker image prune -f
+                echo "Image pruning complete."
+            else
+                echo "Operation cancelled."
+            fi
+            ;;
+        volumes)
+            jwdockervolumeprune
+            ;;
+        networks)
+            jwdockernetworkprune
+            ;;
+        system)
+            echo "This will remove:"
+            echo " - All stopped containers"
+            echo " - All networks not used by at least one container"
+            echo " - All unused images"
+            echo " - All build cache"
+            echo
+            echo "NOTE: This will NOT remove volumes."
+            echo -n "Are you sure? [y/N] "
+            read -r response
+            if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                echo "Performing system prune..."
+                docker system prune -f
+                echo "System pruning complete."
+            else
+                echo "Operation cancelled."
+            fi
+            ;;
+        all)
+            echo "⚠️  WARNING: This will remove:"
+            echo " - All stopped containers"
+            echo " - All networks not used by at least one container"
+            echo " - All unused images"
+            echo " - All unused volumes"
+            echo " - All build cache"
+            echo
+            echo "This is a destructive operation that will free up maximum space."
+            echo -n "Are you absolutely sure? [y/N] "
+            read -r response
+            if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                echo "Performing complete system prune..."
+                docker system prune -a --volumes -f
+                echo "Complete system pruning finished."
+            else
+                echo "Operation cancelled."
+            fi
+            ;;
+        *)
+            echo "Error: Unknown prune type '$TYPE'"
+            echo "Valid types: containers, images, volumes, networks, system, all"
+            return 1
+            ;;
+    esac
+}
+
+
+jwdockercleanup() {
+    echo "🧹 Docker Cleanup Wizard"
+    echo "========================"
+    echo
+    
+    # Show current disk usage
+    echo "Current Docker disk usage:"
+    docker system df
+    echo
+    
+    # Show what can be cleaned
+    echo "Available cleanup options:"
+    echo
+    
+    # Check for stopped containers
+    local stopped_containers
+    stopped_containers=$(docker ps -a --filter status=exited --filter status=created --format "{{.Names}}" | wc -l)
+    echo "1. Stopped containers: $stopped_containers"
+    
+    # Check for unused images
+    local unused_images
+    unused_images=$(docker images --filter dangling=true -q | wc -l)
+    echo "2. Unused/dangling images: $unused_images"
+    
+    # Check for unused volumes
+    local unused_volumes
+    unused_volumes=$(docker volume ls --filter dangling=true -q | wc -l)
+    echo "3. Unused volumes: $unused_volumes"
+    
+    # Check for unused networks
+    local unused_networks
+    unused_networks=$(docker network ls --filter dangling=true -q | wc -l)
+    echo "4. Unused networks: $unused_networks"
+    
+    echo
+    echo "Cleanup options:"
+    echo "  a) Clean stopped containers only"
+    echo "  b) Clean unused images only"
+    echo "  c) Clean unused volumes only"
+    echo "  d) Clean unused networks only"
+    echo "  e) Clean containers + images + networks (safe)"
+    echo "  f) Clean everything including volumes (⚠️  destructive)"
+    echo "  q) Quit without cleaning"
+    echo
+    echo -n "Choose an option [a/b/c/d/e/f/q]: "
+    read -r choice
+    
+    case $choice in
+        a|A)
+            jwdockerprune containers
+            ;;
+        b|B)
+            jwdockerprune images
+            ;;
+        c|C)
+            jwdockerprune volumes
+            ;;
+        d|D)
+            jwdockerprune networks
+            ;;
+        e|E)
+            jwdockerprune system
+            ;;
+        f|F)
+            jwdockerprune all
+            ;;
+        q|Q)
+            echo "Cleanup cancelled."
+            ;;
+        *)
+            echo "Invalid option. Cleanup cancelled."
+            return 1
+            ;;
+    esac
+    
+    # Show final disk usage if cleanup was performed
+    if [ "$choice" != "q" ] && [ "$choice" != "Q" ]; then
+        echo
+        echo "Final Docker disk usage:"
+        docker system df
+    fi
+}
+
+
+jwdockersize() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockersize [containers|images|volumes|all]"
+        echo "Examples:"
+        echo "  jwdockersize containers  # Show container sizes"
+        echo "  jwdockersize images      # Show image sizes"
+        echo "  jwdockersize volumes     # Show volume sizes"
+        echo "  jwdockersize all         # Show everything"
+        return 1
+    fi
+
+    local TYPE=$1
+    
+    case $TYPE in
+        containers)
+            echo
+            echo "---[ Container Sizes ]---------------------------------"
+            docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Size}}"
+            ;;
+        images)
+            echo
+            echo "---[ Image Sizes ]-------------------------------------"
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+            ;;
+        volumes)
+            echo
+            echo "---[ Volume Sizes ]------------------------------------"
+            docker system df -v | grep -A 100 "Local Volumes" | tail -n +3
+            ;;
+        all)
+            jwdockersize containers
+            jwdockersize images
+            jwdockersize volumes
+            echo
+            echo "---[ Summary ]------------------------------------------"
+            docker system df
+            ;;
+        *)
+            echo "Error: Unknown size type '$TYPE'"
+            echo "Valid types: containers, images, volumes, all"
+            return 1
+            ;;
+    esac
+    echo
+}
+
+
+# ---------------------------------------------------------------------------------
 # inspectors
 # ---------------------------------------------------------------------------------
 

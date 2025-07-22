@@ -372,7 +372,7 @@ jwdockerimagehistory() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         echo "Usage: jwdockerimagehistory <image> [--no-trunc]"
-        echo "Available images:"
+        echo
         docker images --format "{{.Repository}}:{{.Tag}}"
         echo
         return 1
@@ -390,6 +390,140 @@ jwdockerimagehistory() {
     echo "---[ Image History: $IMAGE ]----------------------"
     docker history $TRUNC_FLAG --format "table {{.CreatedBy}}\t{{.Size}}\t{{.CreatedSince}}" "$IMAGE"
     echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# volume management
+# ---------------------------------------------------------------------------------
+
+jwdockervolumes() {
+    if [ $# -eq 0 ]; then
+        # Show all volumes with clean formatting
+        docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}"
+    else
+        # Filter volumes by name
+        docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | head -1
+        docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | grep -i "$1"
+    fi
+}
+
+
+jwdockervolumeinspect() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker volume ls --format "{{.Name}}"
+        echo
+        return 1
+    fi
+
+    local VOLUME=$1
+    echo
+    echo "---[ Volume: $VOLUME ]-----------------------------"
+    docker volume inspect --format 'Name:       {{ .Name }}' "$VOLUME"
+    docker volume inspect --format 'Driver:     {{ .Driver }}' "$VOLUME"
+    docker volume inspect --format 'Mountpoint: {{ .Mountpoint }}' "$VOLUME"
+    docker volume inspect --format 'Scope:      {{ .Scope }}' "$VOLUME"
+    docker volume inspect --format 'Created:    {{ .CreatedAt }}' "$VOLUME"
+    echo
+    echo "---[ Labels ]--------------------------------------"
+    docker volume inspect --format '{{ range $key, $value := .Labels }}{{ printf "  %-30s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$VOLUME"
+    echo
+    echo "---[ Options ]-------------------------------------"
+    docker volume inspect --format '{{ range $key, $value := .Options }}{{ printf "  %-30s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$VOLUME"
+    echo
+    
+    # Show which containers are using this volume
+    echo "---[ Used By ]-------------------------------------"
+    local using_containers
+    using_containers=$(docker ps -a --filter volume="$VOLUME" --format "{{.Names}}")
+    if [ -n "$using_containers" ]; then
+        echo "$using_containers" | sed 's/^/ - /'
+    else
+        echo "  (not currently used by any containers)"
+    fi
+    echo
+}
+
+
+jwdockervolumecreate() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockervolumecreate <volume_name> [driver] [options]"
+        echo "Examples:"
+        echo "  jwdockervolumecreate mydata"
+        echo "  jwdockervolumecreate mydata local"
+        echo "  jwdockervolumecreate mydata local --opt type=tmpfs"
+        return 1
+    fi
+
+    local VOLUME_NAME=$1
+    local DRIVER=${2:-local}
+    shift 2  # Remove volume name and driver from arguments
+    local OPTIONS="$*"
+    
+    echo "Creating volume: $VOLUME_NAME"
+    echo "Driver: $DRIVER"
+    if [ -n "$OPTIONS" ]; then
+        echo "Options: $OPTIONS"
+        docker volume create --driver "$DRIVER" $OPTIONS "$VOLUME_NAME"
+    else
+        docker volume create --driver "$DRIVER" "$VOLUME_NAME"
+    fi
+    
+    # Show the created volume info
+    if [ $? -eq 0 ]; then
+        echo
+        echo "---[ Created Volume Info ]-------------------------"
+        docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | head -1
+        docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | grep "^$VOLUME_NAME"
+    fi
+}
+
+
+jwdockervolumeremove() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker volume ls --format "{{.Name}}"
+        echo
+        return 1
+    fi
+
+    local VOLUME=$1
+    local FORCE=${2:-false}
+    
+    # Safety check - don't remove volumes that are being used by containers
+    local using_containers
+    using_containers=$(docker ps -a --filter volume="$VOLUME" --format "{{.Names}}")
+    
+    if [ -n "$using_containers" ]; then
+        if [ "$FORCE" != "force" ] && [ "$FORCE" != "-f" ]; then
+            echo "Error: Volume '$VOLUME' is being used by containers:"
+            echo "$using_containers" | sed 's/^/ - /'
+            echo "Remove containers first or use 'force' flag."
+            echo "Usage: jwdockervolumeremove $VOLUME force"
+            return 1
+        fi
+        echo "Force removing volume used by containers: $VOLUME"
+        docker volume rm -f "$VOLUME"
+    else
+        echo "Removing volume: $VOLUME"
+        docker volume rm "$VOLUME"
+    fi
+}
+
+
+jwdockervolumeprune() {
+    echo "This will remove all unused local volumes."
+    echo -n "Are you sure? [y/N] "
+    read -r response
+    
+    if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+        echo "Pruning unused volumes..."
+        docker volume prune -f
+        echo "Volume pruning complete."
+    else
+        echo "Operation cancelled."
+    fi
 }
 
 

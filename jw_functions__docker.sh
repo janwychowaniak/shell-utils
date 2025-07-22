@@ -1,12 +1,20 @@
 alias jwdlf="docker logs -f"
 alias jwdockerfindcontainerbyip="docker ps -q | xargs -n 1 docker inspect -f '{{.Id}} {{.Name}}  -  {{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' | grep"
+alias jwdockerps="jwdockerpsup"
 
 
 # ---------------------------------------------------------------------------------
 # ps 
 # ---------------------------------------------------------------------------------
 
-alias jwdockerps="docker ps --format \"table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\""
+jwdockerpsup() {
+    docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+}
+
+
+jwdockerpsall() {
+    docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+}
 
 
 jwdockerpsdown() {
@@ -16,6 +24,56 @@ jwdockerpsdown() {
               --filter status=paused \
               --filter status=exited \
               --filter status=dead --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+}
+
+
+# ---------------------------------------------------------------------------------
+# resource monitoring
+# ---------------------------------------------------------------------------------
+
+jwdockerstats() {
+    if [ $# -eq 0 ]; then
+        # Show stats for all running containers with clean formatting
+        docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
+    else
+        # Show stats for specific container(s)
+        docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}" "$@"
+    fi
+}
+
+
+jwdockertop() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps --filter status=running --format "{{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    echo
+    echo "---[ Processes in $CONTAINER ]-------------------------"
+    docker top $CONTAINER
+    echo
+}
+
+
+jwdockerhealth() {
+    echo
+    echo "---[ Container Health Status ]-------------------------"
+    docker ps --format "table {{.Names}}\t{{.Status}}" | head -1
+    docker ps --format "table {{.Names}}\t{{.Status}}" | tail -n +2 | while read name container_status; do
+        if echo "$container_status" | grep -q "healthy"; then
+            echo -e "$name\t\033[32m$container_status\033[0m"
+        elif echo "$container_status" | grep -q "unhealthy"; then
+            echo -e "$name\t\033[31m$container_status\033[0m"
+        elif echo "$container_status" | grep -q "starting"; then
+            echo -e "$name\t\033[33m$container_status\033[0m"
+        else
+            echo -e "$name\t$container_status"
+        fi
+    done
+    echo
 }
 
 

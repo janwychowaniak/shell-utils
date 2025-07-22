@@ -16,6 +16,7 @@ And then _.bashrc_ might be appended with the following:
 
 ```bash
 [[ -f "$HOME/bin/shell-utils/jw_aliases.sh" ]]            && . "$HOME/bin/shell-utils/jw_aliases.sh"
+[[ -f "$HOME/bin/shell-utils/jw_functions__docker.sh" ]]  && . "$HOME/bin/shell-utils/jw_functions__docker.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__fs.sh" ]]      && . "$HOME/bin/shell-utils/jw_functions__fs.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__media.sh" ]]   && . "$HOME/bin/shell-utils/jw_functions__media.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__mediaff.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaff.sh"

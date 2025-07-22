@@ -9,22 +9,50 @@ alias jwdockerps="jwdockerpsup"
 # ---------------------------------------------------------------------------------
 
 jwdockerpsup() {
-    docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+    if [ $# -eq 0 ]; then
+        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+    else
+        # Filter running containers by name
+        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | head -1
+        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | grep -i "$1"
+    fi
 }
 
 
 jwdockerpsall() {
-    docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+    if [ $# -eq 0 ]; then
+        docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+    else
+        # Filter all containers by name
+        docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | head -1
+        docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | grep -i "$1"
+    fi
 }
 
 
 jwdockerpsdown() {
-    docker ps --filter status=created \
-              --filter status=restarting \
-              --filter status=removing \
-              --filter status=paused \
-              --filter status=exited \
-              --filter status=dead --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+    if [ $# -eq 0 ]; then
+        docker ps --filter status=created \
+                  --filter status=restarting \
+                  --filter status=removing \
+                  --filter status=paused \
+                  --filter status=exited \
+                  --filter status=dead --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+    else
+        # Filter stopped containers by name
+        docker ps --filter status=created \
+                  --filter status=restarting \
+                  --filter status=removing \
+                  --filter status=paused \
+                  --filter status=exited \
+                  --filter status=dead --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | head -1
+        docker ps --filter status=created \
+                  --filter status=restarting \
+                  --filter status=removing \
+                  --filter status=paused \
+                  --filter status=exited \
+                  --filter status=dead --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | grep -i "$1"
+    fi
 }
 
 

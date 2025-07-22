@@ -528,6 +528,173 @@ jwdockervolumeprune() {
 
 
 # ---------------------------------------------------------------------------------
+# network management
+# ---------------------------------------------------------------------------------
+
+jwdockernetworks() {
+    if [ $# -eq 0 ]; then
+        # Show all networks with clean formatting
+        docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}"
+    else
+        # Filter networks by name
+        docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | head -1
+        docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | grep -i "$1"
+    fi
+}
+
+
+jwdockernetworkcreate() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockernetworkcreate <network_name> [driver] [options]"
+        echo "Examples:"
+        echo "  jwdockernetworkcreate mynetwork"
+        echo "  jwdockernetworkcreate mynetwork bridge"
+        echo "  jwdockernetworkcreate mynetwork bridge --subnet=172.20.0.0/16"
+        echo "  jwdockernetworkcreate mynetwork overlay --attachable"
+        return 1
+    fi
+
+    local NETWORK_NAME=$1
+    local DRIVER=${2:-bridge}
+    shift 2  # Remove network name and driver from arguments
+    local OPTIONS="$*"
+    
+    echo "Creating network: $NETWORK_NAME"
+    echo "Driver: $DRIVER"
+    if [ -n "$OPTIONS" ]; then
+        echo "Options: $OPTIONS"
+        docker network create --driver "$DRIVER" $OPTIONS "$NETWORK_NAME"
+    else
+        docker network create --driver "$DRIVER" "$NETWORK_NAME"
+    fi
+    
+    # Show the created network info
+    if [ $? -eq 0 ]; then
+        echo
+        echo "---[ Created Network Info ]------------------------"
+        docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | head -1
+        docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | grep "^$NETWORK_NAME"
+    fi
+}
+
+
+jwdockernetworkremove() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        echo "Available networks (excluding system networks):"
+        docker network ls --filter type=custom --format "- {{.Name}}"
+        echo
+        return 1
+    fi
+
+    local NETWORK=$1
+    local FORCE=${2:-false}
+    
+    # Safety check - don't remove networks that are being used by containers
+    local using_containers
+    using_containers=$(docker network inspect "$NETWORK" --format '{{ range $key, $value := .Containers }}{{.Name}} {{ end }}' 2>/dev/null)
+    
+    if [ -n "$using_containers" ]; then
+        if [ "$FORCE" != "force" ] && [ "$FORCE" != "-f" ]; then
+            echo "Error: Network '$NETWORK' is being used by containers:"
+            echo "$using_containers" | tr ' ' '\n' | sed 's/^/ - /' | grep -v '^$'
+            echo "Disconnect containers first or use 'force' flag."
+            echo "Usage: jwdockernetworkremove $NETWORK force"
+            return 1
+        fi
+        echo "Force removing network used by containers: $NETWORK"
+        docker network rm "$NETWORK" 2>/dev/null || echo "Failed to remove network (may be in use)"
+    else
+        echo "Removing network: $NETWORK"
+        docker network rm "$NETWORK"
+    fi
+}
+
+
+jwdockernetworkconnect() {
+    if [ $# -lt 2 ]; then
+        echo "Usage: jwdockernetworkconnect <network> <container> [options]"
+        echo "Examples:"
+        echo "  jwdockernetworkconnect mynetwork mycontainer"
+        echo "  jwdockernetworkconnect mynetwork mycontainer --ip=172.20.0.10"
+        echo "  jwdockernetworkconnect mynetwork mycontainer --alias=web"
+        echo
+        echo "Available networks:"
+        docker network ls --format "- {{.Name}}"
+        echo
+        echo "Available containers:"
+        docker ps -a --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local NETWORK=$1
+    local CONTAINER=$2
+    shift 2  # Remove network and container from arguments
+    local OPTIONS="$*"
+    
+    echo "Connecting container '$CONTAINER' to network '$NETWORK'"
+    if [ -n "$OPTIONS" ]; then
+        echo "Options: $OPTIONS"
+        docker network connect $OPTIONS "$NETWORK" "$CONTAINER"
+    else
+        docker network connect "$NETWORK" "$CONTAINER"
+    fi
+    
+    # Show the connection info
+    if [ $? -eq 0 ]; then
+        echo
+        echo "---[ Connection Info ]-----------------------------"
+        docker inspect "$CONTAINER" --format '{{ range $key, $value := .NetworkSettings.Networks }}{{printf "%s: %s\n" $key .IPAddress}}{{ end }}' | grep "$NETWORK"
+    fi
+}
+
+
+jwdockernetworkdisconnect() {
+    if [ $# -lt 2 ]; then
+        echo "Usage: jwdockernetworkdisconnect <network> <container> [force]"
+        echo "Examples:"
+        echo "  jwdockernetworkdisconnect mynetwork mycontainer"
+        echo "  jwdockernetworkdisconnect mynetwork mycontainer force"
+        echo
+        echo "Available networks:"
+        docker network ls --format "- {{.Name}}"
+        echo
+        echo "Available containers:"
+        docker ps -a --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local NETWORK=$1
+    local CONTAINER=$2
+    local FORCE=${3:-false}
+    
+    echo "Disconnecting container '$CONTAINER' from network '$NETWORK'"
+    if [ "$FORCE" = "force" ] || [ "$FORCE" = "-f" ]; then
+        docker network disconnect --force "$NETWORK" "$CONTAINER"
+    else
+        docker network disconnect "$NETWORK" "$CONTAINER"
+    fi
+}
+
+
+jwdockernetworkprune() {
+    echo "This will remove all unused networks."
+    echo -n "Are you sure? [y/N] "
+    read -r response
+    
+    if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+        echo "Pruning unused networks..."
+        docker network prune -f
+        echo "Network pruning complete."
+    else
+        echo "Operation cancelled."
+    fi
+}
+
+
+# ---------------------------------------------------------------------------------
 # inspectors
 # ---------------------------------------------------------------------------------
 

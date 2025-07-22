@@ -78,6 +78,60 @@ jwdockerhealth() {
 
 
 # ---------------------------------------------------------------------------------
+# troubleshooting tools
+# ---------------------------------------------------------------------------------
+
+jwdockerexec() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps --filter status=running --format "{{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local SHELL=${2:-/bin/bash}
+    
+    echo "Connecting to $CONTAINER with $SHELL..."
+    docker exec -it $CONTAINER $SHELL
+}
+
+
+jwdockerlogs() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps -a --format "{{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local LINES=${2:-50}
+    
+    echo
+    echo "---[ Last $LINES lines from $CONTAINER ]---------------"
+    docker logs --tail $LINES $CONTAINER
+    echo
+}
+
+
+jwdockerport() {
+    if [ $# -eq 0 ]; then
+        echo
+        echo "---[ Port Mappings ]--------------------------------"
+        docker ps --format "table {{.Names}}\t{{.Ports}}"
+        echo
+    else
+        local CONTAINER=$1
+        echo
+        echo "---[ Ports for $CONTAINER ]------------------------"
+        docker port $CONTAINER
+        echo
+    fi
+}
+
+
+# ---------------------------------------------------------------------------------
 # inspectors
 # ---------------------------------------------------------------------------------
 

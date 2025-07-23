@@ -954,6 +954,410 @@ jwdockersize() {
 
 
 # ---------------------------------------------------------------------------------
+# import/export utilities
+# ---------------------------------------------------------------------------------
+
+jwdockersave() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockersave <image> [output_file]"
+        echo "Examples:"
+        echo "  jwdockersave nginx                    # Saves to nginx.tar"
+        echo "  jwdockersave nginx:alpine             # Saves to nginx_alpine.tar"
+        echo "  jwdockersave nginx /tmp/nginx.tar     # Saves to specific file"
+        echo
+        echo "Available images:"
+        docker images --format "- {{.Repository}}:{{.Tag}}"
+        echo
+        return 1
+    fi
+
+    local IMAGE=$1
+    local OUTPUT_FILE=$2
+    
+    # Generate default filename if not provided
+    if [ -z "$OUTPUT_FILE" ]; then
+        OUTPUT_FILE=$(echo "$IMAGE" | tr ':/' '_').tar
+    fi
+    
+    echo "Saving image '$IMAGE' to '$OUTPUT_FILE'..."
+    docker save -o "$OUTPUT_FILE" "$IMAGE"
+    
+    if [ $? -eq 0 ]; then
+        echo "Image saved successfully!"
+        echo "File: $OUTPUT_FILE"
+        echo "Size: $(ls -lh "$OUTPUT_FILE" | awk '{print $5}')"
+    else
+        echo "Failed to save image."
+        return 1
+    fi
+}
+
+
+jwdockerload() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockerload <tar_file>"
+        echo "Examples:"
+        echo "  jwdockerload nginx.tar"
+        echo "  jwdockerload /tmp/myimage.tar"
+        echo
+        echo "Available tar files in current directory:"
+        ls -1 *.tar 2>/dev/null || echo "  (no .tar files found)"
+        echo
+        return 1
+    fi
+
+    local TAR_FILE=$1
+    
+    if [ ! -f "$TAR_FILE" ]; then
+        echo "Error: File '$TAR_FILE' not found."
+        return 1
+    fi
+    
+    echo "Loading image from '$TAR_FILE'..."
+    echo "File size: $(ls -lh "$TAR_FILE" | awk '{print $5}')"
+    echo
+    
+    docker load -i "$TAR_FILE"
+    
+    if [ $? -eq 0 ]; then
+        echo
+        echo "---[ Loaded Images ]--------------------------------"
+        echo "Recent images (last 5):"
+        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -6
+    else
+        echo "Failed to load image."
+        return 1
+    fi
+}
+
+
+jwdockerexport() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockerexport <container> [output_file]"
+        echo "Examples:"
+        echo "  jwdockerexport mycontainer                    # Exports to mycontainer.tar"
+        echo "  jwdockerexport mycontainer /tmp/backup.tar    # Exports to specific file"
+        echo
+        echo "Available containers:"
+        docker ps -a --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local OUTPUT_FILE=$2
+    
+    # Generate default filename if not provided
+    if [ -z "$OUTPUT_FILE" ]; then
+        OUTPUT_FILE="${CONTAINER}.tar"
+    fi
+    
+    echo "Exporting container '$CONTAINER' to '$OUTPUT_FILE'..."
+    docker export -o "$OUTPUT_FILE" "$CONTAINER"
+    
+    if [ $? -eq 0 ]; then
+        echo "Container exported successfully!"
+        echo "File: $OUTPUT_FILE"
+        echo "Size: $(ls -lh "$OUTPUT_FILE" | awk '{print $5}')"
+    else
+        echo "Failed to export container."
+        return 1
+    fi
+}
+
+
+jwdockerimport() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockerimport <tar_file> [repository[:tag]]"
+        echo "Examples:"
+        echo "  jwdockerimport container.tar                    # Imports as <none>:<none>"
+        echo "  jwdockerimport container.tar myimage:latest     # Imports with specific name"
+        echo
+        echo "Available tar files in current directory:"
+        ls -1 *.tar 2>/dev/null || echo "  (no .tar files found)"
+        echo
+        return 1
+    fi
+
+    local TAR_FILE=$1
+    local REPOSITORY=$2
+    
+    if [ ! -f "$TAR_FILE" ]; then
+        echo "Error: File '$TAR_FILE' not found."
+        return 1
+    fi
+    
+    echo "Importing container from '$TAR_FILE'..."
+    echo "File size: $(ls -lh "$TAR_FILE" | awk '{print $5}')"
+    
+    if [ -n "$REPOSITORY" ]; then
+        echo "Repository: $REPOSITORY"
+        docker import "$TAR_FILE" "$REPOSITORY"
+    else
+        echo "Repository: (will be <none>:<none>)"
+        docker import "$TAR_FILE"
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo
+        echo "---[ Imported Image ]-------------------------------"
+        echo "Recent images (last 5):"
+        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -6
+    else
+        echo "Failed to import container."
+        return 1
+    fi
+}
+
+
+# ---------------------------------------------------------------------------------
+# quick utility functions
+# ---------------------------------------------------------------------------------
+
+jwdockersearch() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockersearch <search_term> [limit]"
+        echo "Examples:"
+        echo "  jwdockersearch nginx"
+        echo "  jwdockersearch nginx 10"
+        echo "  jwdockersearch ubuntu/nginx"
+        return 1
+    fi
+
+    local SEARCH_TERM=$1
+    local LIMIT=${2:-25}
+    
+    echo "Searching Docker Hub for '$SEARCH_TERM' (limit: $LIMIT)..."
+    echo
+    docker search --limit="$LIMIT" "$SEARCH_TERM"
+    echo
+}
+
+
+jwdockerbackup() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockerbackup <container> [backup_dir]"
+        echo "Examples:"
+        echo "  jwdockerbackup mycontainer"
+        echo "  jwdockerbackup mycontainer /backups"
+        echo
+        echo "This will create a backup containing:"
+        echo "  - Container export (filesystem)"
+        echo "  - Container configuration"
+        echo "  - Associated volumes (if any)"
+        echo
+        echo "Available containers:"
+        docker ps -a --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local BACKUP_DIR=${2:-./docker-backups}
+    local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    local BACKUP_PATH="$BACKUP_DIR/${CONTAINER}_${TIMESTAMP}"
+    
+    echo "Creating backup for container '$CONTAINER'..."
+    echo "Backup location: $BACKUP_PATH"
+    
+    # Create backup directory
+    mkdir -p "$BACKUP_PATH"
+    
+    # Export container filesystem
+    echo "Exporting container filesystem..."
+    docker export -o "$BACKUP_PATH/${CONTAINER}_filesystem.tar" "$CONTAINER"
+    
+    # Save container configuration
+    echo "Saving container configuration..."
+    docker inspect "$CONTAINER" > "$BACKUP_PATH/${CONTAINER}_config.json"
+    
+    # Get image information
+    local IMAGE
+    IMAGE=$(docker inspect --format='{{.Config.Image}}' "$CONTAINER")
+    echo "Saving image information..."
+    echo "Image: $IMAGE" > "$BACKUP_PATH/${CONTAINER}_image.txt"
+    
+    # List volumes
+    echo "Documenting volumes..."
+    docker inspect --format='{{range .Mounts}}{{.Source}} -> {{.Destination}} ({{.Type}}){{"\n"}}{{end}}' "$CONTAINER" > "$BACKUP_PATH/${CONTAINER}_volumes.txt"
+    
+    # Create restore script
+    echo "Creating restore script..."
+    cat > "$BACKUP_PATH/restore.sh" << EOF
+#!/bin/bash
+# Restore script for container: $CONTAINER
+# Created: $(date)
+
+echo "Restoring container $CONTAINER..."
+
+# Import the filesystem as a new image
+echo "Importing filesystem..."
+docker import ${CONTAINER}_filesystem.tar ${CONTAINER}_restored:latest
+
+# Note: You may need to manually recreate volumes and networks
+echo "Container filesystem imported as ${CONTAINER}_restored:latest"
+echo "Check ${CONTAINER}_config.json for original configuration"
+echo "Check ${CONTAINER}_volumes.txt for volume mappings"
+echo "You may need to manually recreate the container with appropriate options"
+EOF
+    chmod +x "$BACKUP_PATH/restore.sh"
+    
+    # Show backup summary
+    echo
+    echo "---[ Backup Complete ]------------------------------"
+    echo "Location: $BACKUP_PATH"
+    echo "Files created:"
+    ls -lh "$BACKUP_PATH"
+    echo
+    echo "Total backup size: $(du -sh "$BACKUP_PATH" | cut -f1)"
+    echo
+}
+
+
+jwdockercp() {
+    if [ $# -lt 2 ]; then
+        echo "Usage: jwdockercp <source> <destination>"
+        echo "Examples:"
+        echo "  jwdockercp mycontainer:/app/config.txt ./config.txt"
+        echo "  jwdockercp ./data.json mycontainer:/tmp/data.json"
+        echo "  jwdockercp mycontainer:/logs/ ./container-logs/"
+        echo
+        echo "Available containers:"
+        docker ps -a --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local SOURCE=$1
+    local DESTINATION=$2
+    
+    echo "Copying from '$SOURCE' to '$DESTINATION'..."
+    docker cp "$SOURCE" "$DESTINATION"
+    
+    if [ $? -eq 0 ]; then
+        echo "Copy completed successfully!"
+        
+        # Show destination info if it's a local path
+        if [[ "$DESTINATION" != *":"* ]]; then
+            if [ -f "$DESTINATION" ]; then
+                echo "File size: $(ls -lh "$DESTINATION" | awk '{print $5}')"
+            elif [ -d "$DESTINATION" ]; then
+                echo "Directory contents: $(ls -1 "$DESTINATION" | wc -l) items"
+            fi
+        fi
+    else
+        echo "Copy failed!"
+        return 1
+    fi
+}
+
+
+jwdockerrun() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockerrun <image> [options]"
+        echo "Examples:"
+        echo "  jwdockerrun nginx"
+        echo "  jwdockerrun nginx -p 8080:80"
+        echo "  jwdockerrun ubuntu:20.04 -it --rm bash"
+        echo "  jwdockerrun postgres:13 -e POSTGRES_PASSWORD=secret"
+        echo
+        echo "Common options:"
+        echo "  -d, --detach          Run in background"
+        echo "  -it                   Interactive with TTY"
+        echo "  --rm                  Remove container when it exits"
+        echo "  -p <host>:<container> Port mapping"
+        echo "  -v <host>:<container> Volume mapping"
+        echo "  -e <VAR>=<value>      Environment variable"
+        echo "  --name <name>         Container name"
+        echo
+        return 1
+    fi
+
+    local IMAGE=$1
+    shift  # Remove image from arguments
+    local OPTIONS="$*"
+    
+    echo "Running container from image '$IMAGE'..."
+    if [ -n "$OPTIONS" ]; then
+        echo "Options: $OPTIONS"
+        # shellcheck disable=SC2086
+        docker run $OPTIONS "$IMAGE"
+    else
+        echo "Using default options: -d (detached)"
+        docker run -d "$IMAGE"
+    fi
+    
+    # Show the new container if it was created
+    if [ $? -eq 0 ]; then
+        echo
+        echo "---[ New Container ]--------------------------------"
+        docker ps -l --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+    fi
+}
+
+
+jwdockertag() {
+    if [ $# -lt 2 ]; then
+        echo "Usage: jwdockertag <source_image> <target_image>"
+        echo "Examples:"
+        echo "  jwdockertag nginx:latest myregistry.com/nginx:v1.0"
+        echo "  jwdockertag myapp:latest myapp:production"
+        echo "  jwdockertag ubuntu:20.04 ubuntu:focal"
+        echo
+        echo "Available images:"
+        docker images --format "- {{.Repository}}:{{.Tag}}"
+        echo
+        return 1
+    fi
+
+    local SOURCE_IMAGE=$1
+    local TARGET_IMAGE=$2
+    
+    echo "Tagging '$SOURCE_IMAGE' as '$TARGET_IMAGE'..."
+    docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
+    
+    if [ $? -eq 0 ]; then
+        echo "Image tagged successfully!"
+        echo
+        echo "---[ Tagged Images ]--------------------------------"
+        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -1
+        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | grep "$(echo "$TARGET_IMAGE" | cut -d: -f1)"
+    else
+        echo "Tagging failed!"
+        return 1
+    fi
+}
+
+
+jwdockerpush() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdockerpush <image>"
+        echo "Examples:"
+        echo "  jwdockerpush myregistry.com/myapp:latest"
+        echo "  jwdockerpush username/myimage:v1.0"
+        echo
+        echo "Available images:"
+        docker images --format "- {{.Repository}}:{{.Tag}}"
+        echo
+        return 1
+    fi
+
+    local IMAGE=$1
+    
+    echo "Pushing image '$IMAGE' to registry..."
+    docker push "$IMAGE"
+    
+    if [ $? -eq 0 ]; then
+        echo "Image pushed successfully!"
+    else
+        echo "Push failed! Make sure you're logged in to the registry."
+        echo "Use: docker login [registry-url]"
+        return 1
+    fi
+}
+
+
+# ---------------------------------------------------------------------------------
 # inspectors
 # ---------------------------------------------------------------------------------
 
@@ -963,14 +1367,14 @@ jwdockerinspectcontainer() {
     # [https://golang.org/pkg/fmt/]
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
-        docker ps --filter status=running --format "{{.Names}}"
+        docker ps --filter status=running --format "- {{.Names}}"
         echo "---"
         docker ps --filter status=created \
                   --filter status=restarting \
                   --filter status=removing \
                   --filter status=paused \
                   --filter status=exited \
-                  --filter status=dead --format "{{.Names}}"
+                  --filter status=dead --format "- {{.Names}}"
         echo
         return 1
     fi

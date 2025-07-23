@@ -1350,6 +1350,179 @@ jwdockerpush() {
 }
 
 
+jwdockerconnectivity() {
+    if [ $# -lt 2 ]; then
+        echo "Usage: jwdockerconnectivity <source_container> <target_container> [port]"
+        echo "Examples:"
+        echo "  jwdockerconnectivity web database"
+        echo "  jwdockerconnectivity web api 8080"
+        echo "  jwdockerconnectivity frontend backend 3000"
+        echo
+        echo "This will:"
+        echo "  - Show shared networks between containers"
+        echo "  - Display IP addresses on each network"
+        echo "  - Test basic connectivity (ping)"
+        echo "  - Test port connectivity if specified"
+        echo
+        echo "Available running containers:"
+        docker ps --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local SOURCE_CONTAINER=$1
+    local TARGET_CONTAINER=$2
+    local PORT=$3
+    
+    # Check if both containers exist and are running
+    if ! docker ps --format "{{.Names}}" | grep -q "^${SOURCE_CONTAINER}$"; then
+        echo "Error: Source container '$SOURCE_CONTAINER' is not running."
+        return 1
+    fi
+    
+    if ! docker ps --format "{{.Names}}" | grep -q "^${TARGET_CONTAINER}$"; then
+        echo "Error: Target container '$TARGET_CONTAINER' is not running."
+        return 1
+    fi
+    
+    echo "🔍 Testing connectivity: $SOURCE_CONTAINER → $TARGET_CONTAINER"
+    echo "============================================================"
+    echo
+    
+    # Get network information for both containers
+    echo "---[ Network Analysis ]-----------------------------"
+    
+    # Get networks for source container
+    local source_networks
+    source_networks=$(docker inspect "$SOURCE_CONTAINER" --format '{{ range $key, $value := .NetworkSettings.Networks }}{{$key}}:{{.IPAddress}}{{ printf "\n" }}{{ end }}')
+    echo "Source ($SOURCE_CONTAINER) networks:"
+    while IFS=: read -r network ip; do
+        if [ -n "$network" ]; then
+            echo "  - $network: $ip"
+        fi
+    done <<< "$source_networks"
+    echo
+    
+    # Get networks for target container
+    local target_networks
+    target_networks=$(docker inspect "$TARGET_CONTAINER" --format '{{ range $key, $value := .NetworkSettings.Networks }}{{$key}}:{{.IPAddress}}{{ printf "\n" }}{{ end }}')
+    echo "Target ($TARGET_CONTAINER) networks:"
+    while IFS=: read -r network ip; do
+        if [ -n "$network" ]; then
+            echo "  - $network: $ip"
+        fi
+    done <<< "$target_networks"
+    echo
+    
+    # Find shared networks
+    echo "---[ Shared Networks ]------------------------------"
+    local shared_networks=""
+    local target_ips=""
+    
+    while IFS=: read -r source_network _source_ip; do
+        if [ -n "$source_network" ]; then
+            while IFS=: read -r target_network target_ip; do
+                if [ -n "$target_network" ] && [ "$source_network" = "$target_network" ]; then
+                    echo "  ✅ $source_network (target IP: $target_ip)"
+                    shared_networks="$shared_networks $source_network"
+                    target_ips="$target_ips $target_ip"
+                fi
+            done <<< "$target_networks"
+        fi
+    done <<< "$source_networks"
+    
+    if [ -z "$shared_networks" ]; then
+        echo "  ❌ No shared networks found!"
+        echo
+        echo "💡 To enable connectivity, connect both containers to the same network:"
+        echo "   jwdockernetworkconnect <network_name> $SOURCE_CONTAINER"
+        echo "   jwdockernetworkconnect <network_name> $TARGET_CONTAINER"
+        return 1
+    fi
+    echo
+    
+    # Test connectivity
+    echo "---[ Connectivity Tests ]---------------------------"
+    
+    # Test ping connectivity to each shared network IP
+    for target_ip in $target_ips; do
+        if [ -n "$target_ip" ] && [ "$target_ip" != "<no value>" ]; then
+            echo -n "Ping test to $target_ip: "
+            if docker exec "$SOURCE_CONTAINER" ping -c 1 -W 2 "$target_ip" >/dev/null 2>&1; then
+                echo "✅ SUCCESS"
+            else
+                echo "❌ FAILED"
+            fi
+        fi
+    done
+    
+    # Test hostname resolution
+    echo -n "Hostname resolution ($TARGET_CONTAINER): "
+    if docker exec "$SOURCE_CONTAINER" ping -c 1 -W 2 "$TARGET_CONTAINER" >/dev/null 2>&1; then
+        echo "✅ SUCCESS"
+    else
+        echo "❌ FAILED"
+    fi
+    
+    # Test port connectivity if specified
+    if [ -n "$PORT" ]; then
+        echo
+        echo "---[ Port Connectivity Test ]-----------------------"
+        for target_ip in $target_ips; do
+            if [ -n "$target_ip" ] && [ "$target_ip" != "<no value>" ]; then
+                echo -n "Port $PORT test to $target_ip: "
+                # Try to connect to the port using nc (netcat) or telnet
+                if docker exec "$SOURCE_CONTAINER" sh -c "command -v nc >/dev/null 2>&1"; then
+                    if docker exec "$SOURCE_CONTAINER" nc -z -w 2 "$target_ip" "$PORT" >/dev/null 2>&1; then
+                        echo "✅ SUCCESS (port is open)"
+                    else
+                        echo "❌ FAILED (port is closed or filtered)"
+                    fi
+                elif docker exec "$SOURCE_CONTAINER" sh -c "command -v telnet >/dev/null 2>&1"; then
+                    if timeout 2 docker exec "$SOURCE_CONTAINER" telnet "$target_ip" "$PORT" >/dev/null 2>&1; then
+                        echo "✅ SUCCESS (port is open)"
+                    else
+                        echo "❌ FAILED (port is closed or filtered)"
+                    fi
+                else
+                    echo "⚠️  SKIPPED (no nc or telnet available in source container)"
+                fi
+            fi
+        done
+        
+        # Test port via hostname
+        echo -n "Port $PORT test to $TARGET_CONTAINER: "
+        if docker exec "$SOURCE_CONTAINER" sh -c "command -v nc >/dev/null 2>&1"; then
+            if docker exec "$SOURCE_CONTAINER" nc -z -w 2 "$TARGET_CONTAINER" "$PORT" >/dev/null 2>&1; then
+                echo "✅ SUCCESS (port is open)"
+            else
+                echo "❌ FAILED (port is closed or filtered)"
+            fi
+        elif docker exec "$SOURCE_CONTAINER" sh -c "command -v telnet >/dev/null 2>&1"; then
+            if timeout 2 docker exec "$SOURCE_CONTAINER" telnet "$TARGET_CONTAINER" "$PORT" >/dev/null 2>&1; then
+                echo "✅ SUCCESS (port is open)"
+            else
+                echo "❌ FAILED (port is closed or filtered)"
+            fi
+        else
+            echo "⚠️  SKIPPED (no nc or telnet available in source container)"
+        fi
+    fi
+    
+    echo
+    echo "---[ Summary ]--------------------------------------"
+    if [ -n "$shared_networks" ]; then
+        echo "✅ Containers can communicate via shared networks"
+        if [ -n "$PORT" ]; then
+            echo "🔍 Port $PORT connectivity tested above"
+        fi
+    else
+        echo "❌ Containers cannot communicate (no shared networks)"
+    fi
+    echo
+}
+
+
 # ---------------------------------------------------------------------------------
 # inspectors
 # ---------------------------------------------------------------------------------

@@ -980,12 +980,10 @@ jwdockersave() {
     fi
     
     echo "Saving image '$IMAGE' to '$OUTPUT_FILE'..."
-    docker save -o "$OUTPUT_FILE" "$IMAGE"
-    
-    if [ $? -eq 0 ]; then
+    if docker save -o "$OUTPUT_FILE" "$IMAGE"; then
         echo "Image saved successfully!"
         echo "File: $OUTPUT_FILE"
-        echo "Size: $(ls -lh "$OUTPUT_FILE" | awk '{print $5}')"
+        echo "Size: $(stat -c%s "$OUTPUT_FILE" | numfmt --to=iec)"
     else
         echo "Failed to save image."
         return 1
@@ -1001,7 +999,7 @@ jwdockerload() {
         echo "  jwdockerload /tmp/myimage.tar"
         echo
         echo "Available tar files in current directory:"
-        ls -1 *.tar 2>/dev/null || echo "  (no .tar files found)"
+        ls -1 ./*.tar 2>/dev/null || echo "  (no .tar files found)"
         echo
         return 1
     fi
@@ -1014,12 +1012,10 @@ jwdockerload() {
     fi
     
     echo "Loading image from '$TAR_FILE'..."
-    echo "File size: $(ls -lh "$TAR_FILE" | awk '{print $5}')"
+    echo "File size: $(stat -c%s "$TAR_FILE" | numfmt --to=iec)"
     echo
     
-    docker load -i "$TAR_FILE"
-    
-    if [ $? -eq 0 ]; then
+    if docker load -i "$TAR_FILE"; then
         echo
         echo "---[ Loaded Images ]--------------------------------"
         echo "Recent images (last 5):"
@@ -1053,12 +1049,10 @@ jwdockerexport() {
     fi
     
     echo "Exporting container '$CONTAINER' to '$OUTPUT_FILE'..."
-    docker export -o "$OUTPUT_FILE" "$CONTAINER"
-    
-    if [ $? -eq 0 ]; then
+    if docker export -o "$OUTPUT_FILE" "$CONTAINER"; then
         echo "Container exported successfully!"
         echo "File: $OUTPUT_FILE"
-        echo "Size: $(ls -lh "$OUTPUT_FILE" | awk '{print $5}')"
+        echo "Size: $(stat -c%s "$OUTPUT_FILE" | numfmt --to=iec)"
     else
         echo "Failed to export container."
         return 1
@@ -1074,7 +1068,7 @@ jwdockerimport() {
         echo "  jwdockerimport container.tar myimage:latest     # Imports with specific name"
         echo
         echo "Available tar files in current directory:"
-        ls -1 *.tar 2>/dev/null || echo "  (no .tar files found)"
+        ls -1 ./*.tar 2>/dev/null || echo "  (no .tar files found)"
         echo
         return 1
     fi
@@ -1088,24 +1082,30 @@ jwdockerimport() {
     fi
     
     echo "Importing container from '$TAR_FILE'..."
-    echo "File size: $(ls -lh "$TAR_FILE" | awk '{print $5}')"
+    echo "File size: $(stat -c%s "$TAR_FILE" | numfmt --to=iec)"
     
     if [ -n "$REPOSITORY" ]; then
         echo "Repository: $REPOSITORY"
-        docker import "$TAR_FILE" "$REPOSITORY"
+        if docker import "$TAR_FILE" "$REPOSITORY"; then
+            echo
+            echo "---[ Imported Image ]-------------------------------"
+            echo "Recent images (last 5):"
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -6
+        else
+            echo "Failed to import container."
+            return 1
+        fi
     else
         echo "Repository: (will be <none>:<none>)"
-        docker import "$TAR_FILE"
-    fi
-    
-    if [ $? -eq 0 ]; then
-        echo
-        echo "---[ Imported Image ]-------------------------------"
-        echo "Recent images (last 5):"
-        docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -6
-    else
-        echo "Failed to import container."
-        return 1
+        if docker import "$TAR_FILE"; then
+            echo
+            echo "---[ Imported Image ]-------------------------------"
+            echo "Recent images (last 5):"
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -6
+        else
+            echo "Failed to import container."
+            return 1
+        fi
     fi
 }
 
@@ -1154,7 +1154,8 @@ jwdockerbackup() {
 
     local CONTAINER=$1
     local BACKUP_DIR=${2:-./docker-backups}
-    local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    local TIMESTAMP
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     local BACKUP_PATH="$BACKUP_DIR/${CONTAINER}_${TIMESTAMP}"
     
     echo "Creating backup for container '$CONTAINER'..."
@@ -1232,17 +1233,15 @@ jwdockercp() {
     local DESTINATION=$2
     
     echo "Copying from '$SOURCE' to '$DESTINATION'..."
-    docker cp "$SOURCE" "$DESTINATION"
-    
-    if [ $? -eq 0 ]; then
+    if docker cp "$SOURCE" "$DESTINATION"; then
         echo "Copy completed successfully!"
         
         # Show destination info if it's a local path
         if [[ "$DESTINATION" != *":"* ]]; then
             if [ -f "$DESTINATION" ]; then
-                echo "File size: $(ls -lh "$DESTINATION" | awk '{print $5}')"
+                echo "File size: $(stat -c%s "$DESTINATION" | numfmt --to=iec)"
             elif [ -d "$DESTINATION" ]; then
-                echo "Directory contents: $(ls -1 "$DESTINATION" | wc -l) items"
+                echo "Directory contents: $(find "$DESTINATION" -maxdepth 1 -type f | wc -l) items"
             fi
         fi
     else
@@ -1285,14 +1284,12 @@ jwdockerrun() {
     else
         echo "Using default options: -d (detached)"
         docker run -d "$IMAGE"
-    fi
-    
-    # Show the new container if it was created
-    if [ $? -eq 0 ]; then
+    fi && {
+        # Show the new container if it was created
         echo
         echo "---[ New Container ]--------------------------------"
         docker ps -l --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
-    fi
+    }
 }
 
 
@@ -1314,9 +1311,7 @@ jwdockertag() {
     local TARGET_IMAGE=$2
     
     echo "Tagging '$SOURCE_IMAGE' as '$TARGET_IMAGE'..."
-    docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
-    
-    if [ $? -eq 0 ]; then
+    if docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"; then
         echo "Image tagged successfully!"
         echo
         echo "---[ Tagged Images ]--------------------------------"
@@ -1345,9 +1340,7 @@ jwdockerpush() {
     local IMAGE=$1
     
     echo "Pushing image '$IMAGE' to registry..."
-    docker push "$IMAGE"
-    
-    if [ $? -eq 0 ]; then
+    if docker push "$IMAGE"; then
         echo "Image pushed successfully!"
     else
         echo "Push failed! Make sure you're logged in to the registry."

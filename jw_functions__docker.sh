@@ -57,114 +57,10 @@ jwdockerpsdown() {
 
 
 # ---------------------------------------------------------------------------------
-# resource monitoring
-# ---------------------------------------------------------------------------------
-
-jwdockerstats() {
-    if [ $# -eq 0 ]; then
-        # Show stats for all running containers with clean formatting
-        docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
-    else
-        # Show stats for specific container(s)
-        docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}" "$@"
-    fi
-}
-
-
-jwdockertop() {
-    if [ $# -eq 0 ]; then
-        echo -e "\n\t???"
-        docker ps --filter status=running --format "{{.Names}}"
-        echo
-        return 1
-    fi
-
-    local CONTAINER=$1
-    echo
-    echo "---[ Processes in $CONTAINER ]-------------------------"
-    docker top "$CONTAINER"
-    echo
-}
-
-
-jwdockerhealth() {
-    echo
-    echo "---[ Container Health Status ]-------------------------"
-    docker ps --format "table {{.Names}}\t{{.Status}}" | head -1
-    docker ps --format "table {{.Names}}\t{{.Status}}" | tail -n +2 | while read -r name container_status; do
-        if echo "$container_status" | grep -q "healthy"; then
-            echo -e "$name\t\033[32m$container_status\033[0m"
-        elif echo "$container_status" | grep -q "unhealthy"; then
-            echo -e "$name\t\033[31m$container_status\033[0m"
-        elif echo "$container_status" | grep -q "starting"; then
-            echo -e "$name\t\033[33m$container_status\033[0m"
-        else
-            echo -e "$name\t$container_status"
-        fi
-    done
-    echo
-}
-
-
-# ---------------------------------------------------------------------------------
-# troubleshooting tools
-# ---------------------------------------------------------------------------------
-
-jwdockerexec() {
-    if [ $# -eq 0 ]; then
-        echo -e "\n\t???"
-        docker ps --filter status=running --format "{{.Names}}"
-        echo
-        return 1
-    fi
-
-    local CONTAINER=$1
-    local SHELL=${2:-/bin/bash}
-    
-    echo "Connecting to $CONTAINER with $SHELL..."
-    docker exec -it "$CONTAINER" "$SHELL"
-}
-
-
-jwdockerlogs() {
-    if [ $# -eq 0 ]; then
-        echo -e "\n\t???"
-        docker ps -a --format "{{.Names}}"
-        echo
-        return 1
-    fi
-
-    local CONTAINER=$1
-    local LINES=${2:-50}
-    
-    echo
-    echo "---[ Last $LINES lines from $CONTAINER ]---------------"
-    docker logs --tail "$LINES" "$CONTAINER"
-    echo
-}
-
-
-jwdockerport() {
-    if [ $# -eq 0 ]; then
-        echo
-        echo "---[ Port Mappings ]--------------------------------"
-        docker ps --format "table {{.Names}}\t{{.Ports}}"
-        echo
-    else
-        local CONTAINER=$1
-        echo
-        echo "---[ Ports for $CONTAINER ]------------------------"
-        docker port "$CONTAINER"
-        echo
-    fi
-}
-
-
-# ---------------------------------------------------------------------------------
 # container lifecycle management
 # ---------------------------------------------------------------------------------
 
-jwdockerstart() {
+jwdockercontainerstart() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker ps --filter status=exited --filter status=created --format "{{.Names}}"
@@ -182,7 +78,7 @@ jwdockerstart() {
 }
 
 
-jwdockerstop() {
+jwdockercontainerstop() {
     if [ $# -eq 0 ]; then
         local running_containers
         running_containers=$(docker ps --filter status=running --format "{{.Names}}")
@@ -222,7 +118,7 @@ jwdockerstop() {
 }
 
 
-jwdockerrestart() {
+jwdockercontainerrestart() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker ps -a --format "{{.Names}}"
@@ -242,7 +138,7 @@ jwdockerrestart() {
 }
 
 
-jwdockerremove() {
+jwdockercontainerremove() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker ps -a --filter status=exited --filter status=created --format "{{.Names}}"
@@ -285,13 +181,13 @@ jwdockerimages() {
 }
 
 
-jwdockerpull() {
+jwdockerimagepull() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerpull <image[:tag]>"
+        echo "Usage: jwdockerimagepull <image[:tag]>"
         echo "Examples:"
-        echo "  jwdockerpull nginx"
-        echo "  jwdockerpull nginx:alpine"
-        echo "  jwdockerpull ubuntu:20.04"
+        echo "  jwdockerimagepull nginx"
+        echo "  jwdockerimagepull nginx:alpine"
+        echo "  jwdockerimagepull ubuntu:20.04"
         return 1
     fi
 
@@ -307,13 +203,13 @@ jwdockerpull() {
 }
 
 
-jwdockerbuild() {
+jwdockerimagebuild() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerbuild <tag> [dockerfile_path] [build_context]"
+        echo "Usage: jwdockerimagebuild <tag> [dockerfile_path] [build_context]"
         echo "Examples:"
-        echo "  jwdockerbuild myapp:latest"
-        echo "  jwdockerbuild myapp:v1.0 ./Dockerfile ."
-        echo "  jwdockerbuild myapp:dev ./docker/Dockerfile.dev ./src"
+        echo "  jwdockerimagebuild myapp:latest"
+        echo "  jwdockerimagebuild myapp:v1.0 ./Dockerfile ."
+        echo "  jwdockerimagebuild myapp:dev ./docker/Dockerfile.dev ./src"
         return 1
     fi
 
@@ -336,7 +232,7 @@ jwdockerbuild() {
 }
 
 
-jwdockerrmi() {
+jwdockerimagerm() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker images --format "{{.Repository}}:{{.Tag}}"
@@ -694,6 +590,56 @@ jwdockernetworkprune() {
     else
         echo "Operation cancelled."
     fi
+}
+
+
+# ---------------------------------------------------------------------------------
+# resource monitoring
+# ---------------------------------------------------------------------------------
+
+jwdockermonitorstats() {
+    if [ $# -eq 0 ]; then
+        # Show stats for all running containers with clean formatting
+        docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
+    else
+        # Show stats for specific container(s)
+        docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}" "$@"
+    fi
+}
+
+
+jwdockermonitortop() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps --filter status=running --format "{{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    echo
+    echo "---[ Processes in $CONTAINER ]-------------------------"
+    docker top "$CONTAINER"
+    echo
+}
+
+
+jwdockermonitorhealth() {
+    echo
+    echo "---[ Container Health Status ]-------------------------"
+    docker ps --format "table {{.Names}}\t{{.Status}}" | head -1
+    docker ps --format "table {{.Names}}\t{{.Status}}" | tail -n +2 | while read -r name container_status; do
+        if echo "$container_status" | grep -q "healthy"; then
+            echo -e "$name\t\033[32m$container_status\033[0m"
+        elif echo "$container_status" | grep -q "unhealthy"; then
+            echo -e "$name\t\033[31m$container_status\033[0m"
+        elif echo "$container_status" | grep -q "starting"; then
+            echo -e "$name\t\033[33m$container_status\033[0m"
+        else
+            echo -e "$name\t$container_status"
+        fi
+    done
+    echo
 }
 
 
@@ -1520,6 +1466,61 @@ jwdockerconnectivity() {
         echo "❌ Containers cannot communicate (no shared networks)"
     fi
     echo
+}
+
+
+
+# ---------------------------------------------------------------------------------
+# troubleshooting tools
+# ---------------------------------------------------------------------------------
+
+jwdockerexec() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps --filter status=running --format "{{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local SHELL=${2:-/bin/bash}
+    
+    echo "Connecting to $CONTAINER with $SHELL..."
+    docker exec -it "$CONTAINER" "$SHELL"
+}
+
+
+jwdockerlogs() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps -a --format "{{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local LINES=${2:-50}
+    
+    echo
+    echo "---[ Last $LINES lines from $CONTAINER ]---------------"
+    docker logs --tail "$LINES" "$CONTAINER"
+    echo
+}
+
+
+jwdockerport() {
+    if [ $# -eq 0 ]; then
+        echo
+        echo "---[ Port Mappings ]--------------------------------"
+        docker ps --format "table {{.Names}}\t{{.Ports}}"
+        echo
+    else
+        local CONTAINER=$1
+        echo
+        echo "---[ Ports for $CONTAINER ]------------------------"
+        docker port "$CONTAINER"
+        echo
+    fi
 }
 
 

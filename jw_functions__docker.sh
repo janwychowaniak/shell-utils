@@ -7,7 +7,7 @@
 
 alias jwdlf="docker logs -f"
 alias jwdockerfindcontainerbyip="docker ps -q | xargs -n 1 docker inspect -f '{{.Id}} {{.Name}}  -  {{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' | grep"
-alias jwdockerps="jwdockerpsup"
+alias jwdockerps="jwdocker_containers"
 
 
 # ---------------------------------------------------------------------------------
@@ -87,15 +87,7 @@ jwdockerinspectnetwork() {
 # ps 
 # ---------------------------------------------------------------------------------
 
-jwdocker_psup() {
-    if [ $# -eq 0 ]; then
-        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
-    else
-        # Filter running containers by name
-        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | head -1
-        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | grep -i "$1"
-    fi
-}
+alias jwdocker_psup="jwdocker_containers"
 
 
 jwdocker_psall() {
@@ -138,6 +130,17 @@ jwdocker_psdown() {
 # ---------------------------------------------------------------------------------
 # container lifecycle management
 # ---------------------------------------------------------------------------------
+
+jwdocker_containers() {
+    if [ $# -eq 0 ]; then
+        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+    else
+        # Filter running containers by name
+        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | head -1
+        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | grep -i "$1"
+    fi
+}
+
 
 jwdocker_container-start() {
     if [ $# -eq 0 ]; then

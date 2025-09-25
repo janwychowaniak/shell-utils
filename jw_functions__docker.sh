@@ -87,7 +87,7 @@ jwdockerinspectnetwork() {
 # ps 
 # ---------------------------------------------------------------------------------
 
-jwdockerpsup() {
+jwdocker_psup() {
     if [ $# -eq 0 ]; then
         docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
     else
@@ -98,7 +98,7 @@ jwdockerpsup() {
 }
 
 
-jwdockerpsall() {
+jwdocker_psall() {
     if [ $# -eq 0 ]; then
         docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
     else
@@ -109,7 +109,7 @@ jwdockerpsall() {
 }
 
 
-jwdockerpsdown() {
+jwdocker_psdown() {
     if [ $# -eq 0 ]; then
         docker ps --filter status=created \
                   --filter status=restarting \
@@ -139,7 +139,7 @@ jwdockerpsdown() {
 # container lifecycle management
 # ---------------------------------------------------------------------------------
 
-jwdockercontainerstart() {
+jwdocker_container-start() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker ps --filter status=exited --filter status=created --format "{{.Names}}"
@@ -157,7 +157,7 @@ jwdockercontainerstart() {
 }
 
 
-jwdockercontainerstop() {
+jwdocker_container-stop() {
     if [ $# -eq 0 ]; then
         local running_containers
         running_containers=$(docker ps --filter status=running --format "{{.Names}}")
@@ -197,7 +197,7 @@ jwdockercontainerstop() {
 }
 
 
-jwdockercontainerrestart() {
+jwdocker_container-restart() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker ps -a --format "{{.Names}}"
@@ -217,7 +217,7 @@ jwdockercontainerrestart() {
 }
 
 
-jwdockercontainerremove() {
+jwdocker_container-remove() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker ps -a --filter status=exited --filter status=created --format "{{.Names}}"
@@ -248,7 +248,7 @@ jwdockercontainerremove() {
 # image management
 # ---------------------------------------------------------------------------------
 
-jwdockerimages() {
+jwdocker_images() {
     if [ $# -eq 0 ]; then
         # Show all images with clean formatting
         docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}"
@@ -260,7 +260,7 @@ jwdockerimages() {
 }
 
 
-jwdockerimagepull() {
+jwdocker_image-pull() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockerimagepull <image[:tag]>"
         echo "Examples:"
@@ -282,7 +282,7 @@ jwdockerimagepull() {
 }
 
 
-jwdockerimagebuild() {
+jwdocker_image-build() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockerimagebuild <tag> [dockerfile_path] [build_context]"
         echo "Examples:"
@@ -311,7 +311,7 @@ jwdockerimagebuild() {
 }
 
 
-jwdockerimagerm() {
+jwdocker_image-rm() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker images --format "{{.Repository}}:{{.Tag}}"
@@ -345,7 +345,7 @@ jwdockerimagerm() {
 }
 
 
-jwdockerimagehistory() {
+jwdocker_image-history() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         echo "Usage: jwdockerimagehistory <image> [--no-trunc]"
@@ -374,7 +374,7 @@ jwdockerimagehistory() {
 # volume management
 # ---------------------------------------------------------------------------------
 
-jwdockervolumes() {
+jwdocker_volumes() {
     if [ $# -eq 0 ]; then
         # Show all volumes with clean formatting
         docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}"
@@ -386,7 +386,7 @@ jwdockervolumes() {
 }
 
 
-jwdockervolumeinspect() {
+jwdocker_volume-inspect() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker volume ls --format "{{.Name}}"
@@ -425,7 +425,7 @@ jwdockervolumeinspect() {
 }
 
 
-jwdockervolumecreate() {
+jwdocker_volume-create() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockervolumecreate <volume_name> [driver] [options]"
         echo "Examples:"
@@ -458,7 +458,7 @@ jwdockervolumecreate() {
 }
 
 
-jwdockervolumeremove() {
+jwdocker_volume-remove() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker volume ls --format "{{.Name}}"
@@ -492,7 +492,7 @@ jwdockervolumeremove() {
 }
 
 
-jwdockervolumeprune() {
+jwdocker_volume-prune() {
     echo "This will remove all unused local volumes."
     echo -n "Are you sure? [y/N] "
     read -r response
@@ -511,7 +511,7 @@ jwdockervolumeprune() {
 # network management
 # ---------------------------------------------------------------------------------
 
-jwdockernetworks() {
+jwdocker_networks() {
     if [ $# -eq 0 ]; then
         # Show all networks with clean formatting
         docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}"
@@ -523,7 +523,7 @@ jwdockernetworks() {
 }
 
 
-jwdockernetworkcreate() {
+jwdocker_network-create() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockernetworkcreate <network_name> [driver] [options]"
         echo "Examples:"
@@ -557,7 +557,7 @@ jwdockernetworkcreate() {
 }
 
 
-jwdockernetworkremove() {
+jwdocker_network-remove() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         echo "Available networks (excluding system networks):"
@@ -590,7 +590,7 @@ jwdockernetworkremove() {
 }
 
 
-jwdockernetworkconnect() {
+jwdocker_network-connect() {
     if [ $# -lt 2 ]; then
         echo "Usage: jwdockernetworkconnect <network> <container> [options]"
         echo "Examples:"
@@ -628,7 +628,7 @@ jwdockernetworkconnect() {
 }
 
 
-jwdockernetworkdisconnect() {
+jwdocker_network-disconnect() {
     if [ $# -lt 2 ]; then
         echo "Usage: jwdockernetworkdisconnect <network> <container> [force]"
         echo "Examples:"
@@ -657,7 +657,7 @@ jwdockernetworkdisconnect() {
 }
 
 
-jwdockernetworkprune() {
+jwdocker_network-prune() {
     echo "This will remove all unused networks."
     echo -n "Are you sure? [y/N] "
     read -r response
@@ -676,7 +676,7 @@ jwdockernetworkprune() {
 # resource monitoring
 # ---------------------------------------------------------------------------------
 
-jwdockermonitorstats() {
+jwdocker_monitor-stats() {
     if [ $# -eq 0 ]; then
         # Show stats for all running containers with clean formatting
         docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
@@ -687,7 +687,7 @@ jwdockermonitorstats() {
 }
 
 
-jwdockermonitortop() {
+jwdocker_monitor-top() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker ps --filter status=running --format "{{.Names}}"
@@ -703,7 +703,7 @@ jwdockermonitortop() {
 }
 
 
-jwdockermonitorhealth() {
+jwdocker_monitor-health() {
     echo
     echo "---[ Container Health Status ]-------------------------"
     docker ps --format "table {{.Names}}\t{{.Status}}" | head -1
@@ -726,7 +726,7 @@ jwdockermonitorhealth() {
 # system cleanup & maintenance
 # ---------------------------------------------------------------------------------
 
-jwdockerdiskusage() {
+jwdocker_disk-usage() {
     echo
     echo "---[ Docker Disk Usage ]---------------------------"
     docker system df
@@ -737,7 +737,7 @@ jwdockerdiskusage() {
 }
 
 
-jwdockersysteminfo() {
+jwdocker_system-info() {
     echo
     echo "---[ Docker System Information ]-------------------"
     docker version --format "Client Version: {{.Client.Version}}"
@@ -755,7 +755,7 @@ jwdockersysteminfo() {
 }
 
 
-jwdockerprune() {
+jwdocker_prune() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockerprune [containers|images|volumes|networks|system|all]"
         echo "Examples:"
@@ -847,7 +847,7 @@ jwdockerprune() {
 }
 
 
-jwdockercleanup() {
+jwdocker_cleanup() {
     echo "🧹 Docker Cleanup Wizard"
     echo "========================"
     echo
@@ -931,7 +931,7 @@ jwdockercleanup() {
 }
 
 
-jwdockersize() {
+jwdocker_size() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockersize [containers|images|volumes|all]"
         echo "Examples:"
@@ -982,7 +982,7 @@ jwdockersize() {
 # import/export utilities
 # ---------------------------------------------------------------------------------
 
-jwdockersave() {
+jwdocker_save() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockersave <image> [output_file]"
         echo "Examples:"
@@ -1016,7 +1016,7 @@ jwdockersave() {
 }
 
 
-jwdockerload() {
+jwdocker_load() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockerload <tar_file>"
         echo "Examples:"
@@ -1052,7 +1052,7 @@ jwdockerload() {
 }
 
 
-jwdockerexport() {
+jwdocker_export() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockerexport <container> [output_file]"
         echo "Examples:"
@@ -1085,7 +1085,7 @@ jwdockerexport() {
 }
 
 
-jwdockerimport() {
+jwdocker_import() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockerimport <tar_file> [repository[:tag]]"
         echo "Examples:"
@@ -1139,7 +1139,7 @@ jwdockerimport() {
 # quick utility functions
 # ---------------------------------------------------------------------------------
 
-jwdockersearch() {
+jwdocker_search() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockersearch <search_term> [limit]"
         echo "Examples:"
@@ -1159,7 +1159,7 @@ jwdockersearch() {
 }
 
 
-jwdockerbackup() {
+jwdocker_backup() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockerbackup <container> [backup_dir]"
         echo "Examples:"
@@ -1240,7 +1240,7 @@ EOF
 }
 
 
-jwdockercp() {
+jwdocker_cp() {
     if [ $# -lt 2 ]; then
         echo "Usage: jwdockercp <source> <destination>"
         echo "Examples:"
@@ -1276,7 +1276,7 @@ jwdockercp() {
 }
 
 
-jwdockerrun() {
+jwdocker_run() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockerrun <image> [options]"
         echo "Examples:"
@@ -1318,7 +1318,7 @@ jwdockerrun() {
 }
 
 
-jwdockertag() {
+jwdocker_tag() {
     if [ $# -lt 2 ]; then
         echo "Usage: jwdockertag <source_image> <target_image>"
         echo "Examples:"
@@ -1349,7 +1349,7 @@ jwdockertag() {
 }
 
 
-jwdockerpush() {
+jwdocker_push() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwdockerpush <image>"
         echo "Examples:"
@@ -1375,7 +1375,7 @@ jwdockerpush() {
 }
 
 
-jwdockerconnectivity() {
+jwdocker_connectivity() {
     if [ $# -lt 2 ]; then
         echo "Usage: jwdockerconnectivity <source_container> <target_container> [port]"
         echo "Examples:"
@@ -1553,7 +1553,7 @@ jwdockerconnectivity() {
 # troubleshooting tools
 # ---------------------------------------------------------------------------------
 
-jwdockerexec() {
+jwdocker_exec() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker ps --filter status=running --format "{{.Names}}"
@@ -1569,7 +1569,7 @@ jwdockerexec() {
 }
 
 
-jwdockerlogs() {
+jwdocker_logs() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
         docker ps -a --format "{{.Names}}"
@@ -1587,7 +1587,7 @@ jwdockerlogs() {
 }
 
 
-jwdockerport() {
+jwdocker_port() {
     if [ $# -eq 0 ]; then
         echo
         echo "---[ Port Mappings ]--------------------------------"

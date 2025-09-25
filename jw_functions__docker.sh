@@ -2,6 +2,90 @@
 
 
 # ---------------------------------------------------------------------------------
+# table of contents
+# ---------------------------------------------------------------------------------
+
+jwdocker_toc() {
+    echo
+    echo " -----------------------------  legacy: aliases"
+    echo " - jwdlf"
+    echo " - jwdockerfindcontainerbyip"
+    echo " - jwdockerps"
+    echo
+    echo " -----------------------------  legacy: inspectors"
+    echo " - jwdockerinspectcontainer"
+    echo " - jwdockerinspectnetwork"
+    echo
+    echo " -----------------------------  ps"
+    echo " - jwdocker_psup"
+    echo " - jwdocker_psall"
+    echo " - jwdocker_psdown"
+    echo
+    echo " -----------------------------  container lifecycle management"
+    echo " - jwdocker_containers"
+    echo " - jwdocker_container-start"
+    echo " - jwdocker_container-stop"
+    echo " - jwdocker_container-restart"
+    echo " - jwdocker_container-remove"
+    echo
+    echo " -----------------------------  image management"
+    echo " - jwdocker_images"
+    echo " - jwdocker_image-pull"
+    echo " - jwdocker_image-build"
+    echo " - jwdocker_image-rm"
+    echo " - jwdocker_image-history"
+    echo
+    echo " -----------------------------  volume management"
+    echo " - jwdocker_volumes"
+    echo " - jwdocker_volume-inspect"
+    echo " - jwdocker_volume-create"
+    echo " - jwdocker_volume-remove"
+    echo " - jwdocker_volume-prune"
+    echo
+    echo " -----------------------------  network management"
+    echo " - jwdocker_networks"
+    echo " - jwdocker_network-create"
+    echo " - jwdocker_network-remove"
+    echo " - jwdocker_network-connect"
+    echo " - jwdocker_network-disconnect"
+    echo " - jwdocker_network-prune"
+    echo
+    echo " -----------------------------  resource monitoring"
+    echo " - jwdocker_monitor-stats"
+    echo " - jwdocker_monitor-top"
+    echo " - jwdocker_monitor-health"
+    echo
+    echo " -----------------------------  system cleanup & maintenance"
+    echo " - jwdocker_disk-usage"
+    echo " - jwdocker_system-info"
+    echo " - jwdocker_prune"
+    echo " - jwdocker_cleanup"
+    echo " - jwdocker_size"
+    echo
+    echo " -----------------------------  import/export utilities"
+    echo " - jwdocker_save"
+    echo " - jwdocker_load"
+    echo " - jwdocker_export"
+    echo " - jwdocker_import"
+    echo
+    echo " -----------------------------  quick utility functions"
+    echo " - jwdocker_search"
+    echo " - jwdocker_backup"
+    echo " - jwdocker_cp"
+    echo " - jwdocker_run"
+    echo " - jwdocker_tag"
+    echo " - jwdocker_push"
+    echo " - jwdocker_connectivity"
+    echo
+    echo " -----------------------------  troubleshooting tools"
+    echo " - jwdocker_exec"
+    echo " - jwdocker_logs"
+    echo " - jwdocker_port"
+    echo
+}
+
+
+# ---------------------------------------------------------------------------------
 # legacy: aliases
 # ---------------------------------------------------------------------------------
 

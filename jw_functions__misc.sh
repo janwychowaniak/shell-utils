@@ -148,6 +148,35 @@ jwwhois_creat() {
 }
 
 
+jwpaste() {
+    # Dump the current clipboard to a timestamped /tmp file and stream it to stdout
+
+    # 1. Build the timestamped name: /tmp/clip‑dump‑YYYYMMDD‑hhmmss
+    local ts file
+    ts=$(date '+%Y%m%d-%H%M%S')
+    file="/tmp/clip-dump-${ts}"
+
+    # 2. Grab the clipboard content.
+    #    • On MXLinux (Debian‑based) the usual utilities are:
+    #        - xclip  (X11)
+    #        - wl-copy / wl-paste (Wayland)
+    #    Choose whichever is available; fall back to the other.
+    if command -v xclip >/dev/null 2>&1; then
+        # X11: copy primary selection or clipboard (-selection clipboard)
+        xclip -selection clipboard -o >"$file"
+    elif command -v wl-paste >/dev/null 2>&1; then
+        # Wayland: default clipboard
+        wl-paste >"$file"
+    else
+        echo "Error: neither xclip nor wl-paste is installed." >&2
+        return 1
+    fi
+
+    # 3. Stream the file to stdout (so it can be piped)
+    cat "$file"
+}
+
+
 # ---------------------------------------------------------------------------
 
 jwtvnames()

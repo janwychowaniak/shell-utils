@@ -1,6 +1,6 @@
 # A collection of miscellaneous functions that are hard to categorize elsewhere
 
-# ---------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 jwgoogle()
@@ -148,6 +148,9 @@ jwwhois_creat() {
 }
 
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 jwpaste() {
     # Dump the current clipboard to a timestamped /tmp file and stream it to stdout
 
@@ -177,7 +180,89 @@ jwpaste() {
 }
 
 
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------
+# jwjina – fetch a page via Jina AI and store it as a dated MD file
+#
+#   Usage:
+#     jwjina <url> [suffix]
+#
+#   • <url>    – the URL you want to convert to markdown (required)
+#   • suffix   – optional string that will be appended to the file name
+#
+#   Example:
+#     jwjina https://opencode.ai/docs demo
+#     → Stored to /tmp/jina-dump-20251229-111313-demo.md
+# ------------------------------------------------------------
+jwjina() {
+    # ------------------------------------------------------------------
+    # Helper: print a short usage message
+    # ------------------------------------------------------------------
+    _jwjina_usage() {
+        printf 'Usage: %s <url> [suffix]\n' "${FUNCNAME[1]}"
+        printf '\n'
+        printf '  <url>    URL to fetch (required)\n'
+        printf '  suffix   optional text added before the .md extension\n'
+        printf '\n'
+        printf 'Example:\n'
+        printf '  %s https://opencode.ai/docs demo\n' "${FUNCNAME[1]}"
+        printf '  → Stored to /tmp/jina-dump-$(date +%%Y%%m%%d-%%H%%M%%S)-demo.md\n' "${FUNCNAME[1]}"
+    }
+
+    # ------------------------------------------------------------------
+    # Validate arguments
+    # ------------------------------------------------------------------
+    if [[ $# -eq 0 ]]; then
+        _jwjina_usage
+        return 1
+    fi
+
+    local url="${1}"
+    local suffix="${2:-}"               # empty string if not supplied
+
+    # Very light URL sanity‑check (just makes sure it starts with http(s)://)
+    if [[ ! "$url" =~ ^https?:// ]]; then
+        printf 'Error: "%s" does not look like a valid URL.\n' "$url" >&2
+        _jwjina_usage
+        return 1
+    fi
+
+    # ------------------------------------------------------------------
+    # Build the output file name
+    # ------------------------------------------------------------------
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S)    # e.g. 20251229-111313
+
+    local outfile="/tmp/jina-dump-${timestamp}"
+    [[ -n "$suffix" ]] && outfile+="-${suffix}"
+    outfile+=".md"
+
+    # ------------------------------------------------------------------
+    # Perform the request with curl
+    # ------------------------------------------------------------------
+    curl "https://r.jina.ai/${url}" \
+         -H "Authorization: Bearer ${JINA_AI_API_KEY}" \
+         -H "X-Engine: browser" \
+         -H "X-With-Generated-Alt: true" \
+         -o "$outfile" \
+         --fail --silent --show-error
+
+    local curl_exit=$?
+    if (( curl_exit != 0 )); then
+        # Remove a possibly empty/partial file
+        rm -f "$outfile"
+        printf 'cURL failed (exit code %d). No file was written.\n' "$curl_exit" >&2
+        return $curl_exit
+    fi
+
+    # ------------------------------------------------------------------
+    # Success message
+    # ------------------------------------------------------------------
+    printf 'Stored to %s\n' "$outfile"
+}
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 jwtvnames()
 {

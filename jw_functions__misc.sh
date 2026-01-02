@@ -227,6 +227,16 @@ jwjina() {
     fi
 
     # ------------------------------------------------------------------
+    # NEW: Ensure the JINA AI API key is present
+    # ------------------------------------------------------------------
+    if [[ -z "${JINA_AI_API_KEY:-}" ]]; then
+        printf 'Error: JINA_AI_API_KEY is not set in the environment.\n' >&2
+        printf 'Please export it before running jwjina, e.g.\n' >&2
+        printf '  export JINA_AI_API_KEY="your‑key‑here"\n' >&2
+        return 1
+    fi
+
+    # ------------------------------------------------------------------
     # Build the output file name
     # ------------------------------------------------------------------
     local timestamp

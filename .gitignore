@@ -1,6 +1,33 @@
 jw_functions__TYMSIEJESZCZENIEDZIELE.sh
 
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+# --------------- Environments ---------------
+
+.env
+.envrc
+.env.local
+env/
+ENV/
+env.bak/
+
+# --------------- AI -------------------------
+
+# Aider
 .aider.conf.yml
 .aider*
 
-.env
+# Claude Code - personal/session files only
+.claude/settings.local.json
+.claude/*.log
+.claude/logs/
+.claude/cache/
+
+# OpenCode - session data and local files
+.opencode/
+
+# Gemini CLI - session data, cache, and local settings
+.gemini/

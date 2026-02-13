@@ -181,23 +181,23 @@ jwpaste() {
 
 
 # ------------------------------------------------------------
-# jwjina – fetch a page via Jina AI and store it as a dated MD file
+# jwai_jina – fetch a page via Jina AI and store it as a dated MD file
 #
 #   Usage:
-#     jwjina <url> [suffix]
+#     jwai_jina <url> [suffix]
 #
 #   • <url>    – the URL you want to convert to markdown (required)
 #   • suffix   – optional string that will be appended to the file name
 #
 #   Example:
-#     jwjina https://opencode.ai/docs demo
+#     jwai_jina https://opencode.ai/docs demo
 #     → Stored to /tmp/jina-dump-20251229-111313-demo.md
 # ------------------------------------------------------------
-jwjina() {
+jwai_jina() {
     # ------------------------------------------------------------------
     # Helper: print a short usage message
     # ------------------------------------------------------------------
-    _jwjina_usage() {
+    _jwai_jina_usage() {
         printf 'Usage: %s <url> [suffix]\n' "${FUNCNAME[1]}"
         printf '\n'
         printf '  <url>    URL to fetch (required)\n'
@@ -212,7 +212,7 @@ jwjina() {
     # Validate arguments
     # ------------------------------------------------------------------
     if [[ $# -eq 0 ]]; then
-        _jwjina_usage
+        _jwai_jina_usage
         return 1
     fi
 
@@ -222,7 +222,7 @@ jwjina() {
     # Very light URL sanity‑check (just makes sure it starts with http(s)://)
     if [[ ! "$url" =~ ^https?:// ]]; then
         printf 'Error: "%s" does not look like a valid URL.\n' "$url" >&2
-        _jwjina_usage
+        _jwai_jina_usage
         return 1
     fi
 
@@ -231,7 +231,7 @@ jwjina() {
     # ------------------------------------------------------------------
     if [[ -z "${JINA_AI_API_KEY:-}" ]]; then
         printf 'Error: JINA_AI_API_KEY is not set in the environment.\n' >&2
-        printf 'Please export it before running jwjina, e.g.\n' >&2
+        printf 'Please export it before running jwai_jina, e.g.\n' >&2
         printf '  export JINA_AI_API_KEY="your‑key‑here"\n' >&2
         return 1
     fi

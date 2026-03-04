@@ -8,15 +8,10 @@
 jwdocker_toc() {
     echo
     echo " -----------------------------  legacy: aliases"
-    echo " - jwdlf"
-    echo " - jwdockerfindcontainerbyip"
-    echo " - jwdockerps"
-    echo
-    echo " -----------------------------  legacy: inspectors"
-    echo " - jwdockerinspectcontainer"
-    echo " - jwdockerinspectnetwork"
+    echo " - jwdocker_findcontainerbyip"
     echo
     echo " -----------------------------  ps"
+    echo " - jwdocker_ps"
     echo " - jwdocker_psup"
     echo " - jwdocker_psall"
     echo " - jwdocker_psdown"
@@ -27,6 +22,7 @@ jwdocker_toc() {
     echo " - jwdocker_container-stop"
     echo " - jwdocker_container-restart"
     echo " - jwdocker_container-remove"
+    echo " - jwdocker_container-inspect"
     echo
     echo " -----------------------------  image management"
     echo " - jwdocker_images"
@@ -44,6 +40,7 @@ jwdocker_toc() {
     echo
     echo " -----------------------------  network management"
     echo " - jwdocker_networks"
+    echo " - jwdocker_network-inspect"
     echo " - jwdocker_network-create"
     echo " - jwdocker_network-remove"
     echo " - jwdocker_network-connect"
@@ -75,7 +72,7 @@ jwdocker_toc() {
     echo " - jwdocker_run"
     echo " - jwdocker_tag"
     echo " - jwdocker_push"
-    echo " - jwdocker_connectivity"
+    echo " - jwdocker_test-connectivity"
     echo
     echo " -----------------------------  troubleshooting tools"
     echo " - jwdocker_exec"
@@ -89,88 +86,14 @@ jwdocker_toc() {
 # legacy: aliases
 # ---------------------------------------------------------------------------------
 
-alias jwdlf="docker logs -f"
-alias jwdockerfindcontainerbyip="docker ps -q | xargs -n 1 docker inspect -f '{{.Id}} {{.Name}}  -  {{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' | grep"
-alias jwdockerps="jwdocker_containers"
+alias jwdocker_findcontainerbyip="docker ps -q | xargs -n 1 docker inspect -f '{{.Id}} {{.Name}}  -  {{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' | grep"
 
 
 # ---------------------------------------------------------------------------------
-# legacy: inspectors
+# ps
 # ---------------------------------------------------------------------------------
 
-jwdockerinspectcontainer() {
-    # [https://docs.docker.com/config/formatting/]
-    # [https://golang.org/pkg/text/template/#hdr-Functions]
-    # [https://golang.org/pkg/fmt/]
-    if [ $# -eq 0 ]; then
-        echo -e "\n\t???"
-        docker ps --filter status=running --format "- {{.Names}}"
-        echo "---"
-        docker ps --filter status=created \
-                  --filter status=restarting \
-                  --filter status=removing \
-                  --filter status=paused \
-                  --filter status=exited \
-                  --filter status=dead --format "- {{.Names}}"
-        echo
-        return 1
-    fi
-
-    local CONTAINER=$1
-    echo
-    echo "---[ Container ]---------------------------------------"
-    docker inspect -f 'Id:            {{ .Id }}' "$CONTAINER"
-    docker inspect -f 'Hostname:      {{ .Config.Hostname }} ({{ .Name }})' "$CONTAINER"
-    docker inspect -f 'Image:         {{ .Config.Image }}' "$CONTAINER"
-    docker inspect -f 'Path:          {{ .Path }}' "$CONTAINER"
-    docker inspect -f 'Command:       {{json .Config.Cmd }}' "$CONTAINER"
-    docker inspect -f 'Entrypoint:    {{json .Config.Entrypoint }}' "$CONTAINER"
-    docker inspect -f 'User:          {{ .Config.User }}' "$CONTAINER"
-    docker inspect -f 'WorkDir:       {{ .Config.WorkingDir }}' "$CONTAINER"
-    docker inspect -f 'ExtraHosts:    {{json .HostConfig.ExtraHosts }}' "$CONTAINER"
-    docker inspect -f 'RestartCount:  {{ .RestartCount }}' "$CONTAINER"
-    echo
-    echo "---[ Ports ]-------------------------------------------"
-    docker inspect -f '{{ range $key, $value := .NetworkSettings.Ports }}{{printf "%s -> %s\n" $value $key}}{{ end }}' "$CONTAINER"
-    echo "---[ Volumes ]-----------------------------------------"
-    docker inspect -f '{{ range $item := .Mounts }}{{printf "\"%s\" [%s]  ->  %s : %s\n" .Type .Mode .Source .Destination}}{{ end }}' "$CONTAINER"
-    echo "---[ Networks ]----------------------------------------"
-    docker inspect -f '{{ range $key, $value := .NetworkSettings.Networks }}{{printf "\"%s\"  [NetworkID: %s]  -->  IP: %s , Aliases: %s\n" $key .NetworkID .IPAddress .Aliases}}{{ end }}' "$CONTAINER"
-    echo "---[ RestartPolicy ]-----------------------------------"
-    docker inspect -f '{{ range $key, $value := .HostConfig.RestartPolicy }}{{ printf "  %-22s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
-    echo "---[ Labels ]------------------------------------------"
-    docker inspect -f '{{ range $key, $value := .Config.Labels }}{{ printf "  %-40s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
-    echo "---[ Env ]---------------------------------------------"
-    docker inspect -f '{{ range $item := .Config.Env }}{{ range $ii := split $item "=" }}{{printf "  %-30s" $ii}}{{ end }}{{"\n"}}{{ end }}' "$CONTAINER" | grep -v "^$" | sort ; echo
-    echo "---[ State ($(docker inspect  -f '{{ .State.Status }}' "$CONTAINER")) ]---------------------------------"
-    docker inspect -f '{{ range $key, $value := .State }}{{ printf "  %-15s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
-}
-
-
-jwdockerinspectnetwork() {
-    if [ $# -eq 0 ]; then
-        echo -e "\n\t???"
-        docker network ls | awk '{print $2}' | tail -n +2
-        echo
-        return 1
-    fi
-
-    local NETWORK=$1
-    echo
-    echo "-------------- Network:"
-    docker inspect -f 'Id:         {{ .Id }}  [{{ .Name }}]' "$NETWORK"
-    docker inspect -f 'Scope:      {{ .Scope }}' "$NETWORK"
-    docker inspect -f 'Driver:     {{ .Driver }}' "$NETWORK"
-    docker inspect -f '{{ range $item := .IPAM.Config }}{{ range $key, $value := $item }}{{printf "%s\t\t%s\n" $key $value}}{{ end }}{{ end }}' "$NETWORK"
-    echo "-------------- Containers:"
-    docker network inspect -f '{{ range $key, $value := .Containers }}{{printf "%s: [%s]  %s\n" $key .IPv4Address .Name}}{{ end }}' "$NETWORK"
-}
-
-
-# ---------------------------------------------------------------------------------
-# ps 
-# ---------------------------------------------------------------------------------
-
+alias jwdocker_ps="jwdocker_containers"
 alias jwdocker_psup="jwdocker_containers"
 
 
@@ -319,7 +242,7 @@ jwdocker_container-remove() {
     if docker ps --filter name="^${CONTAINER}$" --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
         if [ "$FORCE" != "force" ] && [ "$FORCE" != "-f" ]; then
             echo "Error: Container '$CONTAINER' is running. Stop it first or use 'force' flag."
-            echo "Usage: jwdockerremove $CONTAINER force"
+            echo "Usage: jwdocker_container-remove $CONTAINER force"
             return 1
         fi
         echo "Force removing running container: $CONTAINER"
@@ -328,6 +251,55 @@ jwdocker_container-remove() {
         echo "Removing stopped container: $CONTAINER"
         docker rm "$CONTAINER"
     fi
+}
+
+
+jwdocker_container-inspect() {
+    # [https://docs.docker.com/config/formatting/]
+    # [https://golang.org/pkg/text/template/#hdr-Functions]
+    # [https://golang.org/pkg/fmt/]
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker ps --filter status=running --format "- {{.Names}}"
+        echo "---"
+        docker ps --filter status=created \
+                  --filter status=restarting \
+                  --filter status=removing \
+                  --filter status=paused \
+                  --filter status=exited \
+                  --filter status=dead --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    echo
+    echo "---[ Container ]---------------------------------------"
+    docker inspect -f 'Id:            {{ .Id }}' "$CONTAINER"
+    docker inspect -f 'Hostname:      {{ .Config.Hostname }} ({{ .Name }})' "$CONTAINER"
+    docker inspect -f 'Image:         {{ .Config.Image }}' "$CONTAINER"
+    docker inspect -f 'Path:          {{ .Path }}' "$CONTAINER"
+    docker inspect -f 'Command:       {{json .Config.Cmd }}' "$CONTAINER"
+    docker inspect -f 'Entrypoint:    {{json .Config.Entrypoint }}' "$CONTAINER"
+    docker inspect -f 'User:          {{ .Config.User }}' "$CONTAINER"
+    docker inspect -f 'WorkDir:       {{ .Config.WorkingDir }}' "$CONTAINER"
+    docker inspect -f 'ExtraHosts:    {{json .HostConfig.ExtraHosts }}' "$CONTAINER"
+    docker inspect -f 'RestartCount:  {{ .RestartCount }}' "$CONTAINER"
+    echo
+    echo "---[ Ports ]-------------------------------------------"
+    docker inspect -f '{{ range $key, $value := .NetworkSettings.Ports }}{{printf "%s -> %s\n" $value $key}}{{ end }}' "$CONTAINER"
+    echo "---[ Volumes ]-----------------------------------------"
+    docker inspect -f '{{ range $item := .Mounts }}{{printf "\"%s\" [%s]  ->  %s : %s\n" .Type .Mode .Source .Destination}}{{ end }}' "$CONTAINER"
+    echo "---[ Networks ]----------------------------------------"
+    docker inspect -f '{{ range $key, $value := .NetworkSettings.Networks }}{{printf "\"%s\"  [NetworkID: %s]  -->  IP: %s , Aliases: %s\n" $key .NetworkID .IPAddress .Aliases}}{{ end }}' "$CONTAINER"
+    echo "---[ RestartPolicy ]-----------------------------------"
+    docker inspect -f '{{ range $key, $value := .HostConfig.RestartPolicy }}{{ printf "  %-22s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
+    echo "---[ Labels ]------------------------------------------"
+    docker inspect -f '{{ range $key, $value := .Config.Labels }}{{ printf "  %-40s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
+    echo "---[ Env ]---------------------------------------------"
+    docker inspect -f '{{ range $item := .Config.Env }}{{ range $ii := split $item "=" }}{{printf "  %-30s" $ii}}{{ end }}{{"\n"}}{{ end }}' "$CONTAINER" | grep -v "^$" | sort ; echo
+    echo "---[ State ($(docker inspect  -f '{{ .State.Status }}' "$CONTAINER")) ]---------------------------------"
+    docker inspect -f '{{ range $key, $value := .State }}{{ printf "  %-15s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
 }
 
 
@@ -349,11 +321,11 @@ jwdocker_images() {
 
 jwdocker_image-pull() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerimagepull <image[:tag]>"
+        echo "Usage: jwdocker_image-pull <image[:tag]>"
         echo "Examples:"
-        echo "  jwdockerimagepull nginx"
-        echo "  jwdockerimagepull nginx:alpine"
-        echo "  jwdockerimagepull ubuntu:20.04"
+        echo "  jwdocker_image-pull nginx"
+        echo "  jwdocker_image-pull nginx:alpine"
+        echo "  jwdocker_image-pull ubuntu:20.04"
         return 1
     fi
 
@@ -371,11 +343,11 @@ jwdocker_image-pull() {
 
 jwdocker_image-build() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerimagebuild <tag> [dockerfile_path] [build_context]"
+        echo "Usage: jwdocker_image-build <tag> [dockerfile_path] [build_context]"
         echo "Examples:"
-        echo "  jwdockerimagebuild myapp:latest"
-        echo "  jwdockerimagebuild myapp:v1.0 ./Dockerfile ."
-        echo "  jwdockerimagebuild myapp:dev ./docker/Dockerfile.dev ./src"
+        echo "  jwdocker_image-build myapp:latest"
+        echo "  jwdocker_image-build myapp:v1.0 ./Dockerfile ."
+        echo "  jwdocker_image-build myapp:dev ./docker/Dockerfile.dev ./src"
         return 1
     fi
 
@@ -420,7 +392,7 @@ jwdocker_image-rm() {
                 echo " - $container"
             done <<< "$using_containers"
             echo "Remove containers first or use 'force' flag."
-            echo "Usage: jwdockerrmi $IMAGE force"
+            echo "Usage: jwdocker_image-rm $IMAGE force"
             return 1
         fi
         echo "Force removing image used by containers: $IMAGE"
@@ -435,7 +407,7 @@ jwdocker_image-rm() {
 jwdocker_image-history() {
     if [ $# -eq 0 ]; then
         echo -e "\n\t???"
-        echo "Usage: jwdockerimagehistory <image> [--no-trunc]"
+        echo "Usage: jwdocker_image-history <image> [--no-trunc]"
         echo
         docker images --format "{{.Repository}}:{{.Tag}}"
         echo
@@ -514,11 +486,11 @@ jwdocker_volume-inspect() {
 
 jwdocker_volume-create() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockervolumecreate <volume_name> [driver] [options]"
+        echo "Usage: jwdocker_volume-create <volume_name> [driver] [options]"
         echo "Examples:"
-        echo "  jwdockervolumecreate mydata"
-        echo "  jwdockervolumecreate mydata local"
-        echo "  jwdockervolumecreate mydata local --opt type=tmpfs"
+        echo "  jwdocker_volume-create mydata"
+        echo "  jwdocker_volume-create mydata local"
+        echo "  jwdocker_volume-create mydata local --opt type=tmpfs"
         return 1
     fi
 
@@ -567,7 +539,7 @@ jwdocker_volume-remove() {
                 echo " - $container"
             done <<< "$using_containers"
             echo "Remove containers first or use 'force' flag."
-            echo "Usage: jwdockervolumeremove $VOLUME force"
+            echo "Usage: jwdocker_volume-remove $VOLUME force"
             return 1
         fi
         echo "Force removing volume used by containers: $VOLUME"
@@ -610,14 +582,34 @@ jwdocker_networks() {
 }
 
 
+jwdocker_network-inspect() {
+    if [ $# -eq 0 ]; then
+        echo -e "\n\t???"
+        docker network ls --format "- {{.Name}}"
+        echo
+        return 1
+    fi
+
+    local NETWORK=$1
+    echo
+    echo "---[ Network ]-----------------------------------------"
+    docker inspect -f 'Id:         {{ .Id }}  [{{ .Name }}]' "$NETWORK"
+    docker inspect -f 'Scope:      {{ .Scope }}' "$NETWORK"
+    docker inspect -f 'Driver:     {{ .Driver }}' "$NETWORK"
+    docker inspect -f '{{ range $item := .IPAM.Config }}{{ range $key, $value := $item }}{{printf "%s\t\t%s\n" $key $value}}{{ end }}{{ end }}' "$NETWORK"
+    echo "---[ Containers ]--------------------------------------"
+    docker network inspect -f '{{ range $key, $value := .Containers }}{{printf "%s: [%s]  %s\n" $key .IPv4Address .Name}}{{ end }}' "$NETWORK"
+}
+
+
 jwdocker_network-create() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockernetworkcreate <network_name> [driver] [options]"
+        echo "Usage: jwdocker_network-create <network_name> [driver] [options]"
         echo "Examples:"
-        echo "  jwdockernetworkcreate mynetwork"
-        echo "  jwdockernetworkcreate mynetwork bridge"
-        echo "  jwdockernetworkcreate mynetwork bridge --subnet=172.20.0.0/16"
-        echo "  jwdockernetworkcreate mynetwork overlay --attachable"
+        echo "  jwdocker_network-create mynetwork"
+        echo "  jwdocker_network-create mynetwork bridge"
+        echo "  jwdocker_network-create mynetwork bridge --subnet=172.20.0.0/16"
+        echo "  jwdocker_network-create mynetwork overlay --attachable"
         return 1
     fi
 
@@ -665,7 +657,7 @@ jwdocker_network-remove() {
             echo "Error: Network '$NETWORK' is being used by containers:"
             echo "$using_containers" | tr ' ' '\n' | sed 's/^/ - /' | grep -v '^$'
             echo "Disconnect containers first or use 'force' flag."
-            echo "Usage: jwdockernetworkremove $NETWORK force"
+            echo "Usage: jwdocker_network-remove $NETWORK force"
             return 1
         fi
         echo "Force removing network used by containers: $NETWORK"
@@ -679,11 +671,11 @@ jwdocker_network-remove() {
 
 jwdocker_network-connect() {
     if [ $# -lt 2 ]; then
-        echo "Usage: jwdockernetworkconnect <network> <container> [options]"
+        echo "Usage: jwdocker_network-connect <network> <container> [options]"
         echo "Examples:"
-        echo "  jwdockernetworkconnect mynetwork mycontainer"
-        echo "  jwdockernetworkconnect mynetwork mycontainer --ip=172.20.0.10"
-        echo "  jwdockernetworkconnect mynetwork mycontainer --alias=web"
+        echo "  jwdocker_network-connect mynetwork mycontainer"
+        echo "  jwdocker_network-connect mynetwork mycontainer --ip=172.20.0.10"
+        echo "  jwdocker_network-connect mynetwork mycontainer --alias=web"
         echo
         echo "Available networks:"
         docker network ls --format "- {{.Name}}"
@@ -717,10 +709,10 @@ jwdocker_network-connect() {
 
 jwdocker_network-disconnect() {
     if [ $# -lt 2 ]; then
-        echo "Usage: jwdockernetworkdisconnect <network> <container> [force]"
+        echo "Usage: jwdocker_network-disconnect <network> <container> [force]"
         echo "Examples:"
-        echo "  jwdockernetworkdisconnect mynetwork mycontainer"
-        echo "  jwdockernetworkdisconnect mynetwork mycontainer force"
+        echo "  jwdocker_network-disconnect mynetwork mycontainer"
+        echo "  jwdocker_network-disconnect mynetwork mycontainer force"
         echo
         echo "Available networks:"
         docker network ls --format "- {{.Name}}"
@@ -844,14 +836,14 @@ jwdocker_system-info() {
 
 jwdocker_prune() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerprune [containers|images|volumes|networks|system|all]"
+        echo "Usage: jwdocker_prune [containers|images|volumes|networks|system|all]"
         echo "Examples:"
-        echo "  jwdockerprune containers  # Remove stopped containers"
-        echo "  jwdockerprune images      # Remove unused images"
-        echo "  jwdockerprune volumes     # Remove unused volumes"
-        echo "  jwdockerprune networks    # Remove unused networks"
-        echo "  jwdockerprune system      # Remove containers, networks, images (not volumes)"
-        echo "  jwdockerprune all         # Remove everything unused (including volumes)"
+        echo "  jwdocker_prune containers  # Remove stopped containers"
+        echo "  jwdocker_prune images      # Remove unused images"
+        echo "  jwdocker_prune volumes     # Remove unused volumes"
+        echo "  jwdocker_prune networks    # Remove unused networks"
+        echo "  jwdocker_prune system      # Remove containers, networks, images (not volumes)"
+        echo "  jwdocker_prune all         # Remove everything unused (including volumes)"
         return 1
     fi
 
@@ -883,10 +875,10 @@ jwdocker_prune() {
             fi
             ;;
         volumes)
-            jwdockervolumeprune
+            jwdocker_volume-prune
             ;;
         networks)
-            jwdockernetworkprune
+            jwdocker_network-prune
             ;;
         system)
             echo "This will remove:"
@@ -983,22 +975,22 @@ jwdocker_cleanup() {
     
     case $choice in
         a|A)
-            jwdockerprune containers
+            jwdocker_prune containers
             ;;
         b|B)
-            jwdockerprune images
+            jwdocker_prune images
             ;;
         c|C)
-            jwdockerprune volumes
+            jwdocker_prune volumes
             ;;
         d|D)
-            jwdockerprune networks
+            jwdocker_prune networks
             ;;
         e|E)
-            jwdockerprune system
+            jwdocker_prune system
             ;;
         f|F)
-            jwdockerprune all
+            jwdocker_prune all
             ;;
         q|Q)
             echo "Cleanup cancelled."
@@ -1020,12 +1012,12 @@ jwdocker_cleanup() {
 
 jwdocker_size() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockersize [containers|images|volumes|all]"
+        echo "Usage: jwdocker_size [containers|images|volumes|all]"
         echo "Examples:"
-        echo "  jwdockersize containers  # Show container sizes"
-        echo "  jwdockersize images      # Show image sizes"
-        echo "  jwdockersize volumes     # Show volume sizes"
-        echo "  jwdockersize all         # Show everything"
+        echo "  jwdocker_size containers  # Show container sizes"
+        echo "  jwdocker_size images      # Show image sizes"
+        echo "  jwdocker_size volumes     # Show volume sizes"
+        echo "  jwdocker_size all         # Show everything"
         return 1
     fi
 
@@ -1048,9 +1040,9 @@ jwdocker_size() {
             docker system df -v | grep -A 100 "Local Volumes" | tail -n +3
             ;;
         all)
-            jwdockersize containers
-            jwdockersize images
-            jwdockersize volumes
+            jwdocker_size containers
+            jwdocker_size images
+            jwdocker_size volumes
             echo
             echo "---[ Summary ]------------------------------------------"
             docker system df
@@ -1071,11 +1063,11 @@ jwdocker_size() {
 
 jwdocker_save() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockersave <image> [output_file]"
+        echo "Usage: jwdocker_save <image> [output_file]"
         echo "Examples:"
-        echo "  jwdockersave nginx                    # Saves to nginx.tar"
-        echo "  jwdockersave nginx:alpine             # Saves to nginx_alpine.tar"
-        echo "  jwdockersave nginx /tmp/nginx.tar     # Saves to specific file"
+        echo "  jwdocker_save nginx                    # Saves to nginx.tar"
+        echo "  jwdocker_save nginx:alpine             # Saves to nginx_alpine.tar"
+        echo "  jwdocker_save nginx /tmp/nginx.tar     # Saves to specific file"
         echo
         echo "Available images:"
         docker images --format "- {{.Repository}}:{{.Tag}}"
@@ -1105,10 +1097,10 @@ jwdocker_save() {
 
 jwdocker_load() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerload <tar_file>"
+        echo "Usage: jwdocker_load <tar_file>"
         echo "Examples:"
-        echo "  jwdockerload nginx.tar"
-        echo "  jwdockerload /tmp/myimage.tar"
+        echo "  jwdocker_load nginx.tar"
+        echo "  jwdocker_load /tmp/myimage.tar"
         echo
         echo "Available tar files in current directory:"
         ls -1 ./*.tar 2>/dev/null || echo "  (no .tar files found)"
@@ -1141,10 +1133,10 @@ jwdocker_load() {
 
 jwdocker_export() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerexport <container> [output_file]"
+        echo "Usage: jwdocker_export <container> [output_file]"
         echo "Examples:"
-        echo "  jwdockerexport mycontainer                    # Exports to mycontainer.tar"
-        echo "  jwdockerexport mycontainer /tmp/backup.tar    # Exports to specific file"
+        echo "  jwdocker_export mycontainer                    # Exports to mycontainer.tar"
+        echo "  jwdocker_export mycontainer /tmp/backup.tar    # Exports to specific file"
         echo
         echo "Available containers:"
         docker ps -a --format "- {{.Names}}"
@@ -1174,10 +1166,10 @@ jwdocker_export() {
 
 jwdocker_import() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerimport <tar_file> [repository[:tag]]"
+        echo "Usage: jwdocker_import <tar_file> [repository[:tag]]"
         echo "Examples:"
-        echo "  jwdockerimport container.tar                    # Imports as <none>:<none>"
-        echo "  jwdockerimport container.tar myimage:latest     # Imports with specific name"
+        echo "  jwdocker_import container.tar                    # Imports as <none>:<none>"
+        echo "  jwdocker_import container.tar myimage:latest     # Imports with specific name"
         echo
         echo "Available tar files in current directory:"
         ls -1 ./*.tar 2>/dev/null || echo "  (no .tar files found)"
@@ -1228,11 +1220,11 @@ jwdocker_import() {
 
 jwdocker_search() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockersearch <search_term> [limit]"
+        echo "Usage: jwdocker_search <search_term> [limit]"
         echo "Examples:"
-        echo "  jwdockersearch nginx"
-        echo "  jwdockersearch nginx 10"
-        echo "  jwdockersearch ubuntu/nginx"
+        echo "  jwdocker_search nginx"
+        echo "  jwdocker_search nginx 10"
+        echo "  jwdocker_search ubuntu/nginx"
         return 1
     fi
 
@@ -1248,10 +1240,10 @@ jwdocker_search() {
 
 jwdocker_backup() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerbackup <container> [backup_dir]"
+        echo "Usage: jwdocker_backup <container> [backup_dir]"
         echo "Examples:"
-        echo "  jwdockerbackup mycontainer"
-        echo "  jwdockerbackup mycontainer /backups"
+        echo "  jwdocker_backup mycontainer"
+        echo "  jwdocker_backup mycontainer /backups"
         echo
         echo "This will create a backup containing:"
         echo "  - Container export (filesystem)"
@@ -1329,11 +1321,11 @@ EOF
 
 jwdocker_cp() {
     if [ $# -lt 2 ]; then
-        echo "Usage: jwdockercp <source> <destination>"
+        echo "Usage: jwdocker_cp <source> <destination>"
         echo "Examples:"
-        echo "  jwdockercp mycontainer:/app/config.txt ./config.txt"
-        echo "  jwdockercp ./data.json mycontainer:/tmp/data.json"
-        echo "  jwdockercp mycontainer:/logs/ ./container-logs/"
+        echo "  jwdocker_cp mycontainer:/app/config.txt ./config.txt"
+        echo "  jwdocker_cp ./data.json mycontainer:/tmp/data.json"
+        echo "  jwdocker_cp mycontainer:/logs/ ./container-logs/"
         echo
         echo "Available containers:"
         docker ps -a --format "- {{.Names}}"
@@ -1365,12 +1357,12 @@ jwdocker_cp() {
 
 jwdocker_run() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerrun <image> [options]"
+        echo "Usage: jwdocker_run <image> [options]"
         echo "Examples:"
-        echo "  jwdockerrun nginx"
-        echo "  jwdockerrun nginx -p 8080:80"
-        echo "  jwdockerrun ubuntu:20.04 -it --rm bash"
-        echo "  jwdockerrun postgres:13 -e POSTGRES_PASSWORD=secret"
+        echo "  jwdocker_run nginx"
+        echo "  jwdocker_run nginx -p 8080:80"
+        echo "  jwdocker_run ubuntu:20.04 -it --rm bash"
+        echo "  jwdocker_run postgres:13 -e POSTGRES_PASSWORD=secret"
         echo
         echo "Common options:"
         echo "  -d, --detach          Run in background"
@@ -1407,11 +1399,11 @@ jwdocker_run() {
 
 jwdocker_tag() {
     if [ $# -lt 2 ]; then
-        echo "Usage: jwdockertag <source_image> <target_image>"
+        echo "Usage: jwdocker_tag <source_image> <target_image>"
         echo "Examples:"
-        echo "  jwdockertag nginx:latest myregistry.com/nginx:v1.0"
-        echo "  jwdockertag myapp:latest myapp:production"
-        echo "  jwdockertag ubuntu:20.04 ubuntu:focal"
+        echo "  jwdocker_tag nginx:latest myregistry.com/nginx:v1.0"
+        echo "  jwdocker_tag myapp:latest myapp:production"
+        echo "  jwdocker_tag ubuntu:20.04 ubuntu:focal"
         echo
         echo "Available images:"
         docker images --format "- {{.Repository}}:{{.Tag}}"
@@ -1438,10 +1430,10 @@ jwdocker_tag() {
 
 jwdocker_push() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdockerpush <image>"
+        echo "Usage: jwdocker_push <image>"
         echo "Examples:"
-        echo "  jwdockerpush myregistry.com/myapp:latest"
-        echo "  jwdockerpush username/myimage:v1.0"
+        echo "  jwdocker_push myregistry.com/myapp:latest"
+        echo "  jwdocker_push username/myimage:v1.0"
         echo
         echo "Available images:"
         docker images --format "- {{.Repository}}:{{.Tag}}"
@@ -1462,13 +1454,13 @@ jwdocker_push() {
 }
 
 
-jwdocker_connectivity() {
+jwdocker_test-connectivity() {
     if [ $# -lt 2 ]; then
-        echo "Usage: jwdockerconnectivity <source_container> <target_container> [port]"
+        echo "Usage: jwdocker_test-connectivity <source_container> <target_container> [port]"
         echo "Examples:"
-        echo "  jwdockerconnectivity web database"
-        echo "  jwdockerconnectivity web api 8080"
-        echo "  jwdockerconnectivity frontend backend 3000"
+        echo "  jwdocker_test-connectivity web database"
+        echo "  jwdocker_test-connectivity web api 8080"
+        echo "  jwdocker_test-connectivity frontend backend 3000"
         echo
         echo "This will:"
         echo "  - Show shared networks between containers"
@@ -1547,8 +1539,8 @@ jwdocker_connectivity() {
         echo "  ❌ No shared networks found!"
         echo
         echo "💡 To enable connectivity, connect both containers to the same network:"
-        echo "   jwdockernetworkconnect <network_name> $SOURCE_CONTAINER"
-        echo "   jwdockernetworkconnect <network_name> $TARGET_CONTAINER"
+        echo "   jwdocker_network-connect <network_name> $SOURCE_CONTAINER"
+        echo "   jwdocker_network-connect <network_name> $TARGET_CONTAINER"
         return 1
     fi
     echo

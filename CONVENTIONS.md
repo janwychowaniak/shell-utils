@@ -25,6 +25,10 @@
 # volume management
 # ---------------------------------------------------------------------------------
 ```
+- Larger files should include a `<area>_toc()` function listing all functions by category
+
+### ShellCheck Exceptions
+- Use `# shellcheck disable=SC2086` when passing an `$OPTIONS` variable unquoted to allow multi-word flags through to underlying commands
 
 # User Experience Design
 
@@ -32,6 +36,16 @@
 - Functions called without required parameters show helpful usage examples
 - Display available options (running containers, installed packages, etc.)
 - Provide multiple example use cases with different parameter combinations
+- Two styles for no-args help:
+  - **"Pick one" style**: print `\n\t???` then list available resources — used when the function just needs a target picked from a known set
+  - **"Usage" style**: print `Usage:` / `Examples:` block — used when the function takes complex or multi-parameter input
+- Help format template:
+```bash
+echo "Usage: jwdocker_image-build <tag> [dockerfile_path] [build_context]"
+echo "Examples:"
+echo "  jwdocker_image-build myapp:latest"
+echo "  jwdocker_image-build myapp:v1.0 ./Dockerfile ."
+```
 
 ### Safety Features
 - Destructive operations require user confirmation
@@ -45,10 +59,15 @@
 - Fallback behaviors when tools are unavailable
 
 ### Enhanced Output
-- Consistent formatting with headers, separators, and sections
+- Consistent formatting with headers, separators, and sections using `---[ Title ]---` pattern
 - Color coding and emoji for status indicators (✅ ❌ ⚠️ 💡)
 - Structured information display with clear labels
 - Progress indicators and completion summaries
+- State-changing operations (start, stop, build, pull) should display the resulting state after the action completes
+
+### Interactive Wizards
+- Complex multi-choice operations may use an interactive menu pattern: show current state, present lettered options, act on choice, show final state
+- Example: `jwdocker_cleanup()` — shows disk usage, lists cleanup options with counts, prompts for choice, shows result
 
 # Logical Grouping
 

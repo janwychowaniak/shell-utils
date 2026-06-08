@@ -12,12 +12,15 @@ E.g. in _~/bin_:
 cd ~/bin
 git clone https://github.com/janwychowaniak/shell-utils.git
 ```
-And then _.bashrc_ might be appended with the following:
+And then _.bashrc_ (or _.zshrc_ — the snippet is identical for both shells) might be appended with the following:
 
 ```bash
 [[ -f "$HOME/bin/shell-utils/jw_aliases.sh" ]]            && . "$HOME/bin/shell-utils/jw_aliases.sh"
+[[ -f "$HOME/bin/shell-utils/jw_colors.sh" ]]             && . "$HOME/bin/shell-utils/jw_colors.sh"
+[[ -f "$HOME/bin/shell-utils/jw_functions__deb.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__deb.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__docker.sh" ]]  && . "$HOME/bin/shell-utils/jw_functions__docker.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__fs.sh" ]]      && . "$HOME/bin/shell-utils/jw_functions__fs.sh"
+[[ -f "$HOME/bin/shell-utils/jw_functions__git.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__git.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__media.sh" ]]   && . "$HOME/bin/shell-utils/jw_functions__media.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__mediaff.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaff.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__mediaim.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaim.sh"

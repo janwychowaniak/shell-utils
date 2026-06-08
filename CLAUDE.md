@@ -8,7 +8,7 @@ A collection of Bash shell utility functions and aliases, sourced into the user'
 
 ## Conventions
 
-The authoritative coding-convention spec for this repo lives in [`CONVENTIONS.md`](CONVENTIONS.md) — naming, ShellCheck compliance, function/help patterns, safety rules, logical grouping, and the `<area>_toc()` blast-radius markers (🟢 read-only · 🔵 creates · ⚪ state change/transfer · 🔴 destructive). The sections below are a condensed orientation; when the two disagree, `CONVENTIONS.md` wins.
+The authoritative coding-convention spec for this repo lives in [`CONVENTIONS.md`](CONVENTIONS.md) — naming (public/internal/legacy), ShellCheck compliance, function & help patterns, safety rules, output style, cross-shell portability (bash + zsh), logical grouping, and the `<area>_toc()` blast-radius markers (🟢 read-only · 🔵 creates · ⚪ state change/transfer · 🔴 destructive). This file is a quick orientation (what the repo is, where things live); `CONVENTIONS.md` is the source of truth and wins on any conflict.
 
 ## Linting
 
@@ -35,43 +35,3 @@ All function files should include `# shellcheck shell=bash` at the top.
 | `jw_functions__prog.sh` | Programming helpers (`jwvec*`, `jwc*`) |
 | `jw_aliases.sh` | Shell aliases |
 | `jw_colors.sh` | ANSI color/style helpers (`jwpaintfg*`, `__jwStyle*`) |
-
-## Naming Conventions
-
-- **Public functions**: `jw<area>_<action>` (e.g., `jwdocker_container-start`, `jwdeb_install`, `jwgitcommit`)
-- **Internal helpers**: `__jw<name>__` with double underscores (e.g., `__jwStyleGetMarker__`)
-- **Internal variables**: `_jw<name>_` with single underscores (e.g., `_jwStyleParamBold_`)
-- **New files**: `jw_functions__<area>.sh`
-- Some older functions use Polish names (e.g., `jwodspacjacz` = space remover, `jwnotatki` = notes)
-
-## Function Patterns
-
-Every function that takes parameters must show usage/examples when called with no arguments (or wrong argument count), printing to stderr and returning 1. Example:
-
-```bash
-jwexample() {
-    if [ $# -eq 0 ]; then
-        echo "Usage: jwexample <arg> [options]"
-        echo "Examples:"
-        echo "  jwexample foo"
-        echo "  jwexample bar --verbose"
-        return 1
-    fi
-    # ... implementation
-}
-```
-
-Destructive operations must prompt for user confirmation. Force flags (`force`, `-f`) bypass confirmation for automation.
-
-Within each file, functions are grouped under comment-block section headers:
-```bash
-# ---------------------------------------------------------------------------------
-# section name
-# ---------------------------------------------------------------------------------
-```
-
-The git and docker files include a table of contents at the top listing all functions.
-
-## Color Output
-
-Use the helpers from `jw_colors.sh` for colored output (e.g., `jwpaintfgRed`, `jwpaintfgGreen`). Status indicators use emoji: checkmark, X, warning, lightbulb.

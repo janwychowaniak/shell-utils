@@ -9,6 +9,13 @@
 - Files follow the pattern: `jw_functions__<area>.sh`
 - Examples: `jw_functions__docker.sh`, `jw_functions__deb.sh`, `jw_functions__git.sh`
 
+### Internal Helpers and Variables
+- Internal helper functions: `__jw<name>__` — double underscores both sides (e.g. `__jwStyleGetMarker__`)
+- Internal variables: `_jw<name>_` — single underscores both sides (e.g. `_jwStyleParamBold_`)
+
+### Legacy Names
+- Some older functions use Polish names (e.g. `jwodspacjacz` = space remover, `jwnotatki` = notes)
+
 # Code Quality Standards
 
 ### ShellCheck Compliance
@@ -65,7 +72,7 @@ fi
 # User Experience Design
 
 ### Parameter Handling
-- Functions called without required parameters show helpful usage examples
+- Functions called without required parameters print helpful usage examples and `return 1`
 - Display available options (running containers, installed packages, etc.)
 - Provide multiple example use cases with different parameter combinations
 - Two styles for no-args help:
@@ -92,7 +99,7 @@ echo "  jwdocker_image-build myapp:v1.0 ./Dockerfile ."
 
 ### Enhanced Output
 - Consistent formatting with headers, separators, and sections using `---[ Title ]---` pattern
-- Color coding and emoji for status indicators (✅ ❌ ⚠️ 💡)
+- Color output via the `jw_colors.sh` helpers (`jwpaintfgRed`, `jwpaintfgGreen`, …) rather than raw ANSI codes; emoji for status indicators (✅ ❌ ⚠️ 💡)
 - Structured information display with clear labels
 - Progress indicators and completion summaries
 - State-changing operations (start, stop, build, pull) should display the resulting state after the action completes

@@ -5,42 +5,42 @@
 # Contents:
 #
 #   * repository management
-#     - jwgitinit       ->  init
-#     - jwgitclone      ->  clone
-#     - jwgitremote     ->  remote
+#     - jwgit_init       ->  init
+#     - jwgit_clone      ->  clone
+#     - jwgit_remote     ->  remote
 #
 #   * branch operations
-#     - jwgitbranch     ->  branch
-#     - jwgitcheckout   ->  checkout
-#     - jwgitmerge      ->  merge
-#     - jwgitrebase     ->  rebase
+#     - jwgit_branch     ->  branch
+#     - jwgit_checkout   ->  checkout
+#     - jwgit_merge      ->  merge
+#     - jwgit_rebase     ->  rebase
 #
 #   * staging & commits
-#     - jwgitadd        ->  add
-#     - jwgitcommit     ->  commit
-#     - jwgitstash      ->  stash
-#     - jwgitreset      ->  reset
+#     - jwgit_add        ->  add
+#     - jwgit_commit     ->  commit
+#     - jwgit_stash      ->  stash
+#     - jwgit_reset      ->  reset
 #
 #   * remote operations
-#     - jwgitpush       ->  push
-#     - jwgitpull       ->  pull
-#     - jwgitfetch      ->  fetch
+#     - jwgit_push       ->  push
+#     - jwgit_pull       ->  pull
+#     - jwgit_fetch      ->  fetch
 #
 #   * history & information
-#     - jwgitlog        ->  log
-#     - jwgitstatus     ->  status
-#     - jwgitdiff       ->  diff
-#     - jwgitblame      ->  blame
+#     - jwgit_log        ->  log
+#     - jwgit_status     ->  status
+#     - jwgit_diff       ->  diff
+#     - jwgit_blame      ->  blame
 #
 #   * maintenance & cleanup
-#     - jwgitclean      ->  clean
-#     - jwgitprune      ->  prune
-#     - jwgitgc         ->  gc
+#     - jwgit_clean      ->  clean
+#     - jwgit_prune      ->  prune
+#     - jwgit_gc         ->  gc
 #
 #   * advanced operations
-#     - jwgitcherry     ->  cherry
-#     - jwgitbisect     ->  bisect
-#     - jwgitreflog     ->  reflog
+#     - jwgit_cherry     ->  cherry
+#     - jwgit_bisect     ->  bisect
+#     - jwgit_reflog     ->  reflog
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -49,13 +49,13 @@
 # repository management
 # ---------------------------------------------------------------------------------
 
-jwgitinit() {
+jwgit_init() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitinit [directory] [--bare]"
+        echo "Usage: jwgit_init [directory] [--bare]"
         echo "Examples:"
-        echo "  jwgitinit                    # Initialize current directory"
-        echo "  jwgitinit myproject          # Initialize new directory"
-        echo "  jwgitinit myrepo --bare      # Initialize bare repository"
+        echo "  jwgit_init                    # Initialize current directory"
+        echo "  jwgit_init myproject          # Initialize new directory"
+        echo "  jwgit_init myrepo --bare      # Initialize bare repository"
         echo
         return 1
     fi
@@ -101,14 +101,14 @@ jwgitinit() {
 }
 
 
-jwgitclone() {
+jwgit_clone() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitclone <repository_url> [directory] [options]"
+        echo "Usage: jwgit_clone <repository_url> [directory] [options]"
         echo "Examples:"
-        echo "  jwgitclone https://github.com/user/repo.git"
-        echo "  jwgitclone git@github.com:user/repo.git myproject"
-        echo "  jwgitclone https://github.com/user/repo.git --depth 1"
-        echo "  jwgitclone https://github.com/user/repo.git --branch develop"
+        echo "  jwgit_clone https://github.com/user/repo.git"
+        echo "  jwgit_clone git@github.com:user/repo.git myproject"
+        echo "  jwgit_clone https://github.com/user/repo.git --depth 1"
+        echo "  jwgit_clone https://github.com/user/repo.git --branch develop"
         echo
         echo "Common options:"
         echo "  --depth N        Create shallow clone with N commits"
@@ -185,15 +185,15 @@ jwgitclone() {
 }
 
 
-jwgitremote() {
+jwgit_remote() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitremote [add|remove|set-url|show] [name] [url]"
+        echo "Usage: jwgit_remote [add|remove|set-url|show] [name] [url]"
         echo "Examples:"
-        echo "  jwgitremote                           # List all remotes"
-        echo "  jwgitremote show                      # Show detailed remote info"
-        echo "  jwgitremote add upstream <url>        # Add upstream remote"
-        echo "  jwgitremote remove origin             # Remove origin remote"
-        echo "  jwgitremote set-url origin <new_url>  # Change origin URL"
+        echo "  jwgit_remote                           # List all remotes"
+        echo "  jwgit_remote show                      # Show detailed remote info"
+        echo "  jwgit_remote add upstream <url>        # Add upstream remote"
+        echo "  jwgit_remote remove origin             # Remove origin remote"
+        echo "  jwgit_remote set-url origin <new_url>  # Change origin URL"
         echo
         echo "Current remotes:"
         if git remote >/dev/null 2>&1; then
@@ -212,7 +212,7 @@ jwgitremote() {
     case $ACTION in
         add)
             if [ -z "$NAME" ] || [ -z "$URL" ]; then
-                echo "Usage: jwgitremote add <name> <url>"
+                echo "Usage: jwgit_remote add <name> <url>"
                 return 1
             fi
             
@@ -230,7 +230,7 @@ jwgitremote() {
             
         remove|rm)
             if [ -z "$NAME" ]; then
-                echo "Usage: jwgitremote remove <name>"
+                echo "Usage: jwgit_remote remove <name>"
                 echo
                 echo "Available remotes:"
                 git remote | sed 's/^/  /'
@@ -251,7 +251,7 @@ jwgitremote() {
             
         set-url)
             if [ -z "$NAME" ] || [ -z "$URL" ]; then
-                echo "Usage: jwgitremote set-url <name> <new_url>"
+                echo "Usage: jwgit_remote set-url <name> <new_url>"
                 echo
                 echo "Available remotes:"
                 git remote -v | sed 's/^/  /'
@@ -327,7 +327,7 @@ jwgitremote() {
             else
                 echo "No remotes configured."
                 echo
-                echo "💡 Add a remote with: jwgitremote add <name> <url>"
+                echo "💡 Add a remote with: jwgit_remote add <name> <url>"
             fi
             ;;
     esac
@@ -339,15 +339,15 @@ jwgitremote() {
 # branch operations
 # ---------------------------------------------------------------------------------
 
-jwgitbranch() {
+jwgit_branch() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitbranch [list|create|delete|rename] [branch_name] [options]"
+        echo "Usage: jwgit_branch [list|create|delete|rename] [branch_name] [options]"
         echo "Examples:"
-        echo "  jwgitbranch                    # List all branches"
-        echo "  jwgitbranch list --remote      # List remote branches"
-        echo "  jwgitbranch create feature-x   # Create new branch"
-        echo "  jwgitbranch delete old-branch  # Delete branch"
-        echo "  jwgitbranch rename old new     # Rename branch"
+        echo "  jwgit_branch                    # List all branches"
+        echo "  jwgit_branch list --remote      # List remote branches"
+        echo "  jwgit_branch create feature-x   # Create new branch"
+        echo "  jwgit_branch delete old-branch  # Delete branch"
+        echo "  jwgit_branch rename old new     # Rename branch"
         echo
         echo "Current branches:"
         if git branch >/dev/null 2>&1; then
@@ -423,7 +423,7 @@ jwgitbranch() {
             
         create|new)
             if [ -z "$BRANCH_NAME" ]; then
-                echo "Usage: jwgitbranch create <branch_name> [start_point]"
+                echo "Usage: jwgit_branch create <branch_name> [start_point]"
                 echo
                 echo "Available branches to branch from:"
                 git branch --format="  %(refname:short)" | head -10
@@ -451,7 +451,7 @@ jwgitbranch() {
             
         delete|del|rm)
             if [ -z "$BRANCH_NAME" ]; then
-                echo "Usage: jwgitbranch delete <branch_name> [--force]"
+                echo "Usage: jwgit_branch delete <branch_name> [--force]"
                 echo
                 echo "Available branches:"
                 git branch --format="  %(refname:short)" | grep -v "$(git branch --show-current)" | head -10
@@ -487,7 +487,7 @@ jwgitbranch() {
             
         rename|mv)
             if [ -z "$BRANCH_NAME" ] || [ -z "$OPTION" ]; then
-                echo "Usage: jwgitbranch rename <old_name> <new_name>"
+                echo "Usage: jwgit_branch rename <old_name> <new_name>"
                 echo
                 echo "Available branches:"
                 git branch --format="  %(refname:short)" | head -10
@@ -516,22 +516,22 @@ jwgitbranch() {
             
         *)
             # Default: list branches (same as 'list' action)
-            jwgitbranch list "$@"
+            jwgit_branch list "$@"
             ;;
     esac
     echo
 }
 
 
-jwgitcheckout() {
+jwgit_checkout() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitcheckout <branch|commit|file> [options]"
+        echo "Usage: jwgit_checkout <branch|commit|file> [options]"
         echo "Examples:"
-        echo "  jwgitcheckout main              # Switch to main branch"
-        echo "  jwgitcheckout -b feature-x      # Create and switch to new branch"
-        echo "  jwgitcheckout abc123            # Switch to specific commit"
-        echo "  jwgitcheckout -- file.txt       # Restore file from HEAD"
-        echo "  jwgitcheckout HEAD~1 -- file.txt # Restore file from previous commit"
+        echo "  jwgit_checkout main              # Switch to main branch"
+        echo "  jwgit_checkout -b feature-x      # Create and switch to new branch"
+        echo "  jwgit_checkout abc123            # Switch to specific commit"
+        echo "  jwgit_checkout -- file.txt       # Restore file from HEAD"
+        echo "  jwgit_checkout HEAD~1 -- file.txt # Restore file from previous commit"
         echo
         echo "Available branches:"
         if git branch >/dev/null 2>&1; then
@@ -553,7 +553,7 @@ jwgitcheckout() {
     # Handle create new branch (-b flag)
     if [ "$TARGET" = "-b" ]; then
         if [ -z "$1" ]; then
-            echo "Usage: jwgitcheckout -b <new_branch_name> [start_point]"
+            echo "Usage: jwgit_checkout -b <new_branch_name> [start_point]"
             return 1
         fi
         
@@ -577,8 +577,8 @@ jwgitcheckout() {
     # Handle file restoration (-- flag)
     if [ "$TARGET" = "--" ]; then
         if [ -z "$1" ]; then
-            echo "Usage: jwgitcheckout -- <file_path>"
-            echo "       jwgitcheckout <commit> -- <file_path>"
+            echo "Usage: jwgit_checkout -- <file_path>"
+            echo "       jwgit_checkout <commit> -- <file_path>"
             return 1
         fi
         
@@ -698,15 +698,15 @@ jwgitcheckout() {
 }
 
 
-jwgitmerge() {
+jwgit_merge() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitmerge <branch> [options]"
+        echo "Usage: jwgit_merge <branch> [options]"
         echo "Examples:"
-        echo "  jwgitmerge feature-branch       # Merge feature branch"
-        echo "  jwgitmerge feature --no-ff      # Merge with no fast-forward"
-        echo "  jwgitmerge feature --squash     # Squash merge"
-        echo "  jwgitmerge --abort              # Abort current merge"
-        echo "  jwgitmerge --continue           # Continue after resolving conflicts"
+        echo "  jwgit_merge feature-branch       # Merge feature branch"
+        echo "  jwgit_merge feature --no-ff      # Merge with no fast-forward"
+        echo "  jwgit_merge feature --squash     # Squash merge"
+        echo "  jwgit_merge --abort              # Abort current merge"
+        echo "  jwgit_merge --continue           # Continue after resolving conflicts"
         echo
         echo "Available branches to merge:"
         if git branch >/dev/null 2>&1; then
@@ -851,8 +851,8 @@ jwgitmerge() {
         echo "💡 To resolve conflicts:"
         echo "   1. Edit the conflicted files"
         echo "   2. Run 'git add <file>' for each resolved file"
-        echo "   3. Run 'jwgitmerge --continue' to complete the merge"
-        echo "   4. Or run 'jwgitmerge --abort' to cancel the merge"
+        echo "   3. Run 'jwgit_merge --continue' to complete the merge"
+        echo "   4. Or run 'jwgit_merge --abort' to cancel the merge"
         
         return 1
     fi
@@ -860,16 +860,16 @@ jwgitmerge() {
 }
 
 
-jwgitrebase() {
+jwgit_rebase() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitrebase <branch|commit> [options]"
+        echo "Usage: jwgit_rebase <branch|commit> [options]"
         echo "Examples:"
-        echo "  jwgitrebase main                # Rebase current branch onto main"
-        echo "  jwgitrebase main --interactive  # Interactive rebase"
-        echo "  jwgitrebase HEAD~3 -i           # Interactive rebase last 3 commits"
-        echo "  jwgitrebase --continue          # Continue after resolving conflicts"
-        echo "  jwgitrebase --abort             # Abort current rebase"
-        echo "  jwgitrebase --skip              # Skip current commit during rebase"
+        echo "  jwgit_rebase main                # Rebase current branch onto main"
+        echo "  jwgit_rebase main --interactive  # Interactive rebase"
+        echo "  jwgit_rebase HEAD~3 -i           # Interactive rebase last 3 commits"
+        echo "  jwgit_rebase --continue          # Continue after resolving conflicts"
+        echo "  jwgit_rebase --abort             # Abort current rebase"
+        echo "  jwgit_rebase --skip              # Skip current commit during rebase"
         echo
         echo "Available branches:"
         if git branch >/dev/null 2>&1; then
@@ -1035,9 +1035,9 @@ jwgitrebase() {
         echo "💡 To resolve conflicts:"
         echo "   1. Edit the conflicted files"
         echo "   2. Run 'git add <file>' for each resolved file"
-        echo "   3. Run 'jwgitrebase --continue' to continue the rebase"
-        echo "   4. Or run 'jwgitrebase --abort' to cancel the rebase"
-        echo "   5. Or run 'jwgitrebase --skip' to skip the current commit"
+        echo "   3. Run 'jwgit_rebase --continue' to continue the rebase"
+        echo "   4. Or run 'jwgit_rebase --abort' to cancel the rebase"
+        echo "   5. Or run 'jwgit_rebase --skip' to skip the current commit"
         
         return 1
     fi
@@ -1049,15 +1049,15 @@ jwgitrebase() {
 # staging & commits
 # ---------------------------------------------------------------------------------
 
-jwgitadd() {
+jwgit_add() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitadd <files|pattern> [options]"
+        echo "Usage: jwgit_add <files|pattern> [options]"
         echo "Examples:"
-        echo "  jwgitadd .                    # Add all changes"
-        echo "  jwgitadd file.txt             # Add specific file"
-        echo "  jwgitadd *.js                 # Add all JavaScript files"
-        echo "  jwgitadd --patch file.txt     # Interactive staging"
-        echo "  jwgitadd --update             # Add only modified files"
+        echo "  jwgit_add .                    # Add all changes"
+        echo "  jwgit_add file.txt             # Add specific file"
+        echo "  jwgit_add *.js                 # Add all JavaScript files"
+        echo "  jwgit_add --patch file.txt     # Interactive staging"
+        echo "  jwgit_add --update             # Add only modified files"
         echo
         echo "Current status:"
         if git status --porcelain 2>/dev/null | grep -q .; then
@@ -1080,7 +1080,7 @@ jwgitadd() {
     case $FILES in
         --patch|-p)
             if [ -z "$1" ]; then
-                echo "Usage: jwgitadd --patch <file>"
+                echo "Usage: jwgit_add --patch <file>"
                 echo
                 echo "Modified files available for patch staging:"
                 git diff --name-only | sed 's/^/  /' | head -10
@@ -1095,7 +1095,7 @@ jwgitadd() {
             git add --update
             if [ $? -eq 0 ]; then
                 echo "✅ Updated files added to staging area"
-                jwgitstatus
+                jwgit_status
             else
                 echo "❌ Failed to add updated files"
                 return 1
@@ -1113,7 +1113,7 @@ jwgitadd() {
                 git add --all
                 if [ $? -eq 0 ]; then
                     echo "✅ All changes added to staging area"
-                    jwgitstatus
+                    jwgit_status
                 else
                     echo "❌ Failed to add all changes"
                     return 1
@@ -1188,7 +1188,7 @@ jwgitadd() {
             echo "  ... and $((staged_count - 10)) more staged files"
         fi
         echo
-        echo "💡 Run 'jwgitcommit' to commit these changes"
+        echo "💡 Run 'jwgit_commit' to commit these changes"
     else
         echo "❌ Failed to add files"
         return 1
@@ -1197,15 +1197,15 @@ jwgitadd() {
 }
 
 
-jwgitcommit() {
+jwgit_commit() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitcommit [message] [options]"
+        echo "Usage: jwgit_commit [message] [options]"
         echo "Examples:"
-        echo "  jwgitcommit \"Fix bug in user login\"    # Commit with message"
-        echo "  jwgitcommit                              # Open editor for message"
-        echo "  jwgitcommit -m \"Quick fix\"             # Commit with inline message"
-        echo "  jwgitcommit --amend                      # Amend last commit"
-        echo "  jwgitcommit --all -m \"Commit all\"      # Add and commit all changes"
+        echo "  jwgit_commit \"Fix bug in user login\"    # Commit with message"
+        echo "  jwgit_commit                              # Open editor for message"
+        echo "  jwgit_commit -m \"Quick fix\"             # Commit with inline message"
+        echo "  jwgit_commit --amend                      # Amend last commit"
+        echo "  jwgit_commit --all -m \"Commit all\"      # Add and commit all changes"
         echo
         echo "Current staging area:"
         if git diff --cached --name-only | grep -q .; then
@@ -1222,7 +1222,7 @@ jwgitcommit() {
             echo "Unstaged changes:"
             git status --porcelain | grep "^ M\|^M " | sed 's/^/  /' | head -5
             echo
-            echo "💡 Use 'jwgitadd' to stage files first"
+            echo "💡 Use 'jwgit_add' to stage files first"
         fi
         echo
         return 1
@@ -1318,7 +1318,7 @@ jwgitcommit() {
         echo "Unstaged changes:"
         git status --porcelain | grep "^ M\|^M " | sed 's/^/  /' | head -5
         echo
-        echo "💡 Use 'jwgitadd' to stage files, or use '--all' to commit all changes"
+        echo "💡 Use 'jwgit_add' to stage files, or use '--all' to commit all changes"
         return 1
     fi
     
@@ -1418,17 +1418,17 @@ jwgitcommit() {
 }
 
 
-jwgitstash() {
+jwgit_stash() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitstash [push|pop|list|show|drop|clear] [options]"
+        echo "Usage: jwgit_stash [push|pop|list|show|drop|clear] [options]"
         echo "Examples:"
-        echo "  jwgitstash                        # Stash current changes"
-        echo "  jwgitstash push -m \"WIP feature\" # Stash with message"
-        echo "  jwgitstash pop                    # Apply and remove latest stash"
-        echo "  jwgitstash list                   # List all stashes"
-        echo "  jwgitstash show stash@{0}         # Show stash contents"
-        echo "  jwgitstash drop stash@{1}         # Delete specific stash"
-        echo "  jwgitstash clear                  # Delete all stashes"
+        echo "  jwgit_stash                        # Stash current changes"
+        echo "  jwgit_stash push -m \"WIP feature\" # Stash with message"
+        echo "  jwgit_stash pop                    # Apply and remove latest stash"
+        echo "  jwgit_stash list                   # List all stashes"
+        echo "  jwgit_stash show stash@{0}         # Show stash contents"
+        echo "  jwgit_stash drop stash@{1}         # Delete specific stash"
+        echo "  jwgit_stash clear                  # Delete all stashes"
         echo
         echo "Current changes:"
         if git status --porcelain | grep -q .; then
@@ -1692,23 +1692,23 @@ jwgitstash() {
             
         *)
             # Default: stash current changes (same as 'push')
-            jwgitstash push "$ACTION" "$OPTIONS"
+            jwgit_stash push "$ACTION" "$OPTIONS"
             ;;
     esac
     echo
 }
 
 
-jwgitreset() {
+jwgit_reset() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitreset [--soft|--mixed|--hard] [commit] [files]"
+        echo "Usage: jwgit_reset [--soft|--mixed|--hard] [commit] [files]"
         echo "Examples:"
-        echo "  jwgitreset                    # Unstage all files (mixed reset to HEAD)"
-        echo "  jwgitreset --soft HEAD~1      # Undo last commit, keep changes staged"
-        echo "  jwgitreset --mixed HEAD~1     # Undo last commit, unstage changes"
-        echo "  jwgitreset --hard HEAD~1      # Undo last commit, discard all changes"
-        echo "  jwgitreset file.txt           # Unstage specific file"
-        echo "  jwgitreset --hard origin/main # Reset to remote branch state"
+        echo "  jwgit_reset                    # Unstage all files (mixed reset to HEAD)"
+        echo "  jwgit_reset --soft HEAD~1      # Undo last commit, keep changes staged"
+        echo "  jwgit_reset --mixed HEAD~1     # Undo last commit, unstage changes"
+        echo "  jwgit_reset --hard HEAD~1      # Undo last commit, discard all changes"
+        echo "  jwgit_reset file.txt           # Unstage specific file"
+        echo "  jwgit_reset --hard origin/main # Reset to remote branch state"
         echo
         echo "⚠️  WARNING: --hard reset will permanently delete uncommitted changes!"
         echo
@@ -1909,16 +1909,16 @@ jwgitreset() {
 # remote operations
 # ---------------------------------------------------------------------------------
 
-jwgitpush() {
+jwgit_push() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitpush [remote] [branch] [options]"
+        echo "Usage: jwgit_push [remote] [branch] [options]"
         echo "Examples:"
-        echo "  jwgitpush                     # Push current branch to upstream"
-        echo "  jwgitpush origin main         # Push main branch to origin"
-        echo "  jwgitpush origin --all        # Push all branches"
-        echo "  jwgitpush origin --tags       # Push all tags"
-        echo "  jwgitpush --set-upstream origin feature  # Set upstream and push"
-        echo "  jwgitpush --force-with-lease  # Force push safely"
+        echo "  jwgit_push                     # Push current branch to upstream"
+        echo "  jwgit_push origin main         # Push main branch to origin"
+        echo "  jwgit_push origin --all        # Push all branches"
+        echo "  jwgit_push origin --tags       # Push all tags"
+        echo "  jwgit_push --set-upstream origin feature  # Set upstream and push"
+        echo "  jwgit_push --force-with-lease  # Force push safely"
         echo
         echo "Current branch info:"
         local current_branch
@@ -2148,9 +2148,9 @@ jwgitpush() {
         echo "❌ Push failed!"
         echo
         echo "Common solutions:"
-        echo "  - Pull latest changes: jwgitpull"
-        echo "  - Force push (dangerous): jwgitpush --force-with-lease"
-        echo "  - Set upstream: jwgitpush --set-upstream $REMOTE $BRANCH"
+        echo "  - Pull latest changes: jwgit_pull"
+        echo "  - Force push (dangerous): jwgit_push --force-with-lease"
+        echo "  - Set upstream: jwgit_push --set-upstream $REMOTE $BRANCH"
         
         return 1
     fi
@@ -2158,15 +2158,15 @@ jwgitpush() {
 }
 
 
-jwgitpull() {
+jwgit_pull() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitpull [remote] [branch] [options]"
+        echo "Usage: jwgit_pull [remote] [branch] [options]"
         echo "Examples:"
-        echo "  jwgitpull                     # Pull current branch from upstream"
-        echo "  jwgitpull origin main         # Pull main branch from origin"
-        echo "  jwgitpull --rebase            # Pull with rebase instead of merge"
-        echo "  jwgitpull --no-commit         # Pull without auto-commit"
-        echo "  jwgitpull --all               # Fetch all remotes"
+        echo "  jwgit_pull                     # Pull current branch from upstream"
+        echo "  jwgit_pull origin main         # Pull main branch from origin"
+        echo "  jwgit_pull --rebase            # Pull with rebase instead of merge"
+        echo "  jwgit_pull --no-commit         # Pull without auto-commit"
+        echo "  jwgit_pull --all               # Fetch all remotes"
         echo
         echo "Current branch info:"
         local current_branch
@@ -2394,8 +2394,8 @@ jwgitpull() {
             echo "Rebase conflicts detected. To resolve:"
             echo "  1. Edit conflicted files"
             echo "  2. Run 'git add <file>' for each resolved file"
-            echo "  3. Run 'jwgitrebase --continue'"
-            echo "  4. Or run 'jwgitrebase --abort' to cancel"
+            echo "  3. Run 'jwgit_rebase --continue'"
+            echo "  4. Or run 'jwgit_rebase --abort' to cancel"
         else
             echo "Merge conflicts detected. To resolve:"
             echo "  1. Edit conflicted files"
@@ -2414,16 +2414,16 @@ jwgitpull() {
 }
 
 
-jwgitfetch() {
+jwgit_fetch() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitfetch [remote] [options]"
+        echo "Usage: jwgit_fetch [remote] [options]"
         echo "Examples:"
-        echo "  jwgitfetch                    # Fetch from all remotes"
-        echo "  jwgitfetch origin             # Fetch from origin"
-        echo "  jwgitfetch --all              # Fetch from all remotes"
-        echo "  jwgitfetch --prune            # Fetch and prune deleted branches"
-        echo "  jwgitfetch --tags             # Fetch all tags"
-        echo "  jwgitfetch origin --dry-run   # Show what would be fetched"
+        echo "  jwgit_fetch                    # Fetch from all remotes"
+        echo "  jwgit_fetch origin             # Fetch from origin"
+        echo "  jwgit_fetch --all              # Fetch from all remotes"
+        echo "  jwgit_fetch --prune            # Fetch and prune deleted branches"
+        echo "  jwgit_fetch --tags             # Fetch all tags"
+        echo "  jwgit_fetch origin --dry-run   # Show what would be fetched"
         echo
         echo "Available remotes:"
         if git remote | grep -q .; then
@@ -2588,7 +2588,7 @@ jwgitfetch() {
                             echo "  ... and $((behind - 5)) more commits"
                         fi
                         echo
-                        echo "💡 Run 'jwgitpull' to merge these changes"
+                        echo "💡 Run 'jwgit_pull' to merge these changes"
                     elif [ "$ahead" -eq 0 ] && [ "$behind" -eq 0 ]; then
                         echo "✅ Branch is up to date"
                     fi
@@ -2635,18 +2635,18 @@ jwgitfetch() {
 # history & information
 # ---------------------------------------------------------------------------------
 
-jwgitlog() {
+jwgit_log() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitlog [options] [branch|commit] [-- file]"
+        echo "Usage: jwgit_log [options] [branch|commit] [-- file]"
         echo "Examples:"
-        echo "  jwgitlog                      # Show recent commits"
-        echo "  jwgitlog --oneline            # Compact one-line format"
-        echo "  jwgitlog --graph              # Show branch graph"
-        echo "  jwgitlog -10                  # Show last 10 commits"
-        echo "  jwgitlog main                 # Show commits from main branch"
-        echo "  jwgitlog --since=\"2 weeks\"   # Show commits from last 2 weeks"
-        echo "  jwgitlog --author=\"John\"     # Show commits by author"
-        echo "  jwgitlog -- file.txt          # Show commits affecting file"
+        echo "  jwgit_log                      # Show recent commits"
+        echo "  jwgit_log --oneline            # Compact one-line format"
+        echo "  jwgit_log --graph              # Show branch graph"
+        echo "  jwgit_log -10                  # Show last 10 commits"
+        echo "  jwgit_log main                 # Show commits from main branch"
+        echo "  jwgit_log --since=\"2 weeks\"   # Show commits from last 2 weeks"
+        echo "  jwgit_log --author=\"John\"     # Show commits by author"
+        echo "  jwgit_log -- file.txt          # Show commits affecting file"
         echo
         echo "Quick options:"
         echo "  --oneline     Compact format"
@@ -2803,12 +2803,12 @@ jwgitlog() {
     }
     
     echo
-    echo "💡 Use 'jwgitlog --help' for more options"
+    echo "💡 Use 'jwgit_log --help' for more options"
     echo
 }
 
 
-jwgitstatus() {
+jwgit_status() {
     echo "📊 Git Repository Status"
     echo "=================================================="
     echo
@@ -2994,39 +2994,39 @@ jwgitstatus() {
     # Quick actions
     echo "---[ Quick Actions ]--------------------------------"
     if [ "$staged_count" -gt 0 ]; then
-        echo "💡 Ready to commit: jwgitcommit"
+        echo "💡 Ready to commit: jwgit_commit"
     elif [ "$modified_count" -gt 0 ] || [ "$untracked_count" -gt 0 ]; then
-        echo "💡 Stage changes: jwgitadd ."
+        echo "💡 Stage changes: jwgit_add ."
     fi
     
     if [ -n "$upstream" ]; then
         local behind
         behind=$(git rev-list --count HEAD.."$upstream" 2>/dev/null || echo "0")
         if [ "$behind" -gt 0 ]; then
-            echo "💡 Pull updates: jwgitpull"
+            echo "💡 Pull updates: jwgit_pull"
         fi
         
         local ahead
         ahead=$(git rev-list --count "$upstream"..HEAD 2>/dev/null || echo "0")
         if [ "$ahead" -gt 0 ]; then
-            echo "💡 Push changes: jwgitpush"
+            echo "💡 Push changes: jwgit_push"
         fi
     fi
     echo
 }
 
 
-jwgitdiff() {
+jwgit_diff() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitdiff [options] [commit] [commit] [-- file]"
+        echo "Usage: jwgit_diff [options] [commit] [commit] [-- file]"
         echo "Examples:"
-        echo "  jwgitdiff                     # Show unstaged changes"
-        echo "  jwgitdiff --cached            # Show staged changes"
-        echo "  jwgitdiff HEAD~1              # Compare with previous commit"
-        echo "  jwgitdiff main feature        # Compare two branches"
-        echo "  jwgitdiff --stat              # Show file statistics only"
-        echo "  jwgitdiff --name-only         # Show only changed file names"
-        echo "  jwgitdiff -- file.txt         # Show changes for specific file"
+        echo "  jwgit_diff                     # Show unstaged changes"
+        echo "  jwgit_diff --cached            # Show staged changes"
+        echo "  jwgit_diff HEAD~1              # Compare with previous commit"
+        echo "  jwgit_diff main feature        # Compare two branches"
+        echo "  jwgit_diff --stat              # Show file statistics only"
+        echo "  jwgit_diff --name-only         # Show only changed file names"
+        echo "  jwgit_diff -- file.txt         # Show changes for specific file"
         echo
         echo "Quick options:"
         echo "  --cached      Show staged changes"
@@ -3219,19 +3219,19 @@ jwgitdiff() {
     fi
     
     echo
-    echo "💡 Use 'jwgitdiff --help' for more options"
+    echo "💡 Use 'jwgit_diff --help' for more options"
     echo
 }
 
 
-jwgitblame() {
+jwgit_blame() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitblame <file> [options]"
+        echo "Usage: jwgit_blame <file> [options]"
         echo "Examples:"
-        echo "  jwgitblame file.txt           # Show line-by-line authorship"
-        echo "  jwgitblame file.txt -L 10,20  # Show lines 10-20 only"
-        echo "  jwgitblame file.txt --since=\"1 month ago\""
-        echo "  jwgitblame file.txt -w        # Ignore whitespace changes"
+        echo "  jwgit_blame file.txt           # Show line-by-line authorship"
+        echo "  jwgit_blame file.txt -L 10,20  # Show lines 10-20 only"
+        echo "  jwgit_blame file.txt --since=\"1 month ago\""
+        echo "  jwgit_blame file.txt -w        # Ignore whitespace changes"
         echo
         echo "Available files to blame:"
         if git ls-files >/dev/null 2>&1; then
@@ -3264,7 +3264,7 @@ jwgitblame() {
     # Check if file is tracked by git
     if ! git ls-files --error-unmatch "$FILE" >/dev/null 2>&1; then
         echo "❌ File '$FILE' is not tracked by git"
-        echo "💡 Add it first with: jwgitadd $FILE"
+        echo "💡 Add it first with: jwgit_add $FILE"
         return 1
     fi
     
@@ -3331,15 +3331,15 @@ jwgitblame() {
 # maintenance & cleanup
 # ---------------------------------------------------------------------------------
 
-jwgitclean() {
+jwgit_clean() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitclean [options]"
+        echo "Usage: jwgit_clean [options]"
         echo "Examples:"
-        echo "  jwgitclean                    # Show what would be cleaned (dry run)"
-        echo "  jwgitclean -f                 # Remove untracked files"
-        echo "  jwgitclean -fd                # Remove untracked files and directories"
-        echo "  jwgitclean -fx                # Remove untracked and ignored files"
-        echo "  jwgitclean -i                 # Interactive cleaning"
+        echo "  jwgit_clean                    # Show what would be cleaned (dry run)"
+        echo "  jwgit_clean -f                 # Remove untracked files"
+        echo "  jwgit_clean -fd                # Remove untracked files and directories"
+        echo "  jwgit_clean -fx                # Remove untracked and ignored files"
+        echo "  jwgit_clean -i                 # Interactive cleaning"
         echo
         echo "⚠️  WARNING: This will permanently delete files!"
         echo
@@ -3474,7 +3474,7 @@ jwgitclean() {
         echo "---[ To Actually Clean ]----------------------------"
         echo "This was a dry run. To actually remove files:"
         
-        local actual_cmd="jwgitclean -f"
+        local actual_cmd="jwgit_clean -f"
         if [ -n "$DIRECTORIES" ]; then
             actual_cmd="${actual_cmd}d"
         fi
@@ -3485,7 +3485,7 @@ jwgitclean() {
         echo "  $actual_cmd"
         echo
         echo "Or use interactive mode:"
-        echo "  jwgitclean -i"
+        echo "  jwgit_clean -i"
         return 0
     fi
     
@@ -3546,7 +3546,7 @@ jwgitclean() {
 }
 
 
-jwgitprune() {
+jwgit_prune() {
     echo "🧹 Git Repository Maintenance"
     echo "=================================================="
     echo
@@ -3621,7 +3621,7 @@ jwgitprune() {
 }
 
 
-jwgitgc() {
+jwgit_gc() {
     echo "🗑️  Git Garbage Collection"
     echo "=================================================="
     echo
@@ -3697,15 +3697,15 @@ jwgitgc() {
 # advanced operations
 # ---------------------------------------------------------------------------------
 
-jwgitcherry() {
+jwgit_cherry() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitcherry <commit> [target_branch]"
+        echo "Usage: jwgit_cherry <commit> [target_branch]"
         echo "Examples:"
-        echo "  jwgitcherry abc123            # Cherry-pick commit to current branch"
-        echo "  jwgitcherry abc123 main       # Cherry-pick commit to main branch"
-        echo "  jwgitcherry --continue        # Continue after resolving conflicts"
-        echo "  jwgitcherry --abort           # Abort cherry-pick"
-        echo "  jwgitcherry --skip            # Skip current commit"
+        echo "  jwgit_cherry abc123            # Cherry-pick commit to current branch"
+        echo "  jwgit_cherry abc123 main       # Cherry-pick commit to main branch"
+        echo "  jwgit_cherry --continue        # Continue after resolving conflicts"
+        echo "  jwgit_cherry --abort           # Abort cherry-pick"
+        echo "  jwgit_cherry --skip            # Skip current commit"
         echo
         echo "Recent commits available for cherry-picking:"
         if git log --oneline -10 >/dev/null 2>&1; then
@@ -3863,9 +3863,9 @@ jwgitcherry() {
         echo "💡 To resolve conflicts:"
         echo "   1. Edit the conflicted files"
         echo "   2. Run 'git add <file>' for each resolved file"
-        echo "   3. Run 'jwgitcherry --continue' to complete the cherry-pick"
-        echo "   4. Or run 'jwgitcherry --abort' to cancel the cherry-pick"
-        echo "   5. Or run 'jwgitcherry --skip' to skip this commit"
+        echo "   3. Run 'jwgit_cherry --continue' to complete the cherry-pick"
+        echo "   4. Or run 'jwgit_cherry --abort' to cancel the cherry-pick"
+        echo "   5. Or run 'jwgit_cherry --skip' to skip this commit"
         
         return 1
     fi
@@ -3873,27 +3873,27 @@ jwgitcherry() {
 }
 
 
-jwgitbisect() {
+jwgit_bisect() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitbisect <start|good|bad|reset|skip|run> [commit]"
+        echo "Usage: jwgit_bisect <start|good|bad|reset|skip|run> [commit]"
         echo "Examples:"
-        echo "  jwgitbisect start             # Start bisect session"
-        echo "  jwgitbisect bad               # Mark current commit as bad"
-        echo "  jwgitbisect good abc123       # Mark commit as good"
-        echo "  jwgitbisect skip              # Skip current commit"
-        echo "  jwgitbisect reset             # End bisect session"
-        echo "  jwgitbisect run \"make test\"   # Automate bisect with command"
+        echo "  jwgit_bisect start             # Start bisect session"
+        echo "  jwgit_bisect bad               # Mark current commit as bad"
+        echo "  jwgit_bisect good abc123       # Mark commit as good"
+        echo "  jwgit_bisect skip              # Skip current commit"
+        echo "  jwgit_bisect reset             # End bisect session"
+        echo "  jwgit_bisect run \"make test\"   # Automate bisect with command"
         echo
         echo "Git bisect helps you find the commit that introduced a bug by"
         echo "using binary search through your commit history."
         echo
         echo "Typical workflow:"
-        echo "  1. jwgitbisect start"
-        echo "  2. jwgitbisect bad            # Current commit has the bug"
-        echo "  3. jwgitbisect good <commit>  # Known good commit"
+        echo "  1. jwgit_bisect start"
+        echo "  2. jwgit_bisect bad            # Current commit has the bug"
+        echo "  3. jwgit_bisect good <commit>  # Known good commit"
         echo "  4. Test each commit git shows you"
-        echo "  5. jwgitbisect good/bad for each test"
-        echo "  6. jwgitbisect reset when done"
+        echo "  5. jwgit_bisect good/bad for each test"
+        echo "  6. jwgit_bisect reset when done"
         echo
         return 1
     fi
@@ -3911,7 +3911,7 @@ jwgitbisect() {
             # Check if already in bisect
             if [ -d ".git/BISECT_LOG" ]; then
                 echo "⚠️  Bisect session already in progress"
-                echo "Use 'jwgitbisect reset' to end current session first"
+                echo "Use 'jwgit_bisect reset' to end current session first"
                 return 1
             fi
             
@@ -3922,8 +3922,8 @@ jwgitbisect() {
                 echo "✅ Bisect session started!"
                 echo
                 echo "Next steps:"
-                echo "  1. Mark the current (bad) commit: jwgitbisect bad"
-                echo "  2. Mark a known good commit: jwgitbisect good <commit>"
+                echo "  1. Mark the current (bad) commit: jwgit_bisect bad"
+                echo "  2. Mark a known good commit: jwgit_bisect good <commit>"
                 echo
                 echo "Recent commits:"
                 git log --oneline -10 | sed 's/^/  /'
@@ -3936,7 +3936,7 @@ jwgitbisect() {
         bad)
             if [ ! -d ".git/BISECT_LOG" ]; then
                 echo "❌ No bisect session in progress"
-                echo "Start one with: jwgitbisect start"
+                echo "Start one with: jwgit_bisect start"
                 return 1
             fi
             
@@ -3948,7 +3948,7 @@ jwgitbisect() {
             
             if [ $result -eq 0 ]; then
                 echo "✅ Commit marked as bad"
-                _jwgitbisect_status
+                __jwgit_bisect_status__
             else
                 echo "❌ Failed to mark commit as bad"
                 return 1
@@ -3958,7 +3958,7 @@ jwgitbisect() {
         good)
             if [ ! -d ".git/BISECT_LOG" ]; then
                 echo "❌ No bisect session in progress"
-                echo "Start one with: jwgitbisect start"
+                echo "Start one with: jwgit_bisect start"
                 return 1
             fi
             
@@ -3970,7 +3970,7 @@ jwgitbisect() {
             
             if [ $result -eq 0 ]; then
                 echo "✅ Commit marked as good"
-                _jwgitbisect_status
+                __jwgit_bisect_status__
             else
                 echo "❌ Failed to mark commit as good"
                 return 1
@@ -3980,7 +3980,7 @@ jwgitbisect() {
         skip)
             if [ ! -d ".git/BISECT_LOG" ]; then
                 echo "❌ No bisect session in progress"
-                echo "Start one with: jwgitbisect start"
+                echo "Start one with: jwgit_bisect start"
                 return 1
             fi
             
@@ -3989,7 +3989,7 @@ jwgitbisect() {
             
             if [ $? -eq 0 ]; then
                 echo "✅ Commit skipped"
-                _jwgitbisect_status
+                __jwgit_bisect_status__
             else
                 echo "❌ Failed to skip commit"
                 return 1
@@ -4017,13 +4017,13 @@ jwgitbisect() {
         run)
             if [ ! -d ".git/BISECT_LOG" ]; then
                 echo "❌ No bisect session in progress"
-                echo "Start one with: jwgitbisect start"
+                echo "Start one with: jwgit_bisect start"
                 return 1
             fi
             
             if [ -z "$ARGS" ]; then
-                echo "Usage: jwgitbisect run \"<command>\""
-                echo "Example: jwgitbisect run \"make test\""
+                echo "Usage: jwgit_bisect run \"<command>\""
+                echo "Example: jwgit_bisect run \"make test\""
                 return 1
             fi
             
@@ -4041,7 +4041,7 @@ jwgitbisect() {
                 
                 if [ $? -eq 0 ]; then
                     echo "✅ Automated bisect completed!"
-                    _jwgitbisect_status
+                    __jwgit_bisect_status__
                 else
                     echo "❌ Automated bisect failed"
                     return 1
@@ -4052,7 +4052,7 @@ jwgitbisect() {
             ;;
             
         status)
-            _jwgitbisect_status
+            __jwgit_bisect_status__
             ;;
             
         *)
@@ -4064,7 +4064,7 @@ jwgitbisect() {
     echo
 }
 
-_jwgitbisect_status() {
+__jwgit_bisect_status__() {
     if [ ! -d ".git/BISECT_LOG" ]; then
         echo "No bisect session in progress"
         return 0
@@ -4102,22 +4102,22 @@ _jwgitbisect_status() {
     echo
     echo "Next steps:"
     echo "  - Test current commit for the bug"
-    echo "  - Run 'jwgitbisect good' if commit is good"
-    echo "  - Run 'jwgitbisect bad' if commit is bad"
-    echo "  - Run 'jwgitbisect skip' if commit is untestable"
-    echo "  - Run 'jwgitbisect reset' to end session"
+    echo "  - Run 'jwgit_bisect good' if commit is good"
+    echo "  - Run 'jwgit_bisect bad' if commit is bad"
+    echo "  - Run 'jwgit_bisect skip' if commit is untestable"
+    echo "  - Run 'jwgit_bisect reset' to end session"
 }
 
 
-jwgitreflog() {
+jwgit_reflog() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgitreflog [branch|HEAD] [options]"
+        echo "Usage: jwgit_reflog [branch|HEAD] [options]"
         echo "Examples:"
-        echo "  jwgitreflog                   # Show HEAD reflog"
-        echo "  jwgitreflog main              # Show main branch reflog"
-        echo "  jwgitreflog --all             # Show all reflogs"
-        echo "  jwgitreflog -10               # Show last 10 entries"
-        echo "  jwgitreflog --since=\"1 week\"  # Show entries from last week"
+        echo "  jwgit_reflog                   # Show HEAD reflog"
+        echo "  jwgit_reflog main              # Show main branch reflog"
+        echo "  jwgit_reflog --all             # Show all reflogs"
+        echo "  jwgit_reflog -10               # Show last 10 entries"
+        echo "  jwgit_reflog --since=\"1 week\"  # Show entries from last week"
         echo
         echo "Reflog shows the history of where HEAD (or branch) has been."
         echo "Useful for recovering lost commits or understanding recent changes."
@@ -4263,7 +4263,7 @@ jwgitreflog() {
     echo "To recover a lost commit:"
     echo "  1. Find the commit hash in reflog"
     echo "  2. Create a branch: git branch recovery <hash>"
-    echo "  3. Or cherry-pick: jwgitcherry <hash>"
+    echo "  3. Or cherry-pick: jwgit_cherry <hash>"
     echo
     echo "💡 Reflog entries expire after 90 days by default"
     echo

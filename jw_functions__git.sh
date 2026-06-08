@@ -59,22 +59,23 @@ jwgit_init() {
     if [ $# -eq 0 ]; then
         echo "Usage: jwgit_init [directory] [--bare]"
         echo "Examples:"
-        echo "  jwgit_init                    # Initialize current directory"
+        echo "  jwgit_init .                  # Initialize current directory"
         echo "  jwgit_init myproject          # Initialize new directory"
         echo "  jwgit_init myrepo --bare      # Initialize bare repository"
         echo
         return 1
     fi
 
-    local DIR=${1:-.}
+    # Order-independent parse: --bare toggles bare mode, any other arg is the dir.
+    local DIR="."
     local BARE_FLAG=""
-    
-    if [ "$2" = "--bare" ] || [ "$1" = "--bare" ]; then
-        BARE_FLAG="--bare"
-        if [ "$1" = "--bare" ]; then
-            DIR="."
-        fi
-    fi
+    local arg
+    for arg in "$@"; do
+        case $arg in
+            --bare) BARE_FLAG="--bare" ;;
+            *)      DIR=$arg ;;
+        esac
+    done
     
     echo "📁 Initializing Git repository..."
     echo "Directory: $DIR"
@@ -127,29 +128,20 @@ jwgit_clone() {
 
     local REPO_URL=$1
     shift
-    local OPTIONS="$*"
-    
-    # Extract directory name from URL if not specified
-    local DIR=""
-    if [[ "$OPTIONS" != *"--"* ]] && [ -n "$1" ] && [[ "$1" != -* ]]; then
-        DIR="$1"
-        shift
-        OPTIONS="$*"
-    else
-        DIR=$(basename "$REPO_URL" .git)
-    fi
-    
+    # Remaining args (optional target dir and/or git-clone options) are forwarded
+    # verbatim as "$@" so each token stays separate under both bash and zsh; git
+    # clone accepts options after the <url>.
+    local DIR
+    DIR=$(basename "$REPO_URL" .git)
+
     echo "📥 Cloning repository..."
     echo "URL: $REPO_URL"
-    echo "Directory: $DIR"
-    if [ -n "$OPTIONS" ]; then
-        echo "Options: $OPTIONS"
-    fi
+    [ $# -gt 0 ] && echo "Args: $*"
     echo
-    
-    # Check if directory already exists
+
+    # Warn if the default target directory already exists
     if [ -d "$DIR" ]; then
-        echo "⚠️  Directory '$DIR' already exists!"
+        echo "⚠️  Directory '$DIR' may already exist!"
         echo -n "Continue anyway? [y/N] "
         read -r response
         if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
@@ -157,32 +149,25 @@ jwgit_clone() {
             return 1
         fi
     fi
-    
-    # Clone the repository
-    if [ -n "$OPTIONS" ]; then
-        # shellcheck disable=SC2086
-        git clone $OPTIONS "$REPO_URL" "$DIR"
-    else
-        git clone "$REPO_URL" "$DIR"
-    fi
-    
-    if [ $? -eq 0 ]; then
+
+    # Clone — do NOT 'cd' the caller's interactive shell; query via 'git -C'
+    if git clone "$REPO_URL" "$@"; then
         echo
         echo "✅ Repository cloned successfully!"
-        echo "📁 Location: $DIR"
-        
-        # Show basic info about the cloned repo
-        cd "$DIR" || return 1
-        echo
-        echo "---[ Repository Info ]------------------------------"
-        echo "Remote origin: $(git remote get-url origin 2>/dev/null || echo 'Not set')"
-        echo "Current branch: $(git branch --show-current 2>/dev/null || echo 'Unknown')"
-        echo "Latest commit: $(git log -1 --oneline 2>/dev/null || echo 'No commits')"
-        echo "Total commits: $(git rev-list --count HEAD 2>/dev/null || echo '0')"
-        
-        local branch_count
-        branch_count=$(git branch -r 2>/dev/null | wc -l)
-        echo "Remote branches: $branch_count"
+        if [ -d "$DIR" ]; then
+            echo "📁 Location: $DIR"
+            echo
+            echo "---[ Repository Info ]------------------------------"
+            echo "Remote origin: $(git -C "$DIR" remote get-url origin 2>/dev/null || echo 'Not set')"
+            echo "Current branch: $(git -C "$DIR" branch --show-current 2>/dev/null || echo 'Unknown')"
+            echo "Latest commit: $(git -C "$DIR" log -1 --oneline 2>/dev/null || echo 'No commits')"
+            echo "Total commits: $(git -C "$DIR" rev-list --count HEAD 2>/dev/null || echo '0')"
+            local branch_count
+            branch_count=$(git -C "$DIR" branch -r 2>/dev/null | wc -l)
+            echo "Remote branches: $branch_count"
+        else
+            echo "💡 cd into your new clone to inspect it"
+        fi
     else
         echo "❌ Failed to clone repository"
         return 1
@@ -312,7 +297,7 @@ jwgit_remote() {
                 git branch -r | grep "^  $remote/" | sed 's/^/  /' | head -10
                 
                 local branch_count
-                branch_count=$(git branch -r | grep -c "^  $remote/" || echo "0")
+                branch_count=$(git branch -r | grep -c "^  $remote/")
                 if [ "$branch_count" -gt 10 ]; then
                     echo "  ... and $((branch_count - 10)) more branches"
                 fi

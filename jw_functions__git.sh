@@ -5,42 +5,42 @@
 # Contents:
 #
 #   * repository management
-#     - jwgit_init       ->  init
-#     - jwgit_clone      ->  clone
-#     - jwgit_remote     ->  remote
+#     - jwgit_init
+#     - jwgit_clone
+#     - jwgit_remote
 #
 #   * branch operations
-#     - jwgit_branch     ->  branch
-#     - jwgit_checkout   ->  checkout
-#     - jwgit_merge      ->  merge
-#     - jwgit_rebase     ->  rebase
+#     - jwgit_branch
+#     - jwgit_checkout
+#     - jwgit_merge
+#     - jwgit_rebase
 #
 #   * staging & commits
-#     - jwgit_add        ->  add
-#     - jwgit_commit     ->  commit
-#     - jwgit_stash      ->  stash
-#     - jwgit_reset      ->  reset
+#     - jwgit_add
+#     - jwgit_commit
+#     - jwgit_stash
+#     - jwgit_reset
 #
 #   * remote operations
-#     - jwgit_push       ->  push
-#     - jwgit_pull       ->  pull
-#     - jwgit_fetch      ->  fetch
+#     - jwgit_push
+#     - jwgit_pull
+#     - jwgit_fetch
 #
 #   * history & information
-#     - jwgit_log        ->  log
-#     - jwgit_status     ->  status
-#     - jwgit_diff       ->  diff
-#     - jwgit_blame      ->  blame
+#     - jwgit_log
+#     - jwgit_status
+#     - jwgit_diff
+#     - jwgit_blame
 #
 #   * maintenance & cleanup
-#     - jwgit_clean      ->  clean
-#     - jwgit_prune      ->  prune
-#     - jwgit_gc         ->  gc
+#     - jwgit_clean
+#     - jwgit_prune
+#     - jwgit_gc
 #
 #   * advanced operations
-#     - jwgit_cherry-pick     ->  cherry
-#     - jwgit_bisect     ->  bisect
-#     - jwgit_reflog     ->  reflog
+#     - jwgit_cherry-pick
+#     - jwgit_bisect
+#     - jwgit_reflog
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 

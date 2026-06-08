@@ -496,7 +496,8 @@ jwdocker_volume-create() {
 
     local VOLUME_NAME=$1
     local DRIVER=${2:-local}
-    shift 2  # Remove volume name and driver from arguments
+    shift                      # remove volume name
+    [ $# -gt 0 ] && shift      # remove driver (only if one was supplied)
     local OPTIONS="$*"
     
     echo "Creating volume: $VOLUME_NAME"
@@ -615,7 +616,8 @@ jwdocker_network-create() {
 
     local NETWORK_NAME=$1
     local DRIVER=${2:-bridge}
-    shift 2  # Remove network name and driver from arguments
+    shift                      # remove network name
+    [ $# -gt 0 ] && shift      # remove driver (only if one was supplied)
     local OPTIONS="$*"
     
     echo "Creating network: $NETWORK_NAME"
@@ -661,7 +663,13 @@ jwdocker_network-remove() {
             return 1
         fi
         echo "Force removing network used by containers: $NETWORK"
-        docker network rm "$NETWORK" 2>/dev/null || echo "Failed to remove network (may be in use)"
+        # 'docker network rm' won't detach active endpoints; disconnect them first.
+        # shellcheck disable=SC2086
+        for container in $using_containers; do
+            echo "  Disconnecting: $container"
+            docker network disconnect -f "$NETWORK" "$container"
+        done
+        docker network rm "$NETWORK" || echo "Failed to remove network (may still be in use)"
     else
         echo "Removing network: $NETWORK"
         docker network rm "$NETWORK"
@@ -787,12 +795,13 @@ jwdocker_monitor-health() {
     echo "---[ Container Health Status ]-------------------------"
     docker ps --format "table {{.Names}}\t{{.Status}}" | head -1
     docker ps --format "table {{.Names}}\t{{.Status}}" | tail -n +2 | while read -r name container_status; do
-        if echo "$container_status" | grep -q "healthy"; then
-            echo -e "$name\t\033[32m$container_status\033[0m"
-        elif echo "$container_status" | grep -q "unhealthy"; then
-            echo -e "$name\t\033[31m$container_status\033[0m"
+        # NB: test "unhealthy" before "healthy" — the latter is a substring of the former.
+        if echo "$container_status" | grep -q "unhealthy"; then
+            echo -e "$name\t$(jwpaintfgRed "$container_status")"
+        elif echo "$container_status" | grep -q "healthy"; then
+            echo -e "$name\t$(jwpaintfgGreen "$container_status")"
         elif echo "$container_status" | grep -q "starting"; then
-            echo -e "$name\t\033[33m$container_status\033[0m"
+            echo -e "$name\t$(jwpaintfgBrown "$container_status")"
         else
             echo -e "$name\t$container_status"
         fi
@@ -1357,12 +1366,13 @@ jwdocker_cp() {
 
 jwdocker_run() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdocker_run <image> [options]"
+        echo "Usage: jwdocker_run [options] <image> [command]"
+        echo "       (arguments are passed straight to 'docker run' in native order)"
         echo "Examples:"
         echo "  jwdocker_run nginx"
-        echo "  jwdocker_run nginx -p 8080:80"
-        echo "  jwdocker_run ubuntu:20.04 -it --rm bash"
-        echo "  jwdocker_run postgres:13 -e POSTGRES_PASSWORD=secret"
+        echo "  jwdocker_run -p 8080:80 nginx"
+        echo "  jwdocker_run -it --rm ubuntu:20.04 bash"
+        echo "  jwdocker_run -e POSTGRES_PASSWORD=secret postgres:13"
         echo
         echo "Common options:"
         echo "  -d, --detach          Run in background"
@@ -1376,18 +1386,15 @@ jwdocker_run() {
         return 1
     fi
 
-    local IMAGE=$1
-    shift  # Remove image from arguments
-    local OPTIONS="$*"
-    
-    echo "Running container from image '$IMAGE'..."
-    if [ -n "$OPTIONS" ]; then
-        echo "Options: $OPTIONS"
-        # shellcheck disable=SC2086
-        docker run $OPTIONS "$IMAGE"
-    else
+    echo "Running container..."
+    # Forward arguments verbatim to 'docker run' in Docker's native order:
+    #   jwdocker_run [OPTIONS] IMAGE [COMMAND...]
+    # A lone image is run detached by default.
+    if [ $# -eq 1 ]; then
         echo "Using default options: -d (detached)"
-        docker run -d "$IMAGE"
+        docker run -d "$1"
+    else
+        docker run "$@"
     fi && {
         # Show the new container if it was created
         echo

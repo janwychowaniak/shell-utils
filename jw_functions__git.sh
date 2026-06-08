@@ -38,7 +38,7 @@
 #     - jwgit_gc         ->  gc
 #
 #   * advanced operations
-#     - jwgit_cherry     ->  cherry
+#     - jwgit_cherry-pick     ->  cherry
 #     - jwgit_bisect     ->  bisect
 #     - jwgit_reflog     ->  reflog
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3697,15 +3697,15 @@ jwgit_gc() {
 # advanced operations
 # ---------------------------------------------------------------------------------
 
-jwgit_cherry() {
+jwgit_cherry-pick() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwgit_cherry <commit> [target_branch]"
+        echo "Usage: jwgit_cherry-pick <commit> [target_branch]"
         echo "Examples:"
-        echo "  jwgit_cherry abc123            # Cherry-pick commit to current branch"
-        echo "  jwgit_cherry abc123 main       # Cherry-pick commit to main branch"
-        echo "  jwgit_cherry --continue        # Continue after resolving conflicts"
-        echo "  jwgit_cherry --abort           # Abort cherry-pick"
-        echo "  jwgit_cherry --skip            # Skip current commit"
+        echo "  jwgit_cherry-pick abc123            # Cherry-pick commit to current branch"
+        echo "  jwgit_cherry-pick abc123 main       # Cherry-pick commit to main branch"
+        echo "  jwgit_cherry-pick --continue        # Continue after resolving conflicts"
+        echo "  jwgit_cherry-pick --abort           # Abort cherry-pick"
+        echo "  jwgit_cherry-pick --skip            # Skip current commit"
         echo
         echo "Recent commits available for cherry-picking:"
         if git log --oneline -10 >/dev/null 2>&1; then
@@ -3863,9 +3863,9 @@ jwgit_cherry() {
         echo "💡 To resolve conflicts:"
         echo "   1. Edit the conflicted files"
         echo "   2. Run 'git add <file>' for each resolved file"
-        echo "   3. Run 'jwgit_cherry --continue' to complete the cherry-pick"
-        echo "   4. Or run 'jwgit_cherry --abort' to cancel the cherry-pick"
-        echo "   5. Or run 'jwgit_cherry --skip' to skip this commit"
+        echo "   3. Run 'jwgit_cherry-pick --continue' to complete the cherry-pick"
+        echo "   4. Or run 'jwgit_cherry-pick --abort' to cancel the cherry-pick"
+        echo "   5. Or run 'jwgit_cherry-pick --skip' to skip this commit"
         
         return 1
     fi
@@ -4263,7 +4263,7 @@ jwgit_reflog() {
     echo "To recover a lost commit:"
     echo "  1. Find the commit hash in reflog"
     echo "  2. Create a branch: git branch recovery <hash>"
-    echo "  3. Or cherry-pick: jwgit_cherry <hash>"
+    echo "  3. Or cherry-pick: jwgit_cherry-pick <hash>"
     echo
     echo "💡 Reflog entries expire after 90 days by default"
     echo

@@ -445,7 +445,7 @@ jwgit_branch() {
                 echo "Usage: jwgit_branch delete <branch_name> [--force]"
                 echo
                 echo "Available branches:"
-                git branch --format="  %(refname:short)" | grep -v "$(git branch --show-current)" | head -10
+                git branch --format="  %(refname:short)" | grep -vxF "  $(git branch --show-current)" | head -10
                 return 1
             fi
             
@@ -539,8 +539,7 @@ jwgit_checkout() {
 
     local TARGET=$1
     shift
-    local OPTIONS="$*"
-    
+
     # Handle create new branch (-b flag)
     if [ "$TARGET" = "-b" ]; then
         if [ -z "$1" ]; then
@@ -565,25 +564,24 @@ jwgit_checkout() {
         return 0
     fi
     
-    # Handle file restoration (-- flag)
+    # Restore file(s) from HEAD:  jwgit_checkout -- <file>...
     if [ "$TARGET" = "--" ]; then
-        if [ -z "$1" ]; then
+        if [ $# -eq 0 ]; then
             echo "Usage: jwgit_checkout -- <file_path>"
             echo "       jwgit_checkout <commit> -- <file_path>"
             return 1
         fi
-        
-        local FILE_PATH=$1
-        echo "Restoring file '$FILE_PATH' from HEAD..."
-        echo "⚠️  This will discard local changes to the file!"
+
+        echo "Restoring from HEAD: $*"
+        echo "⚠️  This will discard local changes to the file(s)!"
         echo -n "Continue? [y/N] "
         read -r response
-        
+
         if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-            if git checkout -- "$FILE_PATH"; then
-                echo "✅ File restored successfully"
+            if git checkout -- "$@"; then
+                echo "✅ File(s) restored successfully"
             else
-                echo "❌ Failed to restore file"
+                echo "❌ Failed to restore file(s)"
                 return 1
             fi
         else
@@ -591,24 +589,22 @@ jwgit_checkout() {
         fi
         return 0
     fi
-    
-    # Handle commit with file restoration
-    if [[ "$OPTIONS" == *"--"* ]]; then
+
+    # Restore file(s) from a commit:  jwgit_checkout <commit> -- <file>...
+    if [ "$1" = "--" ]; then
+        shift   # drop the -- separator; remaining "$@" are the paths
         local COMMIT=$TARGET
-        local FILE_PATH
-        FILE_PATH=$(echo "$OPTIONS" | sed 's/.*-- //')
-        
-        echo "Restoring file '$FILE_PATH' from commit '$COMMIT'..."
-        echo "⚠️  This will discard local changes to the file!"
+
+        echo "Restoring from commit '$COMMIT': $*"
+        echo "⚠️  This will discard local changes to the file(s)!"
         echo -n "Continue? [y/N] "
         read -r response
-        
+
         if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-            # shellcheck disable=SC2086
-            if git checkout "$COMMIT" -- $FILE_PATH; then
-                echo "✅ File restored from commit '$COMMIT'"
+            if git checkout "$COMMIT" -- "$@"; then
+                echo "✅ File(s) restored from commit '$COMMIT'"
             else
-                echo "❌ Failed to restore file"
+                echo "❌ Failed to restore file(s)"
                 return 1
             fi
         else
@@ -713,8 +709,8 @@ jwgit_merge() {
 
     local BRANCH=$1
     shift
-    local OPTIONS="$*"
-    
+    local -a OPTS=("$@")   # remaining args are merge options (array: zsh/bash safe)
+
     # Handle merge control commands
     case $BRANCH in
         --abort)
@@ -798,8 +794,8 @@ jwgit_merge() {
     echo
     
     # Show merge options
-    if [ -n "$OPTIONS" ]; then
-        echo "Merge options: $OPTIONS"
+    if [ ${#OPTS[@]} -gt 0 ]; then
+        echo "Merge options: ${OPTS[*]}"
     else
         echo "Merge type: default (fast-forward if possible)"
     fi
@@ -815,13 +811,7 @@ jwgit_merge() {
     
     # Perform the merge
     echo "Merging..."
-    if [ -n "$OPTIONS" ]; then
-        # shellcheck disable=SC2086
-        git merge $OPTIONS "$BRANCH"
-    else
-        git merge "$BRANCH"
-    fi
-    
+    git merge "${OPTS[@]}" "$BRANCH"
     local merge_result=$?
     
     if [ $merge_result -eq 0 ]; then
@@ -876,8 +866,7 @@ jwgit_rebase() {
 
     local TARGET=$1
     shift
-    local OPTIONS="$*"
-    
+
     # Handle rebase control commands
     case $TARGET in
         --continue)
@@ -942,12 +931,17 @@ jwgit_rebase() {
         return 1
     fi
     
-    # Handle interactive rebase
+    # Separate the interactive flag (exact match, not substring) from the other
+    # options; collect the rest into an array so each token survives bash and zsh.
     local INTERACTIVE=""
-    if [[ "$OPTIONS" == *"--interactive"* ]] || [[ "$OPTIONS" == *"-i"* ]]; then
-        INTERACTIVE="--interactive"
-        OPTIONS=$(echo "$OPTIONS" | sed 's/--interactive\|-i//g' | xargs)
-    fi
+    local -a OPTS=()
+    local arg
+    for arg in "$@"; do
+        case $arg in
+            -i|--interactive) INTERACTIVE="--interactive" ;;
+            *)                OPTS+=("$arg") ;;
+        esac
+    done
     
     echo "🔄 Rebasing branch '$current_branch' onto '$TARGET'"
     echo "=================================================="
@@ -991,19 +985,9 @@ jwgit_rebase() {
     # Perform the rebase
     echo "Rebasing..."
     if [ -n "$INTERACTIVE" ]; then
-        if [ -n "$OPTIONS" ]; then
-            # shellcheck disable=SC2086
-            git rebase --interactive $OPTIONS "$TARGET"
-        else
-            git rebase --interactive "$TARGET"
-        fi
+        git rebase --interactive "${OPTS[@]}" "$TARGET"
     else
-        if [ -n "$OPTIONS" ]; then
-            # shellcheck disable=SC2086
-            git rebase $OPTIONS "$TARGET"
-        else
-            git rebase "$TARGET"
-        fi
+        git rebase "${OPTS[@]}" "$TARGET"
     fi
     
     local rebase_result=$?

@@ -843,7 +843,7 @@ jwdocker_system-info() {
     docker info --format "Docker Root Dir: {{.DockerRootDir}}"
     echo
     echo "---[ Resource Usage ]------------------------------"
-    docker system df --format "table {{.Type}}\t{{.Total}}\t{{.Active}}\t{{.Size}}\t{{.Reclaimable}}"
+    docker system df --format "table {{.Type}}\t{{.TotalCount}}\t{{.Active}}\t{{.Size}}\t{{.Reclaimable}}"
     echo
 }
 

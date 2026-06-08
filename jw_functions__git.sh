@@ -7,43 +7,45 @@
 
 jwgit_toc() {
     echo
+    echo "   blast radius:  🟢 tylko odczyt   🔵 tworzy   ⚪ zmiana stanu / transfer   🔴 kasuje (destructive)"
+    echo
     echo " -----------------------------  repository management"
-    echo " - jwgit_init"
-    echo " - jwgit_clone"
-    echo " - jwgit_remote"
+    echo " - 🔵 jwgit_init"
+    echo " - 🔵 jwgit_clone"
+    echo " - ⚪ jwgit_remote"
     echo
     echo " -----------------------------  branch operations"
-    echo " - jwgit_branch"
-    echo " - jwgit_checkout"
-    echo " - jwgit_merge"
-    echo " - jwgit_rebase"
+    echo " - ⚪ jwgit_branch"
+    echo " - ⚪ jwgit_checkout"
+    echo " - ⚪ jwgit_merge"
+    echo " - ⚪ jwgit_rebase"
     echo
     echo " -----------------------------  staging & commits"
-    echo " - jwgit_add"
-    echo " - jwgit_commit"
-    echo " - jwgit_stash"
-    echo " - jwgit_reset"
+    echo " - ⚪ jwgit_add"
+    echo " - 🔵 jwgit_commit"
+    echo " - ⚪ jwgit_stash"
+    echo " - 🔴 jwgit_reset"
     echo
     echo " -----------------------------  remote operations"
-    echo " - jwgit_push"
-    echo " - jwgit_pull"
-    echo " - jwgit_fetch"
+    echo " - ⚪ jwgit_push"
+    echo " - ⚪ jwgit_pull"
+    echo " - ⚪ jwgit_fetch"
     echo
     echo " -----------------------------  history & information"
-    echo " - jwgit_log"
-    echo " - jwgit_status"
-    echo " - jwgit_diff"
-    echo " - jwgit_blame"
+    echo " - 🟢 jwgit_log"
+    echo " - 🟢 jwgit_status"
+    echo " - 🟢 jwgit_diff"
+    echo " - 🟢 jwgit_blame"
     echo
     echo " -----------------------------  maintenance & cleanup"
-    echo " - jwgit_clean"
-    echo " - jwgit_prune"
-    echo " - jwgit_gc"
+    echo " - 🔴 jwgit_clean"
+    echo " - 🔴 jwgit_prune"
+    echo " - 🔴 jwgit_gc"
     echo
     echo " -----------------------------  advanced operations"
-    echo " - jwgit_cherry-pick"
-    echo " - jwgit_bisect"
-    echo " - jwgit_reflog"
+    echo " - ⚪ jwgit_cherry-pick"
+    echo " - ⚪ jwgit_bisect"
+    echo " - 🟢 jwgit_reflog"
     echo
 }
 

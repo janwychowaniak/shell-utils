@@ -1855,10 +1855,11 @@ jwgit_push() {
 
     local REMOTE=""
     local BRANCH=""
-    local OPTIONS=""
+    local -a OPTS=()
     local SET_UPSTREAM=""
     local FORCE=""
-    
+    local HAS_ALL_TAGS=""
+
     # Parse arguments
     while [ $# -gt 0 ]; do
         case $1 in
@@ -1874,12 +1875,13 @@ jwgit_push() {
                 FORCE="--force"
                 shift
                 ;;
-            --all|--tags|--dry-run)
-                OPTIONS="$OPTIONS $1"
+            --all|--tags)
+                OPTS+=("$1")
+                HAS_ALL_TAGS=1
                 shift
                 ;;
             -*)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             *)
@@ -1888,7 +1890,7 @@ jwgit_push() {
                 elif [ -z "$BRANCH" ]; then
                     BRANCH="$1"
                 else
-                    OPTIONS="$OPTIONS $1"
+                    OPTS+=("$1")
                 fi
                 shift
                 ;;
@@ -1910,7 +1912,7 @@ jwgit_push() {
         fi
     fi
     
-    if [ -z "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]] && [[ "$OPTIONS" != *"--tags"* ]]; then
+    if [ -z "$BRANCH" ] && [ -z "$HAS_ALL_TAGS" ]; then
         BRANCH="$current_branch"
     fi
     
@@ -1919,8 +1921,8 @@ jwgit_push() {
     if [ -n "$BRANCH" ]; then
         echo "Branch: $BRANCH"
     fi
-    if [ -n "$OPTIONS" ]; then
-        echo "Options: $OPTIONS"
+    if [ ${#OPTS[@]} -gt 0 ]; then
+        echo "Options: ${OPTS[*]}"
     fi
     if [ -n "$SET_UPSTREAM" ]; then
         echo "Setting upstream: $REMOTE/$BRANCH"
@@ -1931,7 +1933,7 @@ jwgit_push() {
     echo
     
     # Validate remote
-    if ! git remote | grep -q "^$REMOTE$"; then
+    if ! git remote | grep -qxF "$REMOTE"; then
         echo "❌ Remote '$REMOTE' not found"
         echo
         echo "Available remotes:"
@@ -1940,7 +1942,7 @@ jwgit_push() {
     fi
     
     # Check if branch exists (for non-special pushes)
-    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]] && [[ "$OPTIONS" != *"--tags"* ]]; then
+    if [ -n "$BRANCH" ] && [ -z "$HAS_ALL_TAGS" ]; then
         if [ "$BRANCH" != "$current_branch" ] && ! git show-ref --verify --quiet "refs/heads/$BRANCH"; then
             echo "❌ Branch '$BRANCH' does not exist"
             echo
@@ -1951,7 +1953,7 @@ jwgit_push() {
     fi
     
     # Show what will be pushed
-    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]] && [[ "$OPTIONS" != *"--tags"* ]]; then
+    if [ -n "$BRANCH" ] && [ -z "$HAS_ALL_TAGS" ]; then
         echo "---[ Commits to Push ]------------------------------"
         
         # Check if remote branch exists
@@ -1993,31 +1995,20 @@ jwgit_push() {
         fi
     fi
     
-    # Build push command
-    local push_cmd="git push"
-    
-    if [ -n "$SET_UPSTREAM" ]; then
-        push_cmd="$push_cmd --set-upstream"
+    # Build the push argv as an array — no eval, so remote/branch values are
+    # never re-parsed by the shell, and tokens stay separate under bash and zsh
+    local -a CMD=(push)
+    [ -n "$SET_UPSTREAM" ] && CMD+=(--set-upstream)
+    [ -n "$FORCE" ] && CMD+=("$FORCE")
+    CMD+=("${OPTS[@]}")
+    CMD+=("$REMOTE")
+    if [ -n "$BRANCH" ] && [ -z "$HAS_ALL_TAGS" ]; then
+        CMD+=("$BRANCH")
     fi
-    
-    if [ -n "$FORCE" ]; then
-        push_cmd="$push_cmd $FORCE"
-    fi
-    
-    if [ -n "$OPTIONS" ]; then
-        push_cmd="$push_cmd $OPTIONS"
-    fi
-    
-    push_cmd="$push_cmd $REMOTE"
-    
-    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]] && [[ "$OPTIONS" != *"--tags"* ]]; then
-        push_cmd="$push_cmd $BRANCH"
-    fi
-    
+
     # Execute push
     echo "Pushing..."
-    eval "$push_cmd"
-    
+    git "${CMD[@]}"
     local push_result=$?
     
     if [ $push_result -eq 0 ]; then
@@ -2108,9 +2099,10 @@ jwgit_pull() {
 
     local REMOTE=""
     local BRANCH=""
-    local OPTIONS=""
+    local -a OPTS=()
     local REBASE=""
-    
+    local HAS_ALL=""
+
     # Parse arguments
     while [ $# -gt 0 ]; do
         case $1 in
@@ -2118,12 +2110,13 @@ jwgit_pull() {
                 REBASE="--rebase"
                 shift
                 ;;
-            --no-commit|--no-ff|--ff-only|--all|--dry-run)
-                OPTIONS="$OPTIONS $1"
+            --all)
+                OPTS+=("$1")
+                HAS_ALL=1
                 shift
                 ;;
             -*)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             *)
@@ -2132,7 +2125,7 @@ jwgit_pull() {
                 elif [ -z "$BRANCH" ]; then
                     BRANCH="$1"
                 else
-                    OPTIONS="$OPTIONS $1"
+                    OPTS+=("$1")
                 fi
                 shift
                 ;;
@@ -2154,17 +2147,17 @@ jwgit_pull() {
             REMOTE="origin"
             BRANCH="$current_branch"
         fi
-    elif [ -z "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]]; then
+    elif [ -z "$BRANCH" ] && [ -z "$HAS_ALL" ]; then
         BRANCH="$current_branch"
     fi
     
     echo "📥 Pulling from remote repository..."
     echo "Remote: $REMOTE"
-    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]]; then
+    if [ -n "$BRANCH" ] && [ -z "$HAS_ALL" ]; then
         echo "Branch: $BRANCH"
     fi
-    if [ -n "$OPTIONS" ]; then
-        echo "Options: $OPTIONS"
+    if [ ${#OPTS[@]} -gt 0 ]; then
+        echo "Options: ${OPTS[*]}"
     fi
     if [ -n "$REBASE" ]; then
         echo "Mode: Rebase (instead of merge)"
@@ -2172,7 +2165,7 @@ jwgit_pull() {
     echo
     
     # Validate remote
-    if ! git remote | grep -q "^$REMOTE$"; then
+    if ! git remote | grep -qxF "$REMOTE"; then
         echo "❌ Remote '$REMOTE' not found"
         echo
         echo "Available remotes:"
@@ -2205,7 +2198,7 @@ jwgit_pull() {
     echo "Fetching latest changes..."
     git fetch "$REMOTE" >/dev/null 2>&1
     
-    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]]; then
+    if [ -n "$BRANCH" ] && [ -z "$HAS_ALL" ]; then
         echo
         echo "---[ Changes to Pull ]------------------------------"
         
@@ -2242,27 +2235,18 @@ jwgit_pull() {
         echo
     fi
     
-    # Build pull command
-    local pull_cmd="git pull"
-    
-    if [ -n "$REBASE" ]; then
-        pull_cmd="$pull_cmd --rebase"
+    # Build the pull argv as an array (no eval — safe under bash and zsh)
+    local -a CMD=(pull)
+    [ -n "$REBASE" ] && CMD+=(--rebase)
+    CMD+=("${OPTS[@]}")
+    CMD+=("$REMOTE")
+    if [ -n "$BRANCH" ] && [ -z "$HAS_ALL" ]; then
+        CMD+=("$BRANCH")
     fi
-    
-    if [ -n "$OPTIONS" ]; then
-        pull_cmd="$pull_cmd $OPTIONS"
-    fi
-    
-    pull_cmd="$pull_cmd $REMOTE"
-    
-    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]]; then
-        pull_cmd="$pull_cmd $BRANCH"
-    fi
-    
+
     # Execute pull
     echo "Pulling changes..."
-    eval "$pull_cmd"
-    
+    git "${CMD[@]}"
     local pull_result=$?
     
     if [ $pull_result -eq 0 ]; then
@@ -2350,9 +2334,9 @@ jwgit_fetch() {
     fi
 
     local REMOTE=""
-    local OPTIONS=""
+    local -a OPTS=()
     local FETCH_ALL=""
-    
+
     # Parse arguments
     while [ $# -gt 0 ]; do
         case $1 in
@@ -2360,28 +2344,24 @@ jwgit_fetch() {
                 FETCH_ALL="--all"
                 shift
                 ;;
-            --prune|--tags|--dry-run|--verbose|-v)
-                OPTIONS="$OPTIONS $1"
-                shift
-                ;;
             -*)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             *)
                 if [ -z "$REMOTE" ]; then
                     REMOTE="$1"
                 else
-                    OPTIONS="$OPTIONS $1"
+                    OPTS+=("$1")
                 fi
                 shift
                 ;;
         esac
     done
-    
+
     # Set default remote if not specified and not fetching all
     if [ -z "$REMOTE" ] && [ -z "$FETCH_ALL" ]; then
-        if git remote | grep -q "origin"; then
+        if git remote | grep -qxF origin; then
             REMOTE="origin"
         else
             FETCH_ALL="--all"
@@ -2394,13 +2374,13 @@ jwgit_fetch() {
     else
         echo "Remote: $REMOTE"
     fi
-    if [ -n "$OPTIONS" ]; then
-        echo "Options: $OPTIONS"
+    if [ ${#OPTS[@]} -gt 0 ]; then
+        echo "Options: ${OPTS[*]}"
     fi
     echo
     
     # Validate remote (if specified)
-    if [ -n "$REMOTE" ] && ! git remote | grep -q "^$REMOTE$"; then
+    if [ -n "$REMOTE" ] && ! git remote | grep -qxF "$REMOTE"; then
         echo "❌ Remote '$REMOTE' not found"
         echo
         echo "Available remotes:"
@@ -2436,23 +2416,18 @@ jwgit_fetch() {
     fi
     echo
     
-    # Build fetch command
-    local fetch_cmd="git fetch"
-    
+    # Build the fetch argv as an array (no eval — safe under bash and zsh)
+    local -a CMD=(fetch)
     if [ -n "$FETCH_ALL" ]; then
-        fetch_cmd="$fetch_cmd --all"
+        CMD+=(--all)
     else
-        fetch_cmd="$fetch_cmd $REMOTE"
+        CMD+=("$REMOTE")
     fi
-    
-    if [ -n "$OPTIONS" ]; then
-        fetch_cmd="$fetch_cmd $OPTIONS"
-    fi
-    
+    CMD+=("${OPTS[@]}")
+
     # Execute fetch
     echo "Fetching..."
-    eval "$fetch_cmd"
-    
+    git "${CMD[@]}"
     local fetch_result=$?
     
     if [ $fetch_result -eq 0 ]; then

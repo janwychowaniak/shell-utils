@@ -1,47 +1,51 @@
 # shellcheck shell=bash
 
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Contents:
-#
-#   * repository management
-#     - jwgit_init
-#     - jwgit_clone
-#     - jwgit_remote
-#
-#   * branch operations
-#     - jwgit_branch
-#     - jwgit_checkout
-#     - jwgit_merge
-#     - jwgit_rebase
-#
-#   * staging & commits
-#     - jwgit_add
-#     - jwgit_commit
-#     - jwgit_stash
-#     - jwgit_reset
-#
-#   * remote operations
-#     - jwgit_push
-#     - jwgit_pull
-#     - jwgit_fetch
-#
-#   * history & information
-#     - jwgit_log
-#     - jwgit_status
-#     - jwgit_diff
-#     - jwgit_blame
-#
-#   * maintenance & cleanup
-#     - jwgit_clean
-#     - jwgit_prune
-#     - jwgit_gc
-#
-#   * advanced operations
-#     - jwgit_cherry-pick
-#     - jwgit_bisect
-#     - jwgit_reflog
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ---------------------------------------------------------------------------------
+# table of contents
+# ---------------------------------------------------------------------------------
+
+jwgit_toc() {
+    echo
+    echo " -----------------------------  repository management"
+    echo " - jwgit_init"
+    echo " - jwgit_clone"
+    echo " - jwgit_remote"
+    echo
+    echo " -----------------------------  branch operations"
+    echo " - jwgit_branch"
+    echo " - jwgit_checkout"
+    echo " - jwgit_merge"
+    echo " - jwgit_rebase"
+    echo
+    echo " -----------------------------  staging & commits"
+    echo " - jwgit_add"
+    echo " - jwgit_commit"
+    echo " - jwgit_stash"
+    echo " - jwgit_reset"
+    echo
+    echo " -----------------------------  remote operations"
+    echo " - jwgit_push"
+    echo " - jwgit_pull"
+    echo " - jwgit_fetch"
+    echo
+    echo " -----------------------------  history & information"
+    echo " - jwgit_log"
+    echo " - jwgit_status"
+    echo " - jwgit_diff"
+    echo " - jwgit_blame"
+    echo
+    echo " -----------------------------  maintenance & cleanup"
+    echo " - jwgit_clean"
+    echo " - jwgit_prune"
+    echo " - jwgit_gc"
+    echo
+    echo " -----------------------------  advanced operations"
+    echo " - jwgit_cherry-pick"
+    echo " - jwgit_bisect"
+    echo " - jwgit_reflog"
+    echo
+}
 
 
 

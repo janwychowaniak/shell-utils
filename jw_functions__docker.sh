@@ -500,15 +500,15 @@ jwdocker_volume-create() {
     local DRIVER=${2:-local}
     shift                      # remove volume name
     [ $# -gt 0 ] && shift      # remove driver (only if one was supplied)
-    local OPTIONS="$*"
-    
+    # whatever is left in "$@" are the extra options — forward them as an
+    # array so each token stays separate under both bash and zsh
+
     echo "Creating volume: $VOLUME_NAME"
     echo "Driver: $DRIVER"
     # Show the created volume info
-    if [ -n "$OPTIONS" ]; then
-        echo "Options: $OPTIONS"
-        # shellcheck disable=SC2086
-        docker volume create --driver "$DRIVER" $OPTIONS "$VOLUME_NAME"
+    if [ $# -gt 0 ]; then
+        echo "Options: $*"
+        docker volume create --driver "$DRIVER" "$@" "$VOLUME_NAME"
     else
         docker volume create --driver "$DRIVER" "$VOLUME_NAME"
     fi && {
@@ -620,15 +620,15 @@ jwdocker_network-create() {
     local DRIVER=${2:-bridge}
     shift                      # remove network name
     [ $# -gt 0 ] && shift      # remove driver (only if one was supplied)
-    local OPTIONS="$*"
-    
+    # whatever is left in "$@" are the extra options — forward them as an
+    # array so each token stays separate under both bash and zsh
+
     echo "Creating network: $NETWORK_NAME"
     echo "Driver: $DRIVER"
     # Show the created network info
-    if [ -n "$OPTIONS" ]; then
-        echo "Options: $OPTIONS"
-        # shellcheck disable=SC2086
-        docker network create --driver "$DRIVER" $OPTIONS "$NETWORK_NAME"
+    if [ $# -gt 0 ]; then
+        echo "Options: $*"
+        docker network create --driver "$DRIVER" "$@" "$NETWORK_NAME"
     else
         docker network create --driver "$DRIVER" "$NETWORK_NAME"
     fi && {
@@ -653,24 +653,27 @@ jwdocker_network-remove() {
     local FORCE=${2:-false}
     
     # Safety check - don't remove networks that are being used by containers
+    # (one container name per line, so it iterates safely under bash and zsh)
     local using_containers
-    using_containers=$(docker network inspect "$NETWORK" --format '{{ range $key, $value := .Containers }}{{.Name}} {{ end }}' 2>/dev/null)
-    
+    using_containers=$(docker network inspect "$NETWORK" --format '{{ range $key, $value := .Containers }}{{ .Name }}{{ "\n" }}{{ end }}' 2>/dev/null)
+
     if [ -n "$using_containers" ]; then
         if [ "$FORCE" != "force" ] && [ "$FORCE" != "-f" ]; then
             echo "Error: Network '$NETWORK' is being used by containers:"
-            echo "$using_containers" | tr ' ' '\n' | sed 's/^/ - /' | grep -v '^$'
+            while IFS= read -r container; do
+                [ -n "$container" ] && echo " - $container"
+            done <<< "$using_containers"
             echo "Disconnect containers first or use 'force' flag."
             echo "Usage: jwdocker_network-remove $NETWORK force"
             return 1
         fi
         echo "Force removing network used by containers: $NETWORK"
         # 'docker network rm' won't detach active endpoints; disconnect them first.
-        # shellcheck disable=SC2086
-        for container in $using_containers; do
+        while IFS= read -r container; do
+            [ -n "$container" ] || continue
             echo "  Disconnecting: $container"
             docker network disconnect -f "$NETWORK" "$container"
-        done
+        done <<< "$using_containers"
         docker network rm "$NETWORK" || echo "Failed to remove network (may still be in use)"
     else
         echo "Removing network: $NETWORK"
@@ -699,14 +702,14 @@ jwdocker_network-connect() {
     local NETWORK=$1
     local CONTAINER=$2
     shift 2  # Remove network and container from arguments
-    local OPTIONS="$*"
-    
+    # whatever is left in "$@" are the extra options — forward them as an
+    # array so each token stays separate under both bash and zsh
+
     echo "Connecting container '$CONTAINER' to network '$NETWORK'"
     # Show the connection info
-    if [ -n "$OPTIONS" ]; then
-        echo "Options: $OPTIONS"
-        # shellcheck disable=SC2086
-        docker network connect $OPTIONS "$NETWORK" "$CONTAINER"
+    if [ $# -gt 0 ]; then
+        echo "Options: $*"
+        docker network connect "$@" "$NETWORK" "$CONTAINER"
     else
         docker network connect "$NETWORK" "$CONTAINER"
     fi && {
@@ -1530,7 +1533,7 @@ jwdocker_test-connectivity() {
     # Find shared networks
     echo "---[ Shared Networks ]------------------------------"
     local shared_networks=""
-    local target_ips=""
+    local target_ips=()
     
     while IFS=: read -r source_network _source_ip; do
         if [ -n "$source_network" ]; then
@@ -1538,7 +1541,7 @@ jwdocker_test-connectivity() {
                 if [ -n "$target_network" ] && [ "$source_network" = "$target_network" ]; then
                     echo "  ✅ $source_network (target IP: $target_ip)"
                     shared_networks="$shared_networks $source_network"
-                    target_ips="$target_ips $target_ip"
+                    target_ips+=("$target_ip")
                 fi
             done <<< "$target_networks"
         fi
@@ -1558,7 +1561,7 @@ jwdocker_test-connectivity() {
     echo "---[ Connectivity Tests ]---------------------------"
     
     # Test ping connectivity to each shared network IP
-    for target_ip in $target_ips; do
+    for target_ip in "${target_ips[@]}"; do
         if [ -n "$target_ip" ] && [ "$target_ip" != "<no value>" ]; then
             echo -n "Ping test to $target_ip: "
             if docker exec "$SOURCE_CONTAINER" ping -c 1 -W 2 "$target_ip" >/dev/null 2>&1; then
@@ -1581,7 +1584,7 @@ jwdocker_test-connectivity() {
     if [ -n "$PORT" ]; then
         echo
         echo "---[ Port Connectivity Test ]-----------------------"
-        for target_ip in $target_ips; do
+        for target_ip in "${target_ips[@]}"; do
             if [ -n "$target_ip" ] && [ "$target_ip" != "<no value>" ]; then
                 echo -n "Port $PORT test to $target_ip: "
                 # Try to connect to the port using nc (netcat) or telnet

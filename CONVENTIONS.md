@@ -44,8 +44,23 @@ echo " - 🔴 jwdocker_image-rm"
 ```
 - When a function's class is ambiguous, classify conservatively — assign the higher-impact marker (e.g. a tool that opens an interactive shell is ⚪, not 🟢, because of what can be done inside it).
 
+### Cross-shell Portability (bash + zsh)
+- Files are sourced into both bash and zsh, so code must behave identically in both. The key trap: **zsh does not word-split unquoted parameter expansions** by default (no `SH_WORD_SPLIT`), whereas bash does — so `cmd $scalar` passes one argument in zsh but several in bash.
+- Never collect variadic arguments into a joined scalar and pass it unquoted (`OPTIONS="$*"; cmd $OPTIONS`) — that only "works" in bash. Forward the remaining positional parameters as an array instead; this is identical in both shells and also preserves values containing spaces:
+```bash
+shift 2                       # drop the fixed leading args
+if [ $# -gt 0 ]; then
+    echo "Options: $*"        # "$*" is fine for *display* only
+    docker network connect "$@" "$NETWORK" "$CONTAINER"
+else
+    docker network connect "$NETWORK" "$CONTAINER"
+fi
+```
+- To iterate a list, build an array (`items+=("$x")`) and loop with `for x in "${items[@]}"`, or read newline-separated text with `while IFS= read -r x; do ...; done <<< "$text"`. Never `for x in $scalar` — zsh treats the whole scalar as a single word.
+
 ### ShellCheck Exceptions
-- Use `# shellcheck disable=SC2086` when passing an `$OPTIONS` variable unquoted to allow multi-word flags through to underlying commands
+- Forwarding variadic args via `"$@"` / arrays (see *Cross-shell Portability*) is the convention — it replaces the old `# shellcheck disable=SC2086` on an unquoted `$OPTIONS` scalar, which was bash-only.
+- When an SC-disable is genuinely unavoidable, keep it narrowly scoped (one line) with a comment explaining why.
 
 # User Experience Design
 

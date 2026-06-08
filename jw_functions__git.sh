@@ -1047,28 +1047,11 @@ jwgit_add() {
         return 1
     fi
 
-    local FILES="$1"
-    shift
-    local OPTIONS="$*"
-    
-    # Handle special cases
-    case $FILES in
-        --patch|-p)
-            if [ -z "$1" ]; then
-                echo "Usage: jwgit_add --patch <file>"
-                echo
-                echo "Modified files available for patch staging:"
-                git diff --name-only | sed 's/^/  /' | head -10
-                return 1
-            fi
-            FILES="$1"
-            OPTIONS="--patch $OPTIONS"
-            ;;
-            
+    # Standalone modes (no pathspec needed)
+    case $1 in
         --update|-u)
             echo "Adding all modified tracked files..."
-            git add --update
-            if [ $? -eq 0 ]; then
+            if git add --update; then
                 echo "✅ Updated files added to staging area"
                 jwgit_status
             else
@@ -1077,16 +1060,15 @@ jwgit_add() {
             fi
             return 0
             ;;
-            
+
         --all|-A)
             echo "Adding all changes (including untracked files)..."
             echo "⚠️  This will add ALL files in the repository!"
             echo -n "Continue? [y/N] "
             read -r response
-            
+
             if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-                git add --all
-                if [ $? -eq 0 ]; then
+                if git add --all; then
                     echo "✅ All changes added to staging area"
                     jwgit_status
                 else
@@ -1098,67 +1080,44 @@ jwgit_add() {
             fi
             return 0
             ;;
+
+        --patch|-p)
+            if [ $# -lt 2 ]; then
+                echo "Usage: jwgit_add --patch <file>"
+                echo
+                echo "Modified files available for patch staging:"
+                git diff --name-only | sed 's/^/  /' | head -10
+                return 1
+            fi
+            ;;
     esac
-    
-    echo "📝 Adding files to staging area..."
-    echo "Files/Pattern: $FILES"
-    if [ -n "$OPTIONS" ]; then
-        echo "Options: $OPTIONS"
-    fi
+
+    echo "📝 Adding to staging area: $*"
     echo
-    
-    # Show what will be added (if not using wildcards)
-    if [[ "$FILES" != *"*"* ]] && [[ "$FILES" != "." ]] && [ -f "$FILES" ]; then
+
+    # Preview: single existing regular file, or the whole tree ('.')
+    if [ $# -eq 1 ] && [ "$1" != "." ] && [[ "$1" != *"*"* ]] && [ -f "$1" ]; then
         echo "---[ File Status ]----------------------------------"
-        git status --porcelain "$FILES" | sed 's/^/  /' || echo "  (file not in repository)"
+        git status --porcelain "$1" | sed 's/^/  /'
         echo
-    elif [ "$FILES" = "." ]; then
+    elif [ "$1" = "." ]; then
         echo "---[ Changes to be added ]--------------------------"
-        local modified_count
-        local untracked_count
-        modified_count=$(git status --porcelain | grep -c "^ M\|^M \|^MM" || echo "0")
-        untracked_count=$(git status --porcelain | grep -c "^??" || echo "0")
-        
+        local modified_count untracked_count
+        modified_count=$(git status --porcelain | grep -c "^ M\|^M \|^MM")
+        untracked_count=$(git status --porcelain | grep -c "^??")
         echo "Modified files: $modified_count"
         echo "Untracked files: $untracked_count"
-        
-        if [ "$modified_count" -gt 0 ]; then
-            echo
-            echo "Modified files:"
-            git status --porcelain | grep "^ M\|^M \|^MM" | sed 's/^/  /' | head -5
-            if [ "$modified_count" -gt 5 ]; then
-                echo "  ... and $((modified_count - 5)) more files"
-            fi
-        fi
-        
-        if [ "$untracked_count" -gt 0 ]; then
-            echo
-            echo "Untracked files:"
-            git status --porcelain | grep "^??" | sed 's/^/  /' | head -5
-            if [ "$untracked_count" -gt 5 ]; then
-                echo "  ... and $((untracked_count - 5)) more files"
-            fi
-        fi
         echo
     fi
-    
-    # Perform the add operation
-    if [ -n "$OPTIONS" ]; then
-        # shellcheck disable=SC2086
-        git add $OPTIONS "$FILES"
-    else
-        git add "$FILES"
-    fi
-    
-    local add_result=$?
-    
-    if [ $add_result -eq 0 ]; then
+
+    # Forward all args (flags + pathspecs) verbatim — "$@" is zsh/bash safe
+    if git add "$@"; then
         echo "✅ Files added to staging area successfully!"
         echo
         echo "---[ Staging Area Status ]-------------------------"
         git status --porcelain | grep "^A\|^M\|^D" | sed 's/^/  /' | head -10
         local staged_count
-        staged_count=$(git status --porcelain | grep -c "^A\|^M\|^D" || echo "0")
+        staged_count=$(git status --porcelain | grep -c "^A\|^M\|^D")
         if [ "$staged_count" -gt 10 ]; then
             echo "  ... and $((staged_count - 10)) more staged files"
         fi
@@ -1204,7 +1163,7 @@ jwgit_commit() {
     fi
 
     local MESSAGE=""
-    local OPTIONS=""
+    local -a OPTS=()
     local AMEND=""
     local ALL=""
     
@@ -1229,7 +1188,7 @@ jwgit_commit() {
                 shift
                 ;;
             -*)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             *)
@@ -1271,8 +1230,8 @@ jwgit_commit() {
         echo "Files to be committed:"
         git status --porcelain | grep "^ M\|^M " | sed 's/^/  /' | head -10
         local modified_count
-        modified_count=$(git status --porcelain | grep -c "^ M\|^M " || echo "0")
-        
+        modified_count=$(git status --porcelain | grep -c "^ M\|^M ")
+
         if [ "$modified_count" -eq 0 ]; then
             echo "  (no modified files to commit)"
             return 1
@@ -1316,36 +1275,15 @@ jwgit_commit() {
     fi
     echo
     
-    # Perform the commit
-    local commit_cmd="git commit"
-    
-    if [ -n "$ALL" ]; then
-        commit_cmd="$commit_cmd --all"
-    fi
-    
-    if [ -n "$MESSAGE" ]; then
-        commit_cmd="$commit_cmd -m \"$MESSAGE\""
-    fi
-    
-    if [ -n "$OPTIONS" ]; then
-        commit_cmd="$commit_cmd $OPTIONS"
-    fi
-    
-    # Execute the commit
-    if [ -n "$MESSAGE" ]; then
-        if [ -n "$ALL" ]; then
-            git commit --all -m "$MESSAGE"
-        else
-            git commit -m "$MESSAGE"
-        fi
-    else
-        if [ -n "$ALL" ]; then
-            git commit --all
-        else
-            git commit
-        fi
-    fi
-    
+    # Perform the commit — assemble argv as an array so the pass-through
+    # options collected from the -*) arm are actually applied (the old
+    # builder string was discarded), with safe quoting under bash and zsh.
+    local -a CMD=(commit)
+    [ -n "$ALL" ] && CMD+=(--all)
+    [ -n "$MESSAGE" ] && CMD+=(-m "$MESSAGE")
+    CMD+=("${OPTS[@]}")
+
+    git "${CMD[@]}"
     local commit_result=$?
     
     if [ $commit_result -eq 0 ]; then
@@ -1425,8 +1363,7 @@ jwgit_stash() {
 
     local ACTION=$1
     shift
-    local OPTIONS="$*"
-    
+
     case $ACTION in
         push|save)
             echo "📦 Stashing current changes..."
@@ -1447,15 +1384,8 @@ jwgit_stash() {
             fi
             echo
             
-            # Perform stash
-            if [ -n "$OPTIONS" ]; then
-                # shellcheck disable=SC2086
-                git stash push $OPTIONS
-            else
-                git stash push
-            fi
-            
-            if [ $? -eq 0 ]; then
+            # Perform stash (forward args verbatim — zsh/bash safe)
+            if git stash push "$@"; then
                 echo "✅ Changes stashed successfully!"
                 echo "Latest stash: $(git stash list | head -1)"
                 echo
@@ -1494,15 +1424,8 @@ jwgit_stash() {
                 fi
             fi
             
-            # Apply the stash
-            if [ -n "$OPTIONS" ]; then
-                # shellcheck disable=SC2086
-                git stash pop $OPTIONS
-            else
-                git stash pop
-            fi
-            
-            if [ $? -eq 0 ]; then
+            # Apply the stash (forward args verbatim — zsh/bash safe)
+            if git stash pop "$@"; then
                 echo "✅ Stash applied and removed successfully!"
                 echo
                 echo "Current status:"
@@ -1515,12 +1438,13 @@ jwgit_stash() {
             ;;
             
         apply)
-            local STASH_REF=${OPTIONS:-stash@{0}}
+            local STASH_REF=$1
+            [ -n "$STASH_REF" ] || STASH_REF='stash@{0}'
             
             echo "📦 Applying stash (keeping in stash list)..."
             
             # Check if stash exists
-            if ! git stash list | grep -q "$STASH_REF"; then
+            if ! git stash list | grep -qF "$STASH_REF"; then
                 echo "❌ Stash '$STASH_REF' not found"
                 echo
                 echo "Available stashes:"
@@ -1528,7 +1452,7 @@ jwgit_stash() {
                 return 1
             fi
             
-            echo "Applying: $(git stash list | grep "$STASH_REF")"
+            echo "Applying: $(git stash list | grep -F "$STASH_REF")"
             echo
             
             # Apply the stash
@@ -1565,14 +1489,15 @@ jwgit_stash() {
             ;;
             
         show)
-            local STASH_REF=${OPTIONS:-stash@{0}}
+            local STASH_REF=$1
+            [ -n "$STASH_REF" ] || STASH_REF='stash@{0}'
             
             echo "📦 Stash Contents: $STASH_REF"
             echo "=================================================="
             echo
             
             # Check if stash exists
-            if ! git stash list | grep -q "$STASH_REF"; then
+            if ! git stash list | grep -qF "$STASH_REF"; then
                 echo "❌ Stash '$STASH_REF' not found"
                 echo
                 echo "Available stashes:"
@@ -1582,7 +1507,7 @@ jwgit_stash() {
             
             # Show stash information
             echo "---[ Stash Info ]-----------------------------------"
-            git stash list | grep "$STASH_REF" | sed 's/^/  /'
+            git stash list | grep -F "$STASH_REF" | sed 's/^/  /'
             echo
             
             echo "---[ Changed Files ]--------------------------------"
@@ -1597,12 +1522,13 @@ jwgit_stash() {
             ;;
             
         drop)
-            local STASH_REF=${OPTIONS:-stash@{0}}
+            local STASH_REF=$1
+            [ -n "$STASH_REF" ] || STASH_REF='stash@{0}'
             
             echo "📦 Dropping stash: $STASH_REF"
             
             # Check if stash exists
-            if ! git stash list | grep -q "$STASH_REF"; then
+            if ! git stash list | grep -qF "$STASH_REF"; then
                 echo "❌ Stash '$STASH_REF' not found"
                 echo
                 echo "Available stashes:"
@@ -1612,7 +1538,7 @@ jwgit_stash() {
             
             # Show which stash will be dropped
             echo "Stash to be dropped:"
-            echo "  $(git stash list | grep "$STASH_REF")"
+            echo "  $(git stash list | grep -F "$STASH_REF")"
             echo
             echo "⚠️  This action cannot be undone!"
             echo -n "Continue? [y/N] "
@@ -1666,8 +1592,8 @@ jwgit_stash() {
             ;;
             
         *)
-            # Default: stash current changes (same as 'push')
-            jwgit_stash push "$ACTION" "$OPTIONS"
+            # Default: treat the whole invocation as 'push' (forward verbatim)
+            jwgit_stash push "$ACTION" "$@"
             ;;
     esac
     echo
@@ -1705,7 +1631,7 @@ jwgit_reset() {
 
     local RESET_TYPE=""
     local TARGET="HEAD"
-    local FILES=""
+    local -a FILES=()
     
     # Parse arguments
     while [ $# -gt 0 ]; do
@@ -1722,13 +1648,13 @@ jwgit_reset() {
                 if [ -z "$TARGET" ] || [ "$TARGET" = "HEAD" ]; then
                     # Check if it's a file or commit
                     if [ -f "$1" ] || git ls-files --error-unmatch "$1" >/dev/null 2>&1; then
-                        FILES="$FILES $1"
+                        FILES+=("$1")
                         TARGET="HEAD"  # Reset target back to HEAD for file reset
                     else
                         TARGET="$1"
                     fi
                 else
-                    FILES="$FILES $1"
+                    FILES+=("$1")
                 fi
                 shift
                 ;;
@@ -1736,31 +1662,29 @@ jwgit_reset() {
     done
     
     # Handle file-specific reset
-    if [ -n "$FILES" ]; then
-        echo "📝 Unstaging files..."
-        echo "Files: $FILES"
+    if [ ${#FILES[@]} -gt 0 ]; then
+        echo "📝 Resetting files (target: $TARGET)..."
+        echo "Files: ${FILES[*]}"
         echo
-        
+
         # Show current status of files
         echo "Current status:"
-        for file in $FILES; do
-            git status --porcelain "$file" | sed 's/^/  /' || echo "  $file (not in repository)"
+        local file
+        for file in "${FILES[@]}"; do
+            git status --porcelain "$file" | sed 's/^/  /'
         done
         echo
-        
-        # Reset the files
-        # shellcheck disable=SC2086
-        git reset HEAD $FILES
-        
-        if [ $? -eq 0 ]; then
-            echo "✅ Files unstaged successfully!"
+
+        # Path reset to the requested commit (HEAD by default), array-safe
+        if git reset "$TARGET" -- "${FILES[@]}"; then
+            echo "✅ Files reset successfully!"
             echo
             echo "Updated status:"
-            for file in $FILES; do
-                git status --porcelain "$file" | sed 's/^/  /' || echo "  $file (not in repository)"
+            for file in "${FILES[@]}"; do
+                git status --porcelain "$file" | sed 's/^/  /'
             done
         else
-            echo "❌ Failed to unstage files"
+            echo "❌ Failed to reset files"
             return 1
         fi
         return 0
@@ -1789,11 +1713,11 @@ jwgit_reset() {
     # Show commits that will be affected
     if [ "$TARGET" != "HEAD" ]; then
         local commits_affected
-        commits_affected=$(git rev-list --count HEAD..."$TARGET" 2>/dev/null || echo "0")
+        commits_affected=$(git rev-list --count "$TARGET"..HEAD 2>/dev/null || echo "0")
         
         if [ "$commits_affected" -gt 0 ]; then
             echo "Commits that will be reset:"
-            git log --oneline HEAD..."$TARGET" | sed 's/^/  /' | head -5
+            git log --oneline "$TARGET"..HEAD | sed 's/^/  /' | head -5
             if [ "$commits_affected" -gt 5 ]; then
                 echo "  ... and $((commits_affected - 5)) more commits"
             fi

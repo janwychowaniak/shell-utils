@@ -27,6 +27,23 @@
 ```
 - Larger files should include a `<area>_toc()` function listing all functions by category
 
+### Blast-radius Markers in the TOC
+- Every function entry in `<area>_toc()` is prefixed with an emoji marker classifying its side effects, so the impact of a function is visible at a glance — without reading its code or remembering it. Four classes:
+  - 🟢 **tylko odczyt (safe RO)** — only reads/queries state; never mutates anything. Safe to run and experiment with freely. (e.g. `jwdocker_ps`, `jwdocker_*-inspect`, `jwdocker_logs`, `jwdocker_monitor-*`)
+  - 🔵 **tworzy** — creates a resource (image, volume, network, container, file); typically reversible. (e.g. `jwdocker_image-pull`, `jwdocker_volume-create`, `jwdocker_run`, `jwdocker_save`)
+  - ⚪ **zmiana stanu / transfer** — mutates existing state or moves data, but does **not** delete. (e.g. `jwdocker_container-start`/`-stop`/`-restart`, `jwdocker_network-connect`/`-disconnect`, `jwdocker_cp`, `jwdocker_push`, `jwdocker_exec`)
+  - 🔴 **kasuje (destructive)** — removes or prunes resources; the "handle with care" class. (e.g. `jwdocker_*-remove`, `jwdocker_*-prune`, `jwdocker_cleanup`)
+- The TOC opens with a legend line so the key is always at hand:
+```bash
+echo "   blast radius:  🟢 tylko odczyt   🔵 tworzy   ⚪ zmiana stanu / transfer   🔴 kasuje (destructive)"
+```
+- Per-entry format places the marker between the dash and the function name:
+```bash
+echo " - 🟢 jwdocker_psall"
+echo " - 🔴 jwdocker_image-rm"
+```
+- When a function's class is ambiguous, classify conservatively — assign the higher-impact marker (e.g. a tool that opens an interactive shell is ⚪, not 🟢, because of what can be done inside it).
+
 ### ShellCheck Exceptions
 - Use `# shellcheck disable=SC2086` when passing an `$OPTIONS` variable unquoted to allow multi-word flags through to underlying commands
 

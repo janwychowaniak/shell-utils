@@ -1,0 +1,4270 @@
+# shellcheck shell=bash
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Contents:
+#
+#   * repository management
+#     - jwgitinit       ->  init
+#     - jwgitclone      ->  clone
+#     - jwgitremote     ->  remote
+#
+#   * branch operations
+#     - jwgitbranch     ->  branch
+#     - jwgitcheckout   ->  checkout
+#     - jwgitmerge      ->  merge
+#     - jwgitrebase     ->  rebase
+#
+#   * staging & commits
+#     - jwgitadd        ->  add
+#     - jwgitcommit     ->  commit
+#     - jwgitstash      ->  stash
+#     - jwgitreset      ->  reset
+#
+#   * remote operations
+#     - jwgitpush       ->  push
+#     - jwgitpull       ->  pull
+#     - jwgitfetch      ->  fetch
+#
+#   * history & information
+#     - jwgitlog        ->  log
+#     - jwgitstatus     ->  status
+#     - jwgitdiff       ->  diff
+#     - jwgitblame      ->  blame
+#
+#   * maintenance & cleanup
+#     - jwgitclean      ->  clean
+#     - jwgitprune      ->  prune
+#     - jwgitgc         ->  gc
+#
+#   * advanced operations
+#     - jwgitcherry     ->  cherry
+#     - jwgitbisect     ->  bisect
+#     - jwgitreflog     ->  reflog
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+# ---------------------------------------------------------------------------------
+# repository management
+# ---------------------------------------------------------------------------------
+
+jwgitinit() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitinit [directory] [--bare]"
+        echo "Examples:"
+        echo "  jwgitinit                    # Initialize current directory"
+        echo "  jwgitinit myproject          # Initialize new directory"
+        echo "  jwgitinit myrepo --bare      # Initialize bare repository"
+        echo
+        return 1
+    fi
+
+    local DIR=${1:-.}
+    local BARE_FLAG=""
+    
+    if [ "$2" = "--bare" ] || [ "$1" = "--bare" ]; then
+        BARE_FLAG="--bare"
+        if [ "$1" = "--bare" ]; then
+            DIR="."
+        fi
+    fi
+    
+    echo "📁 Initializing Git repository..."
+    echo "Directory: $DIR"
+    if [ -n "$BARE_FLAG" ]; then
+        echo "Type: Bare repository"
+    fi
+    echo
+    
+    if [ "$DIR" != "." ] && [ ! -d "$DIR" ]; then
+        echo "Creating directory: $DIR"
+        mkdir -p "$DIR"
+    fi
+    
+    if [ -n "$BARE_FLAG" ]; then
+        git init --bare "$DIR"
+    else
+        git init "$DIR"
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Repository initialized successfully!"
+        if [ "$DIR" != "." ]; then
+            echo "💡 Run 'cd $DIR' to enter the repository"
+        fi
+    else
+        echo "❌ Failed to initialize repository"
+        return 1
+    fi
+    echo
+}
+
+
+jwgitclone() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitclone <repository_url> [directory] [options]"
+        echo "Examples:"
+        echo "  jwgitclone https://github.com/user/repo.git"
+        echo "  jwgitclone git@github.com:user/repo.git myproject"
+        echo "  jwgitclone https://github.com/user/repo.git --depth 1"
+        echo "  jwgitclone https://github.com/user/repo.git --branch develop"
+        echo
+        echo "Common options:"
+        echo "  --depth N        Create shallow clone with N commits"
+        echo "  --branch NAME    Clone specific branch"
+        echo "  --single-branch  Clone only one branch"
+        echo "  --recursive      Clone with submodules"
+        echo
+        return 1
+    fi
+
+    local REPO_URL=$1
+    shift
+    local OPTIONS="$*"
+    
+    # Extract directory name from URL if not specified
+    local DIR=""
+    if [[ "$OPTIONS" != *"--"* ]] && [ -n "$1" ] && [[ "$1" != -* ]]; then
+        DIR="$1"
+        shift
+        OPTIONS="$*"
+    else
+        DIR=$(basename "$REPO_URL" .git)
+    fi
+    
+    echo "📥 Cloning repository..."
+    echo "URL: $REPO_URL"
+    echo "Directory: $DIR"
+    if [ -n "$OPTIONS" ]; then
+        echo "Options: $OPTIONS"
+    fi
+    echo
+    
+    # Check if directory already exists
+    if [ -d "$DIR" ]; then
+        echo "⚠️  Directory '$DIR' already exists!"
+        echo -n "Continue anyway? [y/N] "
+        read -r response
+        if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+            echo "Clone cancelled."
+            return 1
+        fi
+    fi
+    
+    # Clone the repository
+    if [ -n "$OPTIONS" ]; then
+        # shellcheck disable=SC2086
+        git clone $OPTIONS "$REPO_URL" "$DIR"
+    else
+        git clone "$REPO_URL" "$DIR"
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo
+        echo "✅ Repository cloned successfully!"
+        echo "📁 Location: $DIR"
+        
+        # Show basic info about the cloned repo
+        cd "$DIR" || return 1
+        echo
+        echo "---[ Repository Info ]------------------------------"
+        echo "Remote origin: $(git remote get-url origin 2>/dev/null || echo 'Not set')"
+        echo "Current branch: $(git branch --show-current 2>/dev/null || echo 'Unknown')"
+        echo "Latest commit: $(git log -1 --oneline 2>/dev/null || echo 'No commits')"
+        echo "Total commits: $(git rev-list --count HEAD 2>/dev/null || echo '0')"
+        
+        local branch_count
+        branch_count=$(git branch -r 2>/dev/null | wc -l)
+        echo "Remote branches: $branch_count"
+    else
+        echo "❌ Failed to clone repository"
+        return 1
+    fi
+    echo
+}
+
+
+jwgitremote() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitremote [add|remove|set-url|show] [name] [url]"
+        echo "Examples:"
+        echo "  jwgitremote                           # List all remotes"
+        echo "  jwgitremote show                      # Show detailed remote info"
+        echo "  jwgitremote add upstream <url>        # Add upstream remote"
+        echo "  jwgitremote remove origin             # Remove origin remote"
+        echo "  jwgitremote set-url origin <new_url>  # Change origin URL"
+        echo
+        echo "Current remotes:"
+        if git remote >/dev/null 2>&1; then
+            git remote -v | sed 's/^/  /'
+        else
+            echo "  (not in a git repository)"
+        fi
+        echo
+        return 1
+    fi
+
+    local ACTION=$1
+    local NAME=$2
+    local URL=$3
+    
+    case $ACTION in
+        add)
+            if [ -z "$NAME" ] || [ -z "$URL" ]; then
+                echo "Usage: jwgitremote add <name> <url>"
+                return 1
+            fi
+            
+            echo "Adding remote '$NAME': $URL"
+            if git remote add "$NAME" "$URL"; then
+                echo "✅ Remote added successfully!"
+                echo
+                echo "Updated remotes:"
+                git remote -v | sed 's/^/  /'
+            else
+                echo "❌ Failed to add remote"
+                return 1
+            fi
+            ;;
+            
+        remove|rm)
+            if [ -z "$NAME" ]; then
+                echo "Usage: jwgitremote remove <name>"
+                echo
+                echo "Available remotes:"
+                git remote | sed 's/^/  /'
+                return 1
+            fi
+            
+            echo "Removing remote '$NAME'..."
+            if git remote remove "$NAME"; then
+                echo "✅ Remote removed successfully!"
+                echo
+                echo "Remaining remotes:"
+                git remote -v | sed 's/^/  /' || echo "  (no remotes)"
+            else
+                echo "❌ Failed to remove remote"
+                return 1
+            fi
+            ;;
+            
+        set-url)
+            if [ -z "$NAME" ] || [ -z "$URL" ]; then
+                echo "Usage: jwgitremote set-url <name> <new_url>"
+                echo
+                echo "Available remotes:"
+                git remote -v | sed 's/^/  /'
+                return 1
+            fi
+            
+            local old_url
+            old_url=$(git remote get-url "$NAME" 2>/dev/null)
+            
+            echo "Changing remote '$NAME' URL:"
+            echo "  From: $old_url"
+            echo "  To:   $URL"
+            
+            if git remote set-url "$NAME" "$URL"; then
+                echo "✅ Remote URL updated successfully!"
+                echo
+                echo "Updated remotes:"
+                git remote -v | sed 's/^/  /'
+            else
+                echo "❌ Failed to update remote URL"
+                return 1
+            fi
+            ;;
+            
+        show)
+            echo "📡 Remote Repository Information"
+            echo "=================================================="
+            echo
+            
+            local remotes
+            remotes=$(git remote)
+            
+            if [ -z "$remotes" ]; then
+                echo "No remotes configured."
+                return 0
+            fi
+            
+            while IFS= read -r remote; do
+                echo "---[ Remote: $remote ]------------------------------"
+                local fetch_url
+                local push_url
+                fetch_url=$(git remote get-url "$remote" 2>/dev/null)
+                push_url=$(git remote get-url --push "$remote" 2>/dev/null)
+                
+                echo "Fetch URL: $fetch_url"
+                if [ "$push_url" != "$fetch_url" ]; then
+                    echo "Push URL:  $push_url"
+                fi
+                
+                # Show remote branches
+                echo "Branches:"
+                git branch -r | grep "^  $remote/" | sed 's/^/  /' | head -10
+                
+                local branch_count
+                branch_count=$(git branch -r | grep -c "^  $remote/" || echo "0")
+                if [ "$branch_count" -gt 10 ]; then
+                    echo "  ... and $((branch_count - 10)) more branches"
+                fi
+                echo
+            done <<< "$remotes"
+            ;;
+            
+        *)
+            # Default: list remotes
+            echo "📡 Git Remotes"
+            echo "=================================================="
+            echo
+            
+            if git remote -v | grep -q .; then
+                git remote -v | while read -r line; do
+                    echo "  $line"
+                done
+            else
+                echo "No remotes configured."
+                echo
+                echo "💡 Add a remote with: jwgitremote add <name> <url>"
+            fi
+            ;;
+    esac
+    echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# branch operations
+# ---------------------------------------------------------------------------------
+
+jwgitbranch() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitbranch [list|create|delete|rename] [branch_name] [options]"
+        echo "Examples:"
+        echo "  jwgitbranch                    # List all branches"
+        echo "  jwgitbranch list --remote      # List remote branches"
+        echo "  jwgitbranch create feature-x   # Create new branch"
+        echo "  jwgitbranch delete old-branch  # Delete branch"
+        echo "  jwgitbranch rename old new     # Rename branch"
+        echo
+        echo "Current branches:"
+        if git branch >/dev/null 2>&1; then
+            git branch --format="%(if)%(HEAD)%(then)* %(else)  %(end)%(refname:short)" | head -10
+            local total_branches
+            total_branches=$(git branch | wc -l)
+            if [ "$total_branches" -gt 10 ]; then
+                echo "  ... and $((total_branches - 10)) more branches"
+            fi
+        else
+            echo "  (not in a git repository)"
+        fi
+        echo
+        return 1
+    fi
+
+    local ACTION=$1
+    local BRANCH_NAME=$2
+    local OPTION=$3
+    
+    case $ACTION in
+        list|ls)
+            echo "🌿 Git Branches"
+            echo "=================================================="
+            echo
+            
+            if [ "$BRANCH_NAME" = "--remote" ] || [ "$BRANCH_NAME" = "-r" ]; then
+                echo "---[ Remote Branches ]------------------------------"
+                git branch -r --format="  %(refname:short)%(if)%(upstream)%(then) -> %(upstream:short)%(end)"
+            elif [ "$BRANCH_NAME" = "--all" ] || [ "$BRANCH_NAME" = "-a" ]; then
+                echo "---[ Local Branches ]-------------------------------"
+                git branch --format="%(if)%(HEAD)%(then)* %(else)  %(end)%(refname:short)"
+                echo
+                echo "---[ Remote Branches ]------------------------------"
+                git branch -r --format="  %(refname:short)"
+            else
+                echo "---[ Local Branches ]-------------------------------"
+                git branch --format="%(if)%(HEAD)%(then)* %(else)  %(end)%(refname:short)%(if)%(upstream)%(then) -> %(upstream:short)%(end)"
+                
+                local current_branch
+                current_branch=$(git branch --show-current)
+                if [ -n "$current_branch" ]; then
+                    echo
+                    echo "Current branch: $current_branch"
+                    
+                    # Show branch info
+                    local upstream
+                    upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+                    if [ -n "$upstream" ]; then
+                        echo "Upstream: $upstream"
+                        
+                        # Show ahead/behind status
+                        local ahead_behind
+                        ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
+                        if [ -n "$ahead_behind" ]; then
+                            local ahead
+                            local behind
+                            ahead=$(echo "$ahead_behind" | cut -f1)
+                            behind=$(echo "$ahead_behind" | cut -f2)
+                            
+                            if [ "$ahead" -gt 0 ] || [ "$behind" -gt 0 ]; then
+                                echo "Status: $ahead ahead, $behind behind"
+                            else
+                                echo "Status: up to date"
+                            fi
+                        fi
+                    else
+                        echo "Upstream: (not set)"
+                    fi
+                fi
+            fi
+            ;;
+            
+        create|new)
+            if [ -z "$BRANCH_NAME" ]; then
+                echo "Usage: jwgitbranch create <branch_name> [start_point]"
+                echo
+                echo "Available branches to branch from:"
+                git branch --format="  %(refname:short)" | head -10
+                return 1
+            fi
+            
+            local START_POINT=${OPTION:-HEAD}
+            
+            echo "Creating new branch '$BRANCH_NAME' from '$START_POINT'..."
+            
+            if git branch "$BRANCH_NAME" "$START_POINT"; then
+                echo "✅ Branch created successfully!"
+                echo
+                echo -n "Switch to new branch? [y/N] "
+                read -r response
+                if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                    git checkout "$BRANCH_NAME"
+                    echo "✅ Switched to branch '$BRANCH_NAME'"
+                fi
+            else
+                echo "❌ Failed to create branch"
+                return 1
+            fi
+            ;;
+            
+        delete|del|rm)
+            if [ -z "$BRANCH_NAME" ]; then
+                echo "Usage: jwgitbranch delete <branch_name> [--force]"
+                echo
+                echo "Available branches:"
+                git branch --format="  %(refname:short)" | grep -v "$(git branch --show-current)" | head -10
+                return 1
+            fi
+            
+            local current_branch
+            current_branch=$(git branch --show-current)
+            
+            if [ "$BRANCH_NAME" = "$current_branch" ]; then
+                echo "❌ Cannot delete current branch '$BRANCH_NAME'"
+                echo "Switch to another branch first"
+                return 1
+            fi
+            
+            echo "Deleting branch '$BRANCH_NAME'..."
+            
+            if [ "$OPTION" = "--force" ] || [ "$OPTION" = "-f" ]; then
+                echo "⚠️  Force deleting branch (may lose unmerged changes)"
+                git branch -D "$BRANCH_NAME"
+            else
+                git branch -d "$BRANCH_NAME"
+            fi
+            
+            if [ $? -eq 0 ]; then
+                echo "✅ Branch deleted successfully!"
+            else
+                echo "❌ Failed to delete branch"
+                echo "💡 Use '--force' flag to force delete unmerged branch"
+                return 1
+            fi
+            ;;
+            
+        rename|mv)
+            if [ -z "$BRANCH_NAME" ] || [ -z "$OPTION" ]; then
+                echo "Usage: jwgitbranch rename <old_name> <new_name>"
+                echo
+                echo "Available branches:"
+                git branch --format="  %(refname:short)" | head -10
+                return 1
+            fi
+            
+            local OLD_NAME=$BRANCH_NAME
+            local NEW_NAME=$OPTION
+            
+            echo "Renaming branch '$OLD_NAME' to '$NEW_NAME'..."
+            
+            if git branch -m "$OLD_NAME" "$NEW_NAME"; then
+                echo "✅ Branch renamed successfully!"
+                
+                # Update upstream if it exists
+                local upstream
+                upstream=$(git rev-parse --abbrev-ref "$NEW_NAME@{upstream}" 2>/dev/null)
+                if [ -n "$upstream" ]; then
+                    echo "💡 Consider updating upstream reference if needed"
+                fi
+            else
+                echo "❌ Failed to rename branch"
+                return 1
+            fi
+            ;;
+            
+        *)
+            # Default: list branches (same as 'list' action)
+            jwgitbranch list "$@"
+            ;;
+    esac
+    echo
+}
+
+
+jwgitcheckout() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitcheckout <branch|commit|file> [options]"
+        echo "Examples:"
+        echo "  jwgitcheckout main              # Switch to main branch"
+        echo "  jwgitcheckout -b feature-x      # Create and switch to new branch"
+        echo "  jwgitcheckout abc123            # Switch to specific commit"
+        echo "  jwgitcheckout -- file.txt       # Restore file from HEAD"
+        echo "  jwgitcheckout HEAD~1 -- file.txt # Restore file from previous commit"
+        echo
+        echo "Available branches:"
+        if git branch >/dev/null 2>&1; then
+            git branch --format="  %(refname:short)" | head -10
+            echo
+            echo "Recent commits:"
+            git log --oneline -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+        else
+            echo "  (not in a git repository)"
+        fi
+        echo
+        return 1
+    fi
+
+    local TARGET=$1
+    shift
+    local OPTIONS="$*"
+    
+    # Handle create new branch (-b flag)
+    if [ "$TARGET" = "-b" ]; then
+        if [ -z "$1" ]; then
+            echo "Usage: jwgitcheckout -b <new_branch_name> [start_point]"
+            return 1
+        fi
+        
+        local NEW_BRANCH=$1
+        local START_POINT=${2:-HEAD}
+        
+        echo "Creating and switching to new branch '$NEW_BRANCH'..."
+        if [ "$START_POINT" != "HEAD" ]; then
+            echo "Starting from: $START_POINT"
+        fi
+        
+        if git checkout -b "$NEW_BRANCH" "$START_POINT"; then
+            echo "✅ Created and switched to branch '$NEW_BRANCH'"
+        else
+            echo "❌ Failed to create branch"
+            return 1
+        fi
+        return 0
+    fi
+    
+    # Handle file restoration (-- flag)
+    if [ "$TARGET" = "--" ]; then
+        if [ -z "$1" ]; then
+            echo "Usage: jwgitcheckout -- <file_path>"
+            echo "       jwgitcheckout <commit> -- <file_path>"
+            return 1
+        fi
+        
+        local FILE_PATH=$1
+        echo "Restoring file '$FILE_PATH' from HEAD..."
+        echo "⚠️  This will discard local changes to the file!"
+        echo -n "Continue? [y/N] "
+        read -r response
+        
+        if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+            if git checkout -- "$FILE_PATH"; then
+                echo "✅ File restored successfully"
+            else
+                echo "❌ Failed to restore file"
+                return 1
+            fi
+        else
+            echo "Operation cancelled"
+        fi
+        return 0
+    fi
+    
+    # Handle commit with file restoration
+    if [[ "$OPTIONS" == *"--"* ]]; then
+        local COMMIT=$TARGET
+        local FILE_PATH
+        FILE_PATH=$(echo "$OPTIONS" | sed 's/.*-- //')
+        
+        echo "Restoring file '$FILE_PATH' from commit '$COMMIT'..."
+        echo "⚠️  This will discard local changes to the file!"
+        echo -n "Continue? [y/N] "
+        read -r response
+        
+        if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+            # shellcheck disable=SC2086
+            if git checkout "$COMMIT" -- $FILE_PATH; then
+                echo "✅ File restored from commit '$COMMIT'"
+            else
+                echo "❌ Failed to restore file"
+                return 1
+            fi
+        else
+            echo "Operation cancelled"
+        fi
+        return 0
+    fi
+    
+    # Regular branch/commit checkout
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    
+    # Check if target is a branch
+    if git show-ref --verify --quiet "refs/heads/$TARGET"; then
+        echo "Switching to branch '$TARGET'..."
+        if [ -n "$current_branch" ]; then
+            echo "From: $current_branch"
+        fi
+        
+        # Check for uncommitted changes
+        if ! git diff-index --quiet HEAD --; then
+            echo "⚠️  You have uncommitted changes!"
+            git status --porcelain | head -5 | sed 's/^/  /'
+            echo
+            echo -n "Continue anyway? [y/N] "
+            read -r response
+            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+                echo "Checkout cancelled"
+                echo "💡 Commit or stash your changes first"
+                return 1
+            fi
+        fi
+        
+        if git checkout "$TARGET"; then
+            echo "✅ Switched to branch '$TARGET'"
+            
+            # Show branch info
+            local upstream
+            upstream=$(git rev-parse --abbrev-ref "$TARGET@{upstream}" 2>/dev/null)
+            if [ -n "$upstream" ]; then
+                echo "Upstream: $upstream"
+            fi
+        else
+            echo "❌ Failed to switch branch"
+            return 1
+        fi
+        
+    # Check if target is a commit hash
+    elif git cat-file -e "$TARGET" 2>/dev/null; then
+        echo "Switching to commit '$TARGET'..."
+        echo "⚠️  This will put you in 'detached HEAD' state"
+        echo -n "Continue? [y/N] "
+        read -r response
+        
+        if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+            if git checkout "$TARGET"; then
+                echo "✅ Switched to commit '$TARGET'"
+                echo "💡 Create a branch if you want to make changes: git checkout -b <branch_name>"
+            else
+                echo "❌ Failed to checkout commit"
+                return 1
+            fi
+        else
+            echo "Checkout cancelled"
+        fi
+        
+    else
+        echo "❌ '$TARGET' is not a valid branch or commit"
+        echo
+        echo "Available branches:"
+        git branch --format="  %(refname:short)" | head -5
+        echo
+        echo "Recent commits:"
+        git log --oneline -3 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+        return 1
+    fi
+    echo
+}
+
+
+jwgitmerge() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitmerge <branch> [options]"
+        echo "Examples:"
+        echo "  jwgitmerge feature-branch       # Merge feature branch"
+        echo "  jwgitmerge feature --no-ff      # Merge with no fast-forward"
+        echo "  jwgitmerge feature --squash     # Squash merge"
+        echo "  jwgitmerge --abort              # Abort current merge"
+        echo "  jwgitmerge --continue           # Continue after resolving conflicts"
+        echo
+        echo "Available branches to merge:"
+        if git branch >/dev/null 2>&1; then
+            local current_branch
+            current_branch=$(git branch --show-current)
+            git branch --format="  %(refname:short)" | grep -v "^  $current_branch$" | head -10
+        else
+            echo "  (not in a git repository)"
+        fi
+        echo
+        return 1
+    fi
+
+    local BRANCH=$1
+    shift
+    local OPTIONS="$*"
+    
+    # Handle merge control commands
+    case $BRANCH in
+        --abort)
+            echo "Aborting current merge..."
+            if git merge --abort; then
+                echo "✅ Merge aborted successfully"
+            else
+                echo "❌ Failed to abort merge (no merge in progress?)"
+                return 1
+            fi
+            return 0
+            ;;
+            
+        --continue)
+            echo "Continuing merge after conflict resolution..."
+            
+            # Check if there are unresolved conflicts
+            if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "❌ There are still unresolved conflicts:"
+                git diff --name-only --diff-filter=U | sed 's/^/  /'
+                echo
+                echo "💡 Resolve conflicts and run 'git add <file>' for each resolved file"
+                return 1
+            fi
+            
+            if git merge --continue; then
+                echo "✅ Merge completed successfully"
+            else
+                echo "❌ Failed to continue merge"
+                return 1
+            fi
+            return 0
+            ;;
+    esac
+    
+    local current_branch
+    current_branch=$(git branch --show-current)
+    
+    if [ -z "$current_branch" ]; then
+        echo "❌ Cannot merge in detached HEAD state"
+        echo "💡 Switch to a branch first"
+        return 1
+    fi
+    
+    # Check if branch exists
+    if ! git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+        echo "❌ Branch '$BRANCH' does not exist"
+        echo
+        echo "Available branches:"
+        git branch --format="  %(refname:short)" | grep -v "^  $current_branch$" | head -5
+        return 1
+    fi
+    
+    # Check for uncommitted changes
+    if ! git diff-index --quiet HEAD --; then
+        echo "⚠️  You have uncommitted changes!"
+        git status --porcelain | head -5 | sed 's/^/  /'
+        echo
+        echo -n "Commit changes before merge? [y/N] "
+        read -r response
+        if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+            echo "💡 Please commit your changes first, then retry the merge"
+            return 1
+        fi
+    fi
+    
+    echo "🔀 Merging branch '$BRANCH' into '$current_branch'"
+    echo "=================================================="
+    echo
+    
+    # Show what will be merged
+    echo "---[ Commits to be merged ]-------------------------"
+    git log --oneline "$current_branch..$BRANCH" | head -5 | sed 's/^/  /'
+    local commit_count
+    commit_count=$(git rev-list --count "$current_branch..$BRANCH" 2>/dev/null || echo "0")
+    echo "Total commits: $commit_count"
+    
+    if [ "$commit_count" -gt 5 ]; then
+        echo "  ... and $((commit_count - 5)) more commits"
+    fi
+    echo
+    
+    # Show merge options
+    if [ -n "$OPTIONS" ]; then
+        echo "Merge options: $OPTIONS"
+    else
+        echo "Merge type: default (fast-forward if possible)"
+    fi
+    echo
+    
+    echo -n "Proceed with merge? [y/N] "
+    read -r response
+    
+    if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+        echo "Merge cancelled"
+        return 1
+    fi
+    
+    # Perform the merge
+    echo "Merging..."
+    if [ -n "$OPTIONS" ]; then
+        # shellcheck disable=SC2086
+        git merge $OPTIONS "$BRANCH"
+    else
+        git merge "$BRANCH"
+    fi
+    
+    local merge_result=$?
+    
+    if [ $merge_result -eq 0 ]; then
+        echo
+        echo "✅ Merge completed successfully!"
+        echo
+        echo "---[ Merge Summary ]--------------------------------"
+        echo "Merged: $BRANCH -> $current_branch"
+        echo "Latest commit: $(git log -1 --oneline)"
+        
+    else
+        echo
+        echo "❌ Merge failed due to conflicts!"
+        echo
+        echo "---[ Conflicted Files ]-----------------------------"
+        git diff --name-only --diff-filter=U | sed 's/^/  /'
+        echo
+        echo "💡 To resolve conflicts:"
+        echo "   1. Edit the conflicted files"
+        echo "   2. Run 'git add <file>' for each resolved file"
+        echo "   3. Run 'jwgitmerge --continue' to complete the merge"
+        echo "   4. Or run 'jwgitmerge --abort' to cancel the merge"
+        
+        return 1
+    fi
+    echo
+}
+
+
+jwgitrebase() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitrebase <branch|commit> [options]"
+        echo "Examples:"
+        echo "  jwgitrebase main                # Rebase current branch onto main"
+        echo "  jwgitrebase main --interactive  # Interactive rebase"
+        echo "  jwgitrebase HEAD~3 -i           # Interactive rebase last 3 commits"
+        echo "  jwgitrebase --continue          # Continue after resolving conflicts"
+        echo "  jwgitrebase --abort             # Abort current rebase"
+        echo "  jwgitrebase --skip              # Skip current commit during rebase"
+        echo
+        echo "Available branches:"
+        if git branch >/dev/null 2>&1; then
+            local current_branch
+            current_branch=$(git branch --show-current)
+            git branch --format="  %(refname:short)" | grep -v "^  $current_branch$" | head -10
+        else
+            echo "  (not in a git repository)"
+        fi
+        echo
+        return 1
+    fi
+
+    local TARGET=$1
+    shift
+    local OPTIONS="$*"
+    
+    # Handle rebase control commands
+    case $TARGET in
+        --continue)
+            echo "Continuing rebase after conflict resolution..."
+            
+            # Check if there are unresolved conflicts
+            if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "❌ There are still unresolved conflicts:"
+                git diff --name-only --diff-filter=U | sed 's/^/  /'
+                echo
+                echo "💡 Resolve conflicts and run 'git add <file>' for each resolved file"
+                return 1
+            fi
+            
+            if git rebase --continue; then
+                echo "✅ Rebase completed successfully"
+            else
+                echo "❌ Failed to continue rebase"
+                return 1
+            fi
+            return 0
+            ;;
+            
+        --abort)
+            echo "Aborting current rebase..."
+            if git rebase --abort; then
+                echo "✅ Rebase aborted successfully"
+            else
+                echo "❌ Failed to abort rebase (no rebase in progress?)"
+                return 1
+            fi
+            return 0
+            ;;
+            
+        --skip)
+            echo "Skipping current commit during rebase..."
+            if git rebase --skip; then
+                echo "✅ Commit skipped, continuing rebase"
+            else
+                echo "❌ Failed to skip commit"
+                return 1
+            fi
+            return 0
+            ;;
+    esac
+    
+    local current_branch
+    current_branch=$(git branch --show-current)
+    
+    if [ -z "$current_branch" ]; then
+        echo "❌ Cannot rebase in detached HEAD state"
+        echo "💡 Switch to a branch first"
+        return 1
+    fi
+    
+    # Check for uncommitted changes
+    if ! git diff-index --quiet HEAD --; then
+        echo "⚠️  You have uncommitted changes!"
+        git status --porcelain | head -5 | sed 's/^/  /'
+        echo
+        echo "💡 Commit or stash your changes before rebasing"
+        return 1
+    fi
+    
+    # Handle interactive rebase
+    local INTERACTIVE=""
+    if [[ "$OPTIONS" == *"--interactive"* ]] || [[ "$OPTIONS" == *"-i"* ]]; then
+        INTERACTIVE="--interactive"
+        OPTIONS=$(echo "$OPTIONS" | sed 's/--interactive\|-i//g' | xargs)
+    fi
+    
+    echo "🔄 Rebasing branch '$current_branch' onto '$TARGET'"
+    echo "=================================================="
+    echo
+    
+    # Show what will be rebased
+    if git merge-base --is-ancestor "$TARGET" HEAD 2>/dev/null; then
+        echo "---[ Commits to be rebased ]------------------------"
+        git log --oneline "$TARGET..HEAD" | head -10 | sed 's/^/  /'
+        local commit_count
+        commit_count=$(git rev-list --count "$TARGET..HEAD" 2>/dev/null || echo "0")
+        echo "Total commits: $commit_count"
+        
+        if [ "$commit_count" -gt 10 ]; then
+            echo "  ... and $((commit_count - 10)) more commits"
+        fi
+    else
+        echo "---[ Rebase Information ]---------------------------"
+        echo "Target: $TARGET"
+        echo "Current branch: $current_branch"
+        echo "⚠️  This will rewrite commit history!"
+    fi
+    
+    echo
+    if [ -n "$INTERACTIVE" ]; then
+        echo "Mode: Interactive rebase"
+        echo "💡 You'll be able to edit, reorder, or squash commits"
+    else
+        echo "Mode: Standard rebase"
+    fi
+    echo
+    
+    echo -n "Proceed with rebase? [y/N] "
+    read -r response
+    
+    if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+        echo "Rebase cancelled"
+        return 1
+    fi
+    
+    # Perform the rebase
+    echo "Rebasing..."
+    if [ -n "$INTERACTIVE" ]; then
+        if [ -n "$OPTIONS" ]; then
+            # shellcheck disable=SC2086
+            git rebase --interactive $OPTIONS "$TARGET"
+        else
+            git rebase --interactive "$TARGET"
+        fi
+    else
+        if [ -n "$OPTIONS" ]; then
+            # shellcheck disable=SC2086
+            git rebase $OPTIONS "$TARGET"
+        else
+            git rebase "$TARGET"
+        fi
+    fi
+    
+    local rebase_result=$?
+    
+    if [ $rebase_result -eq 0 ]; then
+        echo
+        echo "✅ Rebase completed successfully!"
+        echo
+        echo "---[ Rebase Summary ]-------------------------------"
+        echo "Rebased: $current_branch onto $TARGET"
+        echo "Latest commit: $(git log -1 --oneline)"
+        
+    else
+        echo
+        echo "❌ Rebase failed due to conflicts!"
+        echo
+        echo "---[ Conflicted Files ]-----------------------------"
+        git diff --name-only --diff-filter=U | sed 's/^/  /' 2>/dev/null || echo "  (checking conflicts...)"
+        echo
+        echo "💡 To resolve conflicts:"
+        echo "   1. Edit the conflicted files"
+        echo "   2. Run 'git add <file>' for each resolved file"
+        echo "   3. Run 'jwgitrebase --continue' to continue the rebase"
+        echo "   4. Or run 'jwgitrebase --abort' to cancel the rebase"
+        echo "   5. Or run 'jwgitrebase --skip' to skip the current commit"
+        
+        return 1
+    fi
+    echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# staging & commits
+# ---------------------------------------------------------------------------------
+
+jwgitadd() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitadd <files|pattern> [options]"
+        echo "Examples:"
+        echo "  jwgitadd .                    # Add all changes"
+        echo "  jwgitadd file.txt             # Add specific file"
+        echo "  jwgitadd *.js                 # Add all JavaScript files"
+        echo "  jwgitadd --patch file.txt     # Interactive staging"
+        echo "  jwgitadd --update             # Add only modified files"
+        echo
+        echo "Current status:"
+        if git status --porcelain 2>/dev/null | grep -q .; then
+            echo "Modified files:"
+            git status --porcelain | grep "^ M\|^M \|^MM" | sed 's/^/  /' | head -10
+            echo "Untracked files:"
+            git status --porcelain | grep "^??" | sed 's/^/  /' | head -10
+        else
+            echo "  (no changes to add)"
+        fi
+        echo
+        return 1
+    fi
+
+    local FILES="$1"
+    shift
+    local OPTIONS="$*"
+    
+    # Handle special cases
+    case $FILES in
+        --patch|-p)
+            if [ -z "$1" ]; then
+                echo "Usage: jwgitadd --patch <file>"
+                echo
+                echo "Modified files available for patch staging:"
+                git diff --name-only | sed 's/^/  /' | head -10
+                return 1
+            fi
+            FILES="$1"
+            OPTIONS="--patch $OPTIONS"
+            ;;
+            
+        --update|-u)
+            echo "Adding all modified tracked files..."
+            git add --update
+            if [ $? -eq 0 ]; then
+                echo "✅ Updated files added to staging area"
+                jwgitstatus
+            else
+                echo "❌ Failed to add updated files"
+                return 1
+            fi
+            return 0
+            ;;
+            
+        --all|-A)
+            echo "Adding all changes (including untracked files)..."
+            echo "⚠️  This will add ALL files in the repository!"
+            echo -n "Continue? [y/N] "
+            read -r response
+            
+            if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                git add --all
+                if [ $? -eq 0 ]; then
+                    echo "✅ All changes added to staging area"
+                    jwgitstatus
+                else
+                    echo "❌ Failed to add all changes"
+                    return 1
+                fi
+            else
+                echo "Operation cancelled"
+            fi
+            return 0
+            ;;
+    esac
+    
+    echo "📝 Adding files to staging area..."
+    echo "Files/Pattern: $FILES"
+    if [ -n "$OPTIONS" ]; then
+        echo "Options: $OPTIONS"
+    fi
+    echo
+    
+    # Show what will be added (if not using wildcards)
+    if [[ "$FILES" != *"*"* ]] && [[ "$FILES" != "." ]] && [ -f "$FILES" ]; then
+        echo "---[ File Status ]----------------------------------"
+        git status --porcelain "$FILES" | sed 's/^/  /' || echo "  (file not in repository)"
+        echo
+    elif [ "$FILES" = "." ]; then
+        echo "---[ Changes to be added ]--------------------------"
+        local modified_count
+        local untracked_count
+        modified_count=$(git status --porcelain | grep -c "^ M\|^M \|^MM" || echo "0")
+        untracked_count=$(git status --porcelain | grep -c "^??" || echo "0")
+        
+        echo "Modified files: $modified_count"
+        echo "Untracked files: $untracked_count"
+        
+        if [ "$modified_count" -gt 0 ]; then
+            echo
+            echo "Modified files:"
+            git status --porcelain | grep "^ M\|^M \|^MM" | sed 's/^/  /' | head -5
+            if [ "$modified_count" -gt 5 ]; then
+                echo "  ... and $((modified_count - 5)) more files"
+            fi
+        fi
+        
+        if [ "$untracked_count" -gt 0 ]; then
+            echo
+            echo "Untracked files:"
+            git status --porcelain | grep "^??" | sed 's/^/  /' | head -5
+            if [ "$untracked_count" -gt 5 ]; then
+                echo "  ... and $((untracked_count - 5)) more files"
+            fi
+        fi
+        echo
+    fi
+    
+    # Perform the add operation
+    if [ -n "$OPTIONS" ]; then
+        # shellcheck disable=SC2086
+        git add $OPTIONS "$FILES"
+    else
+        git add "$FILES"
+    fi
+    
+    local add_result=$?
+    
+    if [ $add_result -eq 0 ]; then
+        echo "✅ Files added to staging area successfully!"
+        echo
+        echo "---[ Staging Area Status ]-------------------------"
+        git status --porcelain | grep "^A\|^M\|^D" | sed 's/^/  /' | head -10
+        local staged_count
+        staged_count=$(git status --porcelain | grep -c "^A\|^M\|^D" || echo "0")
+        if [ "$staged_count" -gt 10 ]; then
+            echo "  ... and $((staged_count - 10)) more staged files"
+        fi
+        echo
+        echo "💡 Run 'jwgitcommit' to commit these changes"
+    else
+        echo "❌ Failed to add files"
+        return 1
+    fi
+    echo
+}
+
+
+jwgitcommit() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitcommit [message] [options]"
+        echo "Examples:"
+        echo "  jwgitcommit \"Fix bug in user login\"    # Commit with message"
+        echo "  jwgitcommit                              # Open editor for message"
+        echo "  jwgitcommit -m \"Quick fix\"             # Commit with inline message"
+        echo "  jwgitcommit --amend                      # Amend last commit"
+        echo "  jwgitcommit --all -m \"Commit all\"      # Add and commit all changes"
+        echo
+        echo "Current staging area:"
+        if git diff --cached --name-only | grep -q .; then
+            echo "Staged files:"
+            git diff --cached --name-status | sed 's/^/  /' | head -10
+            local staged_count
+            staged_count=$(git diff --cached --name-only | wc -l)
+            if [ "$staged_count" -gt 10 ]; then
+                echo "  ... and $((staged_count - 10)) more files"
+            fi
+        else
+            echo "  (no files staged for commit)"
+            echo
+            echo "Unstaged changes:"
+            git status --porcelain | grep "^ M\|^M " | sed 's/^/  /' | head -5
+            echo
+            echo "💡 Use 'jwgitadd' to stage files first"
+        fi
+        echo
+        return 1
+    fi
+
+    local MESSAGE=""
+    local OPTIONS=""
+    local AMEND=""
+    local ALL=""
+    
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --amend)
+                AMEND="--amend"
+                shift
+                ;;
+            --all|-a)
+                ALL="--all"
+                shift
+                ;;
+            -m)
+                shift
+                MESSAGE="$1"
+                shift
+                ;;
+            --message=*)
+                MESSAGE="${1#--message=}"
+                shift
+                ;;
+            -*)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            *)
+                if [ -z "$MESSAGE" ]; then
+                    MESSAGE="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Handle amend
+    if [ -n "$AMEND" ]; then
+        echo "📝 Amending last commit..."
+        
+        if [ -n "$MESSAGE" ]; then
+            echo "New message: $MESSAGE"
+            git commit --amend -m "$MESSAGE"
+        else
+            echo "Opening editor to modify commit message..."
+            git commit --amend
+        fi
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ Commit amended successfully!"
+            echo "Latest commit: $(git log -1 --oneline)"
+        else
+            echo "❌ Failed to amend commit"
+            return 1
+        fi
+        return 0
+    fi
+    
+    # Handle commit all
+    if [ -n "$ALL" ]; then
+        echo "📝 Committing all modified files..."
+        
+        # Show what will be committed
+        echo "Files to be committed:"
+        git status --porcelain | grep "^ M\|^M " | sed 's/^/  /' | head -10
+        local modified_count
+        modified_count=$(git status --porcelain | grep -c "^ M\|^M " || echo "0")
+        
+        if [ "$modified_count" -eq 0 ]; then
+            echo "  (no modified files to commit)"
+            return 1
+        fi
+        
+        if [ "$modified_count" -gt 10 ]; then
+            echo "  ... and $((modified_count - 10)) more files"
+        fi
+        echo
+    fi
+    
+    # Check if there are staged changes (unless using --all)
+    if [ -z "$ALL" ] && ! git diff --cached --quiet; then
+        :  # There are staged changes, continue
+    elif [ -z "$ALL" ]; then
+        echo "❌ No changes staged for commit"
+        echo
+        echo "Unstaged changes:"
+        git status --porcelain | grep "^ M\|^M " | sed 's/^/  /' | head -5
+        echo
+        echo "💡 Use 'jwgitadd' to stage files, or use '--all' to commit all changes"
+        return 1
+    fi
+    
+    echo "📝 Creating commit..."
+    if [ -n "$MESSAGE" ]; then
+        echo "Message: $MESSAGE"
+    else
+        echo "Opening editor for commit message..."
+    fi
+    echo
+    
+    # Show commit summary
+    echo "---[ Commit Summary ]-------------------------------"
+    if [ -n "$ALL" ]; then
+        echo "Type: Commit all modified files"
+        git diff --name-status | sed 's/^/  /'
+    else
+        echo "Type: Commit staged files"
+        git diff --cached --name-status | sed 's/^/  /'
+    fi
+    echo
+    
+    # Perform the commit
+    local commit_cmd="git commit"
+    
+    if [ -n "$ALL" ]; then
+        commit_cmd="$commit_cmd --all"
+    fi
+    
+    if [ -n "$MESSAGE" ]; then
+        commit_cmd="$commit_cmd -m \"$MESSAGE\""
+    fi
+    
+    if [ -n "$OPTIONS" ]; then
+        commit_cmd="$commit_cmd $OPTIONS"
+    fi
+    
+    # Execute the commit
+    if [ -n "$MESSAGE" ]; then
+        if [ -n "$ALL" ]; then
+            git commit --all -m "$MESSAGE"
+        else
+            git commit -m "$MESSAGE"
+        fi
+    else
+        if [ -n "$ALL" ]; then
+            git commit --all
+        else
+            git commit
+        fi
+    fi
+    
+    local commit_result=$?
+    
+    if [ $commit_result -eq 0 ]; then
+        echo
+        echo "✅ Commit created successfully!"
+        echo
+        echo "---[ Commit Information ]---------------------------"
+        echo "Commit: $(git log -1 --oneline)"
+        echo "Author: $(git log -1 --format='%an <%ae>')"
+        echo "Date: $(git log -1 --format='%ad' --date=format:'%Y-%m-%d %H:%M:%S')"
+        
+        # Show files changed
+        local files_changed
+        files_changed=$(git diff --name-only HEAD~1 HEAD | wc -l)
+        echo "Files changed: $files_changed"
+        
+        # Show branch status
+        local current_branch
+        current_branch=$(git branch --show-current)
+        if [ -n "$current_branch" ]; then
+            echo "Branch: $current_branch"
+            
+            # Show ahead/behind status if upstream exists
+            local upstream
+            upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+            if [ -n "$upstream" ]; then
+                local ahead_behind
+                ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
+                if [ -n "$ahead_behind" ]; then
+                    local ahead
+                    local behind
+                    ahead=$(echo "$ahead_behind" | cut -f1)
+                    behind=$(echo "$ahead_behind" | cut -f2)
+                    echo "Status: $ahead ahead, $behind behind $upstream"
+                fi
+            fi
+        fi
+        
+    else
+        echo "❌ Commit failed!"
+        echo "💡 Check your commit message and staged files"
+        return 1
+    fi
+    echo
+}
+
+
+jwgitstash() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitstash [push|pop|list|show|drop|clear] [options]"
+        echo "Examples:"
+        echo "  jwgitstash                        # Stash current changes"
+        echo "  jwgitstash push -m \"WIP feature\" # Stash with message"
+        echo "  jwgitstash pop                    # Apply and remove latest stash"
+        echo "  jwgitstash list                   # List all stashes"
+        echo "  jwgitstash show stash@{0}         # Show stash contents"
+        echo "  jwgitstash drop stash@{1}         # Delete specific stash"
+        echo "  jwgitstash clear                  # Delete all stashes"
+        echo
+        echo "Current changes:"
+        if git status --porcelain | grep -q .; then
+            git status --porcelain | head -10 | sed 's/^/  /'
+            local change_count
+            change_count=$(git status --porcelain | wc -l)
+            if [ "$change_count" -gt 10 ]; then
+                echo "  ... and $((change_count - 10)) more changes"
+            fi
+        else
+            echo "  (no changes to stash)"
+        fi
+        echo
+        echo "Existing stashes:"
+        git stash list | head -5 | sed 's/^/  /' 2>/dev/null || echo "  (no stashes)"
+        echo
+        return 1
+    fi
+
+    local ACTION=$1
+    shift
+    local OPTIONS="$*"
+    
+    case $ACTION in
+        push|save)
+            echo "📦 Stashing current changes..."
+            
+            # Check if there are changes to stash
+            if ! git status --porcelain | grep -q .; then
+                echo "❌ No changes to stash"
+                return 1
+            fi
+            
+            # Show what will be stashed
+            echo "Changes to be stashed:"
+            git status --porcelain | head -10 | sed 's/^/  /'
+            local change_count
+            change_count=$(git status --porcelain | wc -l)
+            if [ "$change_count" -gt 10 ]; then
+                echo "  ... and $((change_count - 10)) more changes"
+            fi
+            echo
+            
+            # Perform stash
+            if [ -n "$OPTIONS" ]; then
+                # shellcheck disable=SC2086
+                git stash push $OPTIONS
+            else
+                git stash push
+            fi
+            
+            if [ $? -eq 0 ]; then
+                echo "✅ Changes stashed successfully!"
+                echo "Latest stash: $(git stash list | head -1)"
+                echo
+                echo "Working directory is now clean:"
+                git status --short
+            else
+                echo "❌ Failed to stash changes"
+                return 1
+            fi
+            ;;
+            
+        pop)
+            echo "📦 Applying and removing latest stash..."
+            
+            # Check if there are stashes
+            if ! git stash list | grep -q .; then
+                echo "❌ No stashes to pop"
+                return 1
+            fi
+            
+            # Show which stash will be popped
+            echo "Stash to be applied:"
+            echo "  $(git stash list | head -1)"
+            echo
+            
+            # Check for conflicts with current changes
+            if git status --porcelain | grep -q .; then
+                echo "⚠️  You have uncommitted changes!"
+                git status --porcelain | head -5 | sed 's/^/  /'
+                echo
+                echo -n "Continue anyway? [y/N] "
+                read -r response
+                if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+                    echo "Stash pop cancelled"
+                    return 1
+                fi
+            fi
+            
+            # Apply the stash
+            if [ -n "$OPTIONS" ]; then
+                # shellcheck disable=SC2086
+                git stash pop $OPTIONS
+            else
+                git stash pop
+            fi
+            
+            if [ $? -eq 0 ]; then
+                echo "✅ Stash applied and removed successfully!"
+                echo
+                echo "Current status:"
+                git status --short
+            else
+                echo "❌ Failed to apply stash (conflicts?)"
+                echo "💡 Resolve conflicts and commit, or use 'git stash drop' to discard"
+                return 1
+            fi
+            ;;
+            
+        apply)
+            local STASH_REF=${OPTIONS:-stash@{0}}
+            
+            echo "📦 Applying stash (keeping in stash list)..."
+            
+            # Check if stash exists
+            if ! git stash list | grep -q "$STASH_REF"; then
+                echo "❌ Stash '$STASH_REF' not found"
+                echo
+                echo "Available stashes:"
+                git stash list | head -5 | sed 's/^/  /'
+                return 1
+            fi
+            
+            echo "Applying: $(git stash list | grep "$STASH_REF")"
+            echo
+            
+            # Apply the stash
+            git stash apply "$STASH_REF"
+            
+            if [ $? -eq 0 ]; then
+                echo "✅ Stash applied successfully!"
+                echo "💡 Stash is still saved in stash list"
+                echo
+                echo "Current status:"
+                git status --short
+            else
+                echo "❌ Failed to apply stash"
+                return 1
+            fi
+            ;;
+            
+        list|ls)
+            echo "📦 Git Stashes"
+            echo "=================================================="
+            echo
+            
+            if git stash list | grep -q .; then
+                git stash list | while IFS= read -r stash_line; do
+                    echo "  $stash_line"
+                done
+                echo
+                local stash_count
+                stash_count=$(git stash list | wc -l)
+                echo "Total stashes: $stash_count"
+            else
+                echo "No stashes found."
+            fi
+            ;;
+            
+        show)
+            local STASH_REF=${OPTIONS:-stash@{0}}
+            
+            echo "📦 Stash Contents: $STASH_REF"
+            echo "=================================================="
+            echo
+            
+            # Check if stash exists
+            if ! git stash list | grep -q "$STASH_REF"; then
+                echo "❌ Stash '$STASH_REF' not found"
+                echo
+                echo "Available stashes:"
+                git stash list | head -5 | sed 's/^/  /'
+                return 1
+            fi
+            
+            # Show stash information
+            echo "---[ Stash Info ]-----------------------------------"
+            git stash list | grep "$STASH_REF" | sed 's/^/  /'
+            echo
+            
+            echo "---[ Changed Files ]--------------------------------"
+            git stash show --name-status "$STASH_REF" | sed 's/^/  /'
+            echo
+            
+            echo "---[ Diff Summary ]---------------------------------"
+            git stash show --stat "$STASH_REF"
+            echo
+            
+            echo "💡 Use 'git stash show -p $STASH_REF' to see full diff"
+            ;;
+            
+        drop)
+            local STASH_REF=${OPTIONS:-stash@{0}}
+            
+            echo "📦 Dropping stash: $STASH_REF"
+            
+            # Check if stash exists
+            if ! git stash list | grep -q "$STASH_REF"; then
+                echo "❌ Stash '$STASH_REF' not found"
+                echo
+                echo "Available stashes:"
+                git stash list | head -5 | sed 's/^/  /'
+                return 1
+            fi
+            
+            # Show which stash will be dropped
+            echo "Stash to be dropped:"
+            echo "  $(git stash list | grep "$STASH_REF")"
+            echo
+            echo "⚠️  This action cannot be undone!"
+            echo -n "Continue? [y/N] "
+            read -r response
+            
+            if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                git stash drop "$STASH_REF"
+                if [ $? -eq 0 ]; then
+                    echo "✅ Stash dropped successfully!"
+                else
+                    echo "❌ Failed to drop stash"
+                    return 1
+                fi
+            else
+                echo "Operation cancelled"
+            fi
+            ;;
+            
+        clear)
+            echo "📦 Clearing all stashes..."
+            
+            local stash_count
+            stash_count=$(git stash list | wc -l)
+            
+            if [ "$stash_count" -eq 0 ]; then
+                echo "No stashes to clear."
+                return 0
+            fi
+            
+            echo "This will delete $stash_count stashes:"
+            git stash list | head -5 | sed 's/^/  /'
+            if [ "$stash_count" -gt 5 ]; then
+                echo "  ... and $((stash_count - 5)) more stashes"
+            fi
+            echo
+            echo "⚠️  This action cannot be undone!"
+            echo -n "Continue? [y/N] "
+            read -r response
+            
+            if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                git stash clear
+                if [ $? -eq 0 ]; then
+                    echo "✅ All stashes cleared successfully!"
+                else
+                    echo "❌ Failed to clear stashes"
+                    return 1
+                fi
+            else
+                echo "Operation cancelled"
+            fi
+            ;;
+            
+        *)
+            # Default: stash current changes (same as 'push')
+            jwgitstash push "$ACTION" "$OPTIONS"
+            ;;
+    esac
+    echo
+}
+
+
+jwgitreset() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitreset [--soft|--mixed|--hard] [commit] [files]"
+        echo "Examples:"
+        echo "  jwgitreset                    # Unstage all files (mixed reset to HEAD)"
+        echo "  jwgitreset --soft HEAD~1      # Undo last commit, keep changes staged"
+        echo "  jwgitreset --mixed HEAD~1     # Undo last commit, unstage changes"
+        echo "  jwgitreset --hard HEAD~1      # Undo last commit, discard all changes"
+        echo "  jwgitreset file.txt           # Unstage specific file"
+        echo "  jwgitreset --hard origin/main # Reset to remote branch state"
+        echo
+        echo "⚠️  WARNING: --hard reset will permanently delete uncommitted changes!"
+        echo
+        echo "Current status:"
+        if git status --porcelain | grep -q .; then
+            echo "Staged files:"
+            git status --porcelain | grep "^[MADRC]" | sed 's/^/  /' | head -5
+            echo "Modified files:"
+            git status --porcelain | grep "^ [MD]" | sed 's/^/  /' | head -5
+        else
+            echo "  (working directory clean)"
+        fi
+        echo
+        echo "Recent commits:"
+        git log --oneline -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+        echo
+        return 1
+    fi
+
+    local RESET_TYPE=""
+    local TARGET="HEAD"
+    local FILES=""
+    
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --soft|--mixed|--hard)
+                RESET_TYPE="$1"
+                shift
+                ;;
+            -*)
+                echo "❌ Unknown option: $1"
+                return 1
+                ;;
+            *)
+                if [ -z "$TARGET" ] || [ "$TARGET" = "HEAD" ]; then
+                    # Check if it's a file or commit
+                    if [ -f "$1" ] || git ls-files --error-unmatch "$1" >/dev/null 2>&1; then
+                        FILES="$FILES $1"
+                        TARGET="HEAD"  # Reset target back to HEAD for file reset
+                    else
+                        TARGET="$1"
+                    fi
+                else
+                    FILES="$FILES $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Handle file-specific reset
+    if [ -n "$FILES" ]; then
+        echo "📝 Unstaging files..."
+        echo "Files: $FILES"
+        echo
+        
+        # Show current status of files
+        echo "Current status:"
+        for file in $FILES; do
+            git status --porcelain "$file" | sed 's/^/  /' || echo "  $file (not in repository)"
+        done
+        echo
+        
+        # Reset the files
+        # shellcheck disable=SC2086
+        git reset HEAD $FILES
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ Files unstaged successfully!"
+            echo
+            echo "Updated status:"
+            for file in $FILES; do
+                git status --porcelain "$file" | sed 's/^/  /' || echo "  $file (not in repository)"
+            done
+        else
+            echo "❌ Failed to unstage files"
+            return 1
+        fi
+        return 0
+    fi
+    
+    # Handle commit reset
+    echo "🔄 Resetting to commit: $TARGET"
+    echo "Reset type: ${RESET_TYPE:-mixed (default)}"
+    echo
+    
+    # Validate target commit
+    if ! git rev-parse --verify "$TARGET" >/dev/null 2>&1; then
+        echo "❌ Invalid commit: $TARGET"
+        echo
+        echo "Recent commits:"
+        git log --oneline -5 | sed 's/^/  /'
+        return 1
+    fi
+    
+    # Show what will happen
+    echo "---[ Reset Information ]----------------------------"
+    echo "Current HEAD: $(git rev-parse --short HEAD) ($(git log -1 --oneline))"
+    echo "Reset target: $(git rev-parse --short "$TARGET") ($(git log -1 --oneline "$TARGET"))"
+    echo
+    
+    # Show commits that will be affected
+    if [ "$TARGET" != "HEAD" ]; then
+        local commits_affected
+        commits_affected=$(git rev-list --count HEAD..."$TARGET" 2>/dev/null || echo "0")
+        
+        if [ "$commits_affected" -gt 0 ]; then
+            echo "Commits that will be reset:"
+            git log --oneline HEAD..."$TARGET" | sed 's/^/  /' | head -5
+            if [ "$commits_affected" -gt 5 ]; then
+                echo "  ... and $((commits_affected - 5)) more commits"
+            fi
+            echo
+        fi
+    fi
+    
+    # Explain what each reset type does
+    case $RESET_TYPE in
+        --soft)
+            echo "Soft reset will:"
+            echo "  ✅ Move HEAD to target commit"
+            echo "  ✅ Keep changes staged"
+            echo "  ✅ Keep working directory unchanged"
+            ;;
+        --mixed|"")
+            echo "Mixed reset will:"
+            echo "  ✅ Move HEAD to target commit"
+            echo "  ⚠️  Unstage all changes"
+            echo "  ✅ Keep working directory unchanged"
+            ;;
+        --hard)
+            echo "Hard reset will:"
+            echo "  ⚠️  Move HEAD to target commit"
+            echo "  ⚠️  Discard all staged changes"
+            echo "  ⚠️  PERMANENTLY DELETE all uncommitted changes"
+            echo
+            echo "🚨 DANGER: This will permanently delete:"
+            if git status --porcelain | grep -q .; then
+                git status --porcelain | sed 's/^/    /' | head -10
+            else
+                echo "    (no uncommitted changes)"
+            fi
+            ;;
+    esac
+    
+    echo
+    echo -n "Proceed with reset? [y/N] "
+    read -r response
+    
+    if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+        echo "Reset cancelled"
+        return 1
+    fi
+    
+    # Perform the reset
+    echo "Performing reset..."
+    if [ -n "$RESET_TYPE" ]; then
+        git reset "$RESET_TYPE" "$TARGET"
+    else
+        git reset "$TARGET"
+    fi
+    
+    local reset_result=$?
+    
+    if [ $reset_result -eq 0 ]; then
+        echo
+        echo "✅ Reset completed successfully!"
+        echo
+        echo "---[ Reset Summary ]--------------------------------"
+        echo "HEAD is now at: $(git rev-parse --short HEAD) ($(git log -1 --oneline))"
+        
+        case $RESET_TYPE in
+            --soft)
+                echo "Changes are still staged and ready to commit"
+                ;;
+            --mixed|"")
+                echo "Changes are unstaged but preserved in working directory"
+                ;;
+            --hard)
+                echo "Working directory and staging area are clean"
+                ;;
+        esac
+        
+        echo
+        echo "Current status:"
+        git status --short
+        
+    else
+        echo "❌ Reset failed!"
+        return 1
+    fi
+    echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# remote operations
+# ---------------------------------------------------------------------------------
+
+jwgitpush() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitpush [remote] [branch] [options]"
+        echo "Examples:"
+        echo "  jwgitpush                     # Push current branch to upstream"
+        echo "  jwgitpush origin main         # Push main branch to origin"
+        echo "  jwgitpush origin --all        # Push all branches"
+        echo "  jwgitpush origin --tags       # Push all tags"
+        echo "  jwgitpush --set-upstream origin feature  # Set upstream and push"
+        echo "  jwgitpush --force-with-lease  # Force push safely"
+        echo
+        echo "Current branch info:"
+        local current_branch
+        current_branch=$(git branch --show-current 2>/dev/null)
+        if [ -n "$current_branch" ]; then
+            echo "Branch: $current_branch"
+            
+            local upstream
+            upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+            if [ -n "$upstream" ]; then
+                echo "Upstream: $upstream"
+                
+                # Show ahead/behind status
+                local ahead_behind
+                ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
+                if [ -n "$ahead_behind" ]; then
+                    local ahead
+                    local behind
+                    ahead=$(echo "$ahead_behind" | cut -f1)
+                    behind=$(echo "$ahead_behind" | cut -f2)
+                    echo "Status: $ahead ahead, $behind behind"
+                fi
+            else
+                echo "Upstream: (not set)"
+            fi
+        else
+            echo "  (not on any branch)"
+        fi
+        echo
+        echo "Available remotes:"
+        git remote -v | sed 's/^/  /' || echo "  (no remotes configured)"
+        echo
+        return 1
+    fi
+
+    local REMOTE=""
+    local BRANCH=""
+    local OPTIONS=""
+    local SET_UPSTREAM=""
+    local FORCE=""
+    
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --set-upstream|-u)
+                SET_UPSTREAM="--set-upstream"
+                shift
+                ;;
+            --force-with-lease)
+                FORCE="--force-with-lease"
+                shift
+                ;;
+            --force|-f)
+                FORCE="--force"
+                shift
+                ;;
+            --all|--tags|--dry-run)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            -*)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            *)
+                if [ -z "$REMOTE" ]; then
+                    REMOTE="$1"
+                elif [ -z "$BRANCH" ]; then
+                    BRANCH="$1"
+                else
+                    OPTIONS="$OPTIONS $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Set defaults
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    
+    if [ -z "$REMOTE" ]; then
+        # Try to get upstream remote
+        local upstream
+        upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+        if [ -n "$upstream" ]; then
+            REMOTE=$(echo "$upstream" | cut -d'/' -f1)
+        else
+            REMOTE="origin"
+        fi
+    fi
+    
+    if [ -z "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]] && [[ "$OPTIONS" != *"--tags"* ]]; then
+        BRANCH="$current_branch"
+    fi
+    
+    echo "📤 Pushing to remote repository..."
+    echo "Remote: $REMOTE"
+    if [ -n "$BRANCH" ]; then
+        echo "Branch: $BRANCH"
+    fi
+    if [ -n "$OPTIONS" ]; then
+        echo "Options: $OPTIONS"
+    fi
+    if [ -n "$SET_UPSTREAM" ]; then
+        echo "Setting upstream: $REMOTE/$BRANCH"
+    fi
+    if [ -n "$FORCE" ]; then
+        echo "Force push: $FORCE"
+    fi
+    echo
+    
+    # Validate remote
+    if ! git remote | grep -q "^$REMOTE$"; then
+        echo "❌ Remote '$REMOTE' not found"
+        echo
+        echo "Available remotes:"
+        git remote | sed 's/^/  /'
+        return 1
+    fi
+    
+    # Check if branch exists (for non-special pushes)
+    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]] && [[ "$OPTIONS" != *"--tags"* ]]; then
+        if [ "$BRANCH" != "$current_branch" ] && ! git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+            echo "❌ Branch '$BRANCH' does not exist"
+            echo
+            echo "Available branches:"
+            git branch --format="  %(refname:short)" | head -10
+            return 1
+        fi
+    fi
+    
+    # Show what will be pushed
+    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]] && [[ "$OPTIONS" != *"--tags"* ]]; then
+        echo "---[ Commits to Push ]------------------------------"
+        
+        # Check if remote branch exists
+        if git show-ref --verify --quiet "refs/remotes/$REMOTE/$BRANCH"; then
+            local commits_to_push
+            commits_to_push=$(git rev-list --count "$REMOTE/$BRANCH..$BRANCH" 2>/dev/null || echo "0")
+            
+            if [ "$commits_to_push" -gt 0 ]; then
+                echo "New commits to push: $commits_to_push"
+                git log --oneline "$REMOTE/$BRANCH..$BRANCH" | head -5 | sed 's/^/  /'
+                if [ "$commits_to_push" -gt 5 ]; then
+                    echo "  ... and $((commits_to_push - 5)) more commits"
+                fi
+            else
+                echo "Branch is up to date with remote"
+            fi
+        else
+            echo "New branch - all commits will be pushed:"
+            git log --oneline "$BRANCH" | head -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+            local total_commits
+            total_commits=$(git rev-list --count "$BRANCH" 2>/dev/null || echo "0")
+            if [ "$total_commits" -gt 5 ]; then
+                echo "  ... and $((total_commits - 5)) more commits"
+            fi
+        fi
+        echo
+    fi
+    
+    # Warning for force push
+    if [ -n "$FORCE" ]; then
+        echo "⚠️  WARNING: Force push will rewrite remote history!"
+        echo "This may affect other collaborators."
+        echo
+        echo -n "Continue with force push? [y/N] "
+        read -r response
+        if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+            echo "Push cancelled"
+            return 1
+        fi
+    fi
+    
+    # Build push command
+    local push_cmd="git push"
+    
+    if [ -n "$SET_UPSTREAM" ]; then
+        push_cmd="$push_cmd --set-upstream"
+    fi
+    
+    if [ -n "$FORCE" ]; then
+        push_cmd="$push_cmd $FORCE"
+    fi
+    
+    if [ -n "$OPTIONS" ]; then
+        push_cmd="$push_cmd $OPTIONS"
+    fi
+    
+    push_cmd="$push_cmd $REMOTE"
+    
+    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]] && [[ "$OPTIONS" != *"--tags"* ]]; then
+        push_cmd="$push_cmd $BRANCH"
+    fi
+    
+    # Execute push
+    echo "Pushing..."
+    eval "$push_cmd"
+    
+    local push_result=$?
+    
+    if [ $push_result -eq 0 ]; then
+        echo
+        echo "✅ Push completed successfully!"
+        echo
+        echo "---[ Push Summary ]---------------------------------"
+        echo "Remote: $REMOTE"
+        if [ -n "$BRANCH" ]; then
+            echo "Branch: $BRANCH"
+            
+            # Update upstream info
+            if [ -n "$SET_UPSTREAM" ]; then
+                echo "Upstream set: $REMOTE/$BRANCH"
+            fi
+            
+            # Show final status
+            local upstream
+            upstream=$(git rev-parse --abbrev-ref "$BRANCH@{upstream}" 2>/dev/null)
+            if [ -n "$upstream" ]; then
+                echo "Status: up to date with $upstream"
+            fi
+        fi
+        
+    else
+        echo
+        echo "❌ Push failed!"
+        echo
+        echo "Common solutions:"
+        echo "  - Pull latest changes: jwgitpull"
+        echo "  - Force push (dangerous): jwgitpush --force-with-lease"
+        echo "  - Set upstream: jwgitpush --set-upstream $REMOTE $BRANCH"
+        
+        return 1
+    fi
+    echo
+}
+
+
+jwgitpull() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitpull [remote] [branch] [options]"
+        echo "Examples:"
+        echo "  jwgitpull                     # Pull current branch from upstream"
+        echo "  jwgitpull origin main         # Pull main branch from origin"
+        echo "  jwgitpull --rebase            # Pull with rebase instead of merge"
+        echo "  jwgitpull --no-commit         # Pull without auto-commit"
+        echo "  jwgitpull --all               # Fetch all remotes"
+        echo
+        echo "Current branch info:"
+        local current_branch
+        current_branch=$(git branch --show-current 2>/dev/null)
+        if [ -n "$current_branch" ]; then
+            echo "Branch: $current_branch"
+            
+            local upstream
+            upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+            if [ -n "$upstream" ]; then
+                echo "Upstream: $upstream"
+                
+                # Show ahead/behind status
+                local ahead_behind
+                ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
+                if [ -n "$ahead_behind" ]; then
+                    local ahead
+                    local behind
+                    ahead=$(echo "$ahead_behind" | cut -f1)
+                    behind=$(echo "$ahead_behind" | cut -f2)
+                    echo "Status: $ahead ahead, $behind behind"
+                    
+                    if [ "$behind" -eq 0 ]; then
+                        echo "💡 Branch is up to date"
+                    fi
+                fi
+            else
+                echo "Upstream: (not set)"
+                echo "💡 Set upstream with: git branch --set-upstream-to=origin/$current_branch"
+            fi
+        else
+            echo "  (not on any branch)"
+        fi
+        echo
+        echo "Available remotes:"
+        git remote -v | sed 's/^/  /' || echo "  (no remotes configured)"
+        echo
+        return 1
+    fi
+
+    local REMOTE=""
+    local BRANCH=""
+    local OPTIONS=""
+    local REBASE=""
+    
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --rebase|-r)
+                REBASE="--rebase"
+                shift
+                ;;
+            --no-commit|--no-ff|--ff-only|--all|--dry-run)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            -*)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            *)
+                if [ -z "$REMOTE" ]; then
+                    REMOTE="$1"
+                elif [ -z "$BRANCH" ]; then
+                    BRANCH="$1"
+                else
+                    OPTIONS="$OPTIONS $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Set defaults
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    
+    if [ -z "$REMOTE" ] && [ -z "$BRANCH" ]; then
+        # Use upstream if available
+        local upstream
+        upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+        if [ -n "$upstream" ]; then
+            REMOTE=$(echo "$upstream" | cut -d'/' -f1)
+            BRANCH=$(echo "$upstream" | cut -d'/' -f2-)
+        else
+            REMOTE="origin"
+            BRANCH="$current_branch"
+        fi
+    elif [ -z "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]]; then
+        BRANCH="$current_branch"
+    fi
+    
+    echo "📥 Pulling from remote repository..."
+    echo "Remote: $REMOTE"
+    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]]; then
+        echo "Branch: $BRANCH"
+    fi
+    if [ -n "$OPTIONS" ]; then
+        echo "Options: $OPTIONS"
+    fi
+    if [ -n "$REBASE" ]; then
+        echo "Mode: Rebase (instead of merge)"
+    fi
+    echo
+    
+    # Validate remote
+    if ! git remote | grep -q "^$REMOTE$"; then
+        echo "❌ Remote '$REMOTE' not found"
+        echo
+        echo "Available remotes:"
+        git remote | sed 's/^/  /'
+        return 1
+    fi
+    
+    # Check for uncommitted changes
+    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+        echo "⚠️  You have uncommitted changes!"
+        git status --porcelain | head -5 | sed 's/^/  /'
+        echo
+        
+        if [ -n "$REBASE" ]; then
+            echo "💡 Rebase requires a clean working directory"
+            echo "Commit or stash your changes first"
+            return 1
+        else
+            echo -n "Continue with pull? [y/N] "
+            read -r response
+            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+                echo "Pull cancelled"
+                echo "💡 Commit or stash your changes first"
+                return 1
+            fi
+        fi
+    fi
+    
+    # Show what will be pulled (fetch first to check)
+    echo "Fetching latest changes..."
+    git fetch "$REMOTE" >/dev/null 2>&1
+    
+    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]]; then
+        echo
+        echo "---[ Changes to Pull ]------------------------------"
+        
+        if git show-ref --verify --quiet "refs/remotes/$REMOTE/$BRANCH"; then
+            local commits_to_pull
+            commits_to_pull=$(git rev-list --count HEAD.."$REMOTE/$BRANCH" 2>/dev/null || echo "0")
+            
+            if [ "$commits_to_pull" -gt 0 ]; then
+                echo "New commits to pull: $commits_to_pull"
+                git log --oneline HEAD.."$REMOTE/$BRANCH" | head -5 | sed 's/^/  /'
+                if [ "$commits_to_pull" -gt 5 ]; then
+                    echo "  ... and $((commits_to_pull - 5)) more commits"
+                fi
+                
+                # Check for potential conflicts
+                local local_commits
+                local_commits=$(git rev-list --count "$REMOTE/$BRANCH"..HEAD 2>/dev/null || echo "0")
+                if [ "$local_commits" -gt 0 ]; then
+                    echo
+                    echo "⚠️  You have $local_commits local commits that will be merged/rebased"
+                    git log --oneline "$REMOTE/$BRANCH"..HEAD | head -3 | sed 's/^/  /'
+                fi
+            else
+                echo "Branch is up to date"
+                return 0
+            fi
+        else
+            echo "❌ Remote branch '$REMOTE/$BRANCH' not found"
+            echo
+            echo "Available remote branches:"
+            git branch -r | grep "^  $REMOTE/" | sed 's/^/  /' | head -10
+            return 1
+        fi
+        echo
+    fi
+    
+    # Build pull command
+    local pull_cmd="git pull"
+    
+    if [ -n "$REBASE" ]; then
+        pull_cmd="$pull_cmd --rebase"
+    fi
+    
+    if [ -n "$OPTIONS" ]; then
+        pull_cmd="$pull_cmd $OPTIONS"
+    fi
+    
+    pull_cmd="$pull_cmd $REMOTE"
+    
+    if [ -n "$BRANCH" ] && [[ "$OPTIONS" != *"--all"* ]]; then
+        pull_cmd="$pull_cmd $BRANCH"
+    fi
+    
+    # Execute pull
+    echo "Pulling changes..."
+    eval "$pull_cmd"
+    
+    local pull_result=$?
+    
+    if [ $pull_result -eq 0 ]; then
+        echo
+        echo "✅ Pull completed successfully!"
+        echo
+        echo "---[ Pull Summary ]---------------------------------"
+        echo "Remote: $REMOTE"
+        if [ -n "$BRANCH" ]; then
+            echo "Branch: $BRANCH"
+        fi
+        echo "Latest commit: $(git log -1 --oneline)"
+        
+        # Show final status
+        if [ -n "$current_branch" ]; then
+            local upstream
+            upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+            if [ -n "$upstream" ]; then
+                echo "Status: up to date with $upstream"
+            fi
+        fi
+        
+    else
+        echo
+        echo "❌ Pull failed!"
+        echo
+        if [ -n "$REBASE" ]; then
+            echo "Rebase conflicts detected. To resolve:"
+            echo "  1. Edit conflicted files"
+            echo "  2. Run 'git add <file>' for each resolved file"
+            echo "  3. Run 'jwgitrebase --continue'"
+            echo "  4. Or run 'jwgitrebase --abort' to cancel"
+        else
+            echo "Merge conflicts detected. To resolve:"
+            echo "  1. Edit conflicted files"
+            echo "  2. Run 'git add <file>' for each resolved file"
+            echo "  3. Run 'git commit' to complete the merge"
+            echo "  4. Or run 'git merge --abort' to cancel"
+        fi
+        
+        echo
+        echo "Conflicted files:"
+        git diff --name-only --diff-filter=U | sed 's/^/  /' 2>/dev/null || echo "  (checking conflicts...)"
+        
+        return 1
+    fi
+    echo
+}
+
+
+jwgitfetch() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitfetch [remote] [options]"
+        echo "Examples:"
+        echo "  jwgitfetch                    # Fetch from all remotes"
+        echo "  jwgitfetch origin             # Fetch from origin"
+        echo "  jwgitfetch --all              # Fetch from all remotes"
+        echo "  jwgitfetch --prune            # Fetch and prune deleted branches"
+        echo "  jwgitfetch --tags             # Fetch all tags"
+        echo "  jwgitfetch origin --dry-run   # Show what would be fetched"
+        echo
+        echo "Available remotes:"
+        if git remote | grep -q .; then
+            git remote -v | sed 's/^/  /'
+        else
+            echo "  (no remotes configured)"
+        fi
+        echo
+        echo "Current branch status:"
+        local current_branch
+        current_branch=$(git branch --show-current 2>/dev/null)
+        if [ -n "$current_branch" ]; then
+            local upstream
+            upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+            if [ -n "$upstream" ]; then
+                echo "  Branch: $current_branch -> $upstream"
+            else
+                echo "  Branch: $current_branch (no upstream)"
+            fi
+        else
+            echo "  (not on any branch)"
+        fi
+        echo
+        return 1
+    fi
+
+    local REMOTE=""
+    local OPTIONS=""
+    local FETCH_ALL=""
+    
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --all|-a)
+                FETCH_ALL="--all"
+                shift
+                ;;
+            --prune|--tags|--dry-run|--verbose|-v)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            -*)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            *)
+                if [ -z "$REMOTE" ]; then
+                    REMOTE="$1"
+                else
+                    OPTIONS="$OPTIONS $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Set default remote if not specified and not fetching all
+    if [ -z "$REMOTE" ] && [ -z "$FETCH_ALL" ]; then
+        if git remote | grep -q "origin"; then
+            REMOTE="origin"
+        else
+            FETCH_ALL="--all"
+        fi
+    fi
+    
+    echo "📡 Fetching from remote repository..."
+    if [ -n "$FETCH_ALL" ]; then
+        echo "Mode: Fetch from all remotes"
+    else
+        echo "Remote: $REMOTE"
+    fi
+    if [ -n "$OPTIONS" ]; then
+        echo "Options: $OPTIONS"
+    fi
+    echo
+    
+    # Validate remote (if specified)
+    if [ -n "$REMOTE" ] && ! git remote | grep -q "^$REMOTE$"; then
+        echo "❌ Remote '$REMOTE' not found"
+        echo
+        echo "Available remotes:"
+        git remote | sed 's/^/  /'
+        return 1
+    fi
+    
+    # Show current remote branch status before fetch
+    echo "---[ Before Fetch ]---------------------------------"
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    
+    if [ -n "$current_branch" ]; then
+        local upstream
+        upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+        if [ -n "$upstream" ]; then
+            echo "Current branch: $current_branch"
+            echo "Upstream: $upstream"
+            
+            # Show ahead/behind status
+            local ahead_behind
+            ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
+            if [ -n "$ahead_behind" ]; then
+                local ahead
+                local behind
+                ahead=$(echo "$ahead_behind" | cut -f1)
+                behind=$(echo "$ahead_behind" | cut -f2)
+                echo "Status: $ahead ahead, $behind behind"
+            fi
+        else
+            echo "Current branch: $current_branch (no upstream)"
+        fi
+    fi
+    echo
+    
+    # Build fetch command
+    local fetch_cmd="git fetch"
+    
+    if [ -n "$FETCH_ALL" ]; then
+        fetch_cmd="$fetch_cmd --all"
+    else
+        fetch_cmd="$fetch_cmd $REMOTE"
+    fi
+    
+    if [ -n "$OPTIONS" ]; then
+        fetch_cmd="$fetch_cmd $OPTIONS"
+    fi
+    
+    # Execute fetch
+    echo "Fetching..."
+    eval "$fetch_cmd"
+    
+    local fetch_result=$?
+    
+    if [ $fetch_result -eq 0 ]; then
+        echo
+        echo "✅ Fetch completed successfully!"
+        echo
+        echo "---[ After Fetch ]----------------------------------"
+        
+        # Show updated status for current branch
+        if [ -n "$current_branch" ]; then
+            local upstream
+            upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+            if [ -n "$upstream" ]; then
+                echo "Current branch: $current_branch"
+                echo "Upstream: $upstream"
+                
+                # Show updated ahead/behind status
+                local ahead_behind
+                ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
+                if [ -n "$ahead_behind" ]; then
+                    local ahead
+                    local behind
+                    ahead=$(echo "$ahead_behind" | cut -f1)
+                    behind=$(echo "$ahead_behind" | cut -f2)
+                    echo "Status: $ahead ahead, $behind behind"
+                    
+                    if [ "$behind" -gt 0 ]; then
+                        echo
+                        echo "New commits available:"
+                        git log --oneline "$current_branch..$upstream" | head -5 | sed 's/^/  /'
+                        if [ "$behind" -gt 5 ]; then
+                            echo "  ... and $((behind - 5)) more commits"
+                        fi
+                        echo
+                        echo "💡 Run 'jwgitpull' to merge these changes"
+                    elif [ "$ahead" -eq 0 ] && [ "$behind" -eq 0 ]; then
+                        echo "✅ Branch is up to date"
+                    fi
+                fi
+            fi
+        fi
+        
+        # Show summary of fetched branches
+        echo
+        echo "---[ Remote Branches ]------------------------------"
+        if [ -n "$REMOTE" ]; then
+            git branch -r | grep "^  $REMOTE/" | head -10 | sed 's/^/  /'
+            local remote_branch_count
+            remote_branch_count=$(git branch -r | grep -c "^  $REMOTE/" || echo "0")
+            if [ "$remote_branch_count" -gt 10 ]; then
+                echo "  ... and $((remote_branch_count - 10)) more branches"
+            fi
+        else
+            git branch -r | head -10 | sed 's/^/  /'
+            local total_remote_branches
+            total_remote_branches=$(git branch -r | wc -l)
+            if [ "$total_remote_branches" -gt 10 ]; then
+                echo "  ... and $((total_remote_branches - 10)) more branches"
+            fi
+        fi
+        
+    else
+        echo
+        echo "❌ Fetch failed!"
+        echo
+        echo "Common issues:"
+        echo "  - Network connectivity problems"
+        echo "  - Authentication issues"
+        echo "  - Remote repository not accessible"
+        echo "  - Invalid remote URL"
+        
+        return 1
+    fi
+    echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# history & information
+# ---------------------------------------------------------------------------------
+
+jwgitlog() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitlog [options] [branch|commit] [-- file]"
+        echo "Examples:"
+        echo "  jwgitlog                      # Show recent commits"
+        echo "  jwgitlog --oneline            # Compact one-line format"
+        echo "  jwgitlog --graph              # Show branch graph"
+        echo "  jwgitlog -10                  # Show last 10 commits"
+        echo "  jwgitlog main                 # Show commits from main branch"
+        echo "  jwgitlog --since=\"2 weeks\"   # Show commits from last 2 weeks"
+        echo "  jwgitlog --author=\"John\"     # Show commits by author"
+        echo "  jwgitlog -- file.txt          # Show commits affecting file"
+        echo
+        echo "Quick options:"
+        echo "  --oneline     Compact format"
+        echo "  --graph       Show branch graph"
+        echo "  --stat        Show file statistics"
+        echo "  --patch       Show full diff"
+        echo "  --all         Show all branches"
+        echo
+        return 1
+    fi
+
+    local OPTIONS=""
+    local BRANCH=""
+    local FILE=""
+    local SHOW_GRAPH=""
+    local SHOW_STAT=""
+    local ONELINE=""
+    local LIMIT=""
+    
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --oneline)
+                ONELINE="--oneline"
+                shift
+                ;;
+            --graph)
+                SHOW_GRAPH="--graph"
+                shift
+                ;;
+            --stat)
+                SHOW_STAT="--stat"
+                shift
+                ;;
+            --patch|-p)
+                OPTIONS="$OPTIONS --patch"
+                shift
+                ;;
+            --all)
+                OPTIONS="$OPTIONS --all"
+                shift
+                ;;
+            --since=*|--until=*|--author=*|--grep=*)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            --since|--until|--author|--grep)
+                OPTIONS="$OPTIONS $1 $2"
+                shift 2
+                ;;
+            -[0-9]*)
+                LIMIT="$1"
+                shift
+                ;;
+            --)
+                shift
+                FILE="$*"
+                break
+                ;;
+            -*)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            *)
+                if [ -z "$BRANCH" ]; then
+                    BRANCH="$1"
+                else
+                    OPTIONS="$OPTIONS $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Set default limit if not specified
+    if [ -z "$LIMIT" ] && [ -z "$OPTIONS" ]; then
+        LIMIT="-20"
+    fi
+    
+    echo "📜 Git Commit History"
+    echo "=================================================="
+    echo
+    
+    # Show repository info
+    echo "---[ Repository Info ]------------------------------"
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    if [ -n "$current_branch" ]; then
+        echo "Current branch: $current_branch"
+    fi
+    
+    if [ -n "$BRANCH" ] && [ "$BRANCH" != "$current_branch" ]; then
+        echo "Showing: $BRANCH"
+    fi
+    
+    if [ -n "$FILE" ]; then
+        echo "File filter: $FILE"
+    fi
+    
+    local total_commits
+    if [ -n "$BRANCH" ]; then
+        total_commits=$(git rev-list --count "$BRANCH" 2>/dev/null || echo "0")
+    else
+        total_commits=$(git rev-list --count HEAD 2>/dev/null || echo "0")
+    fi
+    echo "Total commits: $total_commits"
+    echo
+    
+    # Build git log command
+    local log_cmd="git log"
+    
+    # Add formatting options
+    if [ -n "$ONELINE" ]; then
+        log_cmd="$log_cmd --oneline"
+    else
+        log_cmd="$log_cmd --format='%C(yellow)%h%C(reset) - %C(green)(%cr)%C(reset) %s %C(blue)<%an>%C(reset)'"
+    fi
+    
+    if [ -n "$SHOW_GRAPH" ]; then
+        log_cmd="$log_cmd --graph"
+    fi
+    
+    if [ -n "$SHOW_STAT" ]; then
+        log_cmd="$log_cmd --stat"
+    fi
+    
+    if [ -n "$LIMIT" ]; then
+        log_cmd="$log_cmd $LIMIT"
+    fi
+    
+    if [ -n "$OPTIONS" ]; then
+        log_cmd="$log_cmd $OPTIONS"
+    fi
+    
+    if [ -n "$BRANCH" ]; then
+        log_cmd="$log_cmd $BRANCH"
+    fi
+    
+    if [ -n "$FILE" ]; then
+        log_cmd="$log_cmd -- $FILE"
+    fi
+    
+    # Execute the log command
+    echo "---[ Commit History ]-------------------------------"
+    eval "$log_cmd" 2>/dev/null || {
+        echo "❌ Failed to show log"
+        if [ -n "$BRANCH" ]; then
+            echo "Branch '$BRANCH' may not exist"
+            echo
+            echo "Available branches:"
+            git branch --format="  %(refname:short)" | head -10
+        fi
+        return 1
+    }
+    
+    echo
+    echo "💡 Use 'jwgitlog --help' for more options"
+    echo
+}
+
+
+jwgitstatus() {
+    echo "📊 Git Repository Status"
+    echo "=================================================="
+    echo
+    
+    # Repository info
+    echo "---[ Repository Info ]------------------------------"
+    local repo_root
+    repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    if [ -n "$repo_root" ]; then
+        echo "Repository: $(basename "$repo_root")"
+        echo "Location: $repo_root"
+    else
+        echo "❌ Not in a git repository"
+        return 1
+    fi
+    
+    # Branch information
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    if [ -n "$current_branch" ]; then
+        echo "Current branch: $current_branch"
+        
+        # Upstream information
+        local upstream
+        upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
+        if [ -n "$upstream" ]; then
+            echo "Upstream: $upstream"
+            
+            # Ahead/behind status
+            local ahead_behind
+            ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
+            if [ -n "$ahead_behind" ]; then
+                local ahead
+                local behind
+                ahead=$(echo "$ahead_behind" | cut -f1)
+                behind=$(echo "$ahead_behind" | cut -f2)
+                
+                if [ "$ahead" -gt 0 ] || [ "$behind" -gt 0 ]; then
+                    echo "Status: $ahead ahead, $behind behind"
+                else
+                    echo "Status: up to date"
+                fi
+            fi
+        else
+            echo "Upstream: (not set)"
+        fi
+    else
+        local current_commit
+        current_commit=$(git rev-parse --short HEAD 2>/dev/null)
+        if [ -n "$current_commit" ]; then
+            echo "HEAD: $current_commit (detached)"
+        else
+            echo "HEAD: (no commits yet)"
+        fi
+    fi
+    
+    # Latest commit
+    local latest_commit
+    latest_commit=$(git log -1 --oneline 2>/dev/null)
+    if [ -n "$latest_commit" ]; then
+        echo "Latest commit: $latest_commit"
+    fi
+    echo
+    
+    # Working directory status
+    echo "---[ Working Directory ]----------------------------"
+    
+    # Get status counts
+    local staged_count
+    local modified_count
+    local untracked_count
+    local deleted_count
+    
+    staged_count=$(git status --porcelain | grep -c "^[MADRC]" || echo "0")
+    modified_count=$(git status --porcelain | grep -c "^ [MD]" || echo "0")
+    untracked_count=$(git status --porcelain | grep -c "^??" || echo "0")
+    deleted_count=$(git status --porcelain | grep -c "^ D\|^D " || echo "0")
+    
+    echo "Staged files: $staged_count"
+    echo "Modified files: $modified_count"
+    echo "Untracked files: $untracked_count"
+    echo "Deleted files: $deleted_count"
+    
+    # Show detailed status if there are changes
+    if [ "$staged_count" -gt 0 ] || [ "$modified_count" -gt 0 ] || [ "$untracked_count" -gt 0 ]; then
+        echo
+        
+        # Staged files
+        if [ "$staged_count" -gt 0 ]; then
+            echo "---[ Staged Files ]---------------------------------"
+            git status --porcelain | grep "^[MADRC]" | head -10 | while read -r line; do
+                local status
+                local file
+                status=$(echo "$line" | cut -c1-2)
+                file=$(echo "$line" | cut -c4-)
+                
+                case $status in
+                    A*) echo "  ✅ $file (new file)" ;;
+                    M*) echo "  📝 $file (modified)" ;;
+                    D*) echo "  🗑️  $file (deleted)" ;;
+                    R*) echo "  🔄 $file (renamed)" ;;
+                    C*) echo "  📋 $file (copied)" ;;
+                    *) echo "  $status $file" ;;
+                esac
+            done
+            
+            if [ "$staged_count" -gt 10 ]; then
+                echo "  ... and $((staged_count - 10)) more files"
+            fi
+            echo
+        fi
+        
+        # Modified files
+        if [ "$modified_count" -gt 0 ]; then
+            echo "---[ Modified Files ]-------------------------------"
+            git status --porcelain | grep "^ [MD]" | head -10 | while read -r line; do
+                local status
+                local file
+                status=$(echo "$line" | cut -c1-2)
+                file=$(echo "$line" | cut -c4-)
+                
+                case $status in
+                    " M") echo "  📝 $file (modified)" ;;
+                    " D") echo "  🗑️  $file (deleted)" ;;
+                    *) echo "  $status $file" ;;
+                esac
+            done
+            
+            if [ "$modified_count" -gt 10 ]; then
+                echo "  ... and $((modified_count - 10)) more files"
+            fi
+            echo
+        fi
+        
+        # Untracked files
+        if [ "$untracked_count" -gt 0 ]; then
+            echo "---[ Untracked Files ]------------------------------"
+            git status --porcelain | grep "^??" | head -10 | while read -r line; do
+                local file
+                file=$(echo "$line" | cut -c4-)
+                echo "  ❓ $file"
+            done
+            
+            if [ "$untracked_count" -gt 10 ]; then
+                echo "  ... and $((untracked_count - 10)) more files"
+            fi
+            echo
+        fi
+        
+    else
+        echo "✅ Working directory is clean"
+        echo
+    fi
+    
+    # Stash information
+    local stash_count
+    stash_count=$(git stash list | wc -l 2>/dev/null || echo "0")
+    if [ "$stash_count" -gt 0 ]; then
+        echo "---[ Stashes ]--------------------------------------"
+        echo "Stashed changes: $stash_count"
+        git stash list | head -3 | sed 's/^/  /'
+        if [ "$stash_count" -gt 3 ]; then
+            echo "  ... and $((stash_count - 3)) more stashes"
+        fi
+        echo
+    fi
+    
+    # Recent activity
+    echo "---[ Recent Activity ]------------------------------"
+    echo "Recent commits (last 5):"
+    git log --oneline -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+    echo
+    
+    # Remotes
+    echo "---[ Remotes ]--------------------------------------"
+    if git remote | grep -q .; then
+        git remote -v | sed 's/^/  /'
+    else
+        echo "  (no remotes configured)"
+    fi
+    echo
+    
+    # Quick actions
+    echo "---[ Quick Actions ]--------------------------------"
+    if [ "$staged_count" -gt 0 ]; then
+        echo "💡 Ready to commit: jwgitcommit"
+    elif [ "$modified_count" -gt 0 ] || [ "$untracked_count" -gt 0 ]; then
+        echo "💡 Stage changes: jwgitadd ."
+    fi
+    
+    if [ -n "$upstream" ]; then
+        local behind
+        behind=$(git rev-list --count HEAD.."$upstream" 2>/dev/null || echo "0")
+        if [ "$behind" -gt 0 ]; then
+            echo "💡 Pull updates: jwgitpull"
+        fi
+        
+        local ahead
+        ahead=$(git rev-list --count "$upstream"..HEAD 2>/dev/null || echo "0")
+        if [ "$ahead" -gt 0 ]; then
+            echo "💡 Push changes: jwgitpush"
+        fi
+    fi
+    echo
+}
+
+
+jwgitdiff() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitdiff [options] [commit] [commit] [-- file]"
+        echo "Examples:"
+        echo "  jwgitdiff                     # Show unstaged changes"
+        echo "  jwgitdiff --cached            # Show staged changes"
+        echo "  jwgitdiff HEAD~1              # Compare with previous commit"
+        echo "  jwgitdiff main feature        # Compare two branches"
+        echo "  jwgitdiff --stat              # Show file statistics only"
+        echo "  jwgitdiff --name-only         # Show only changed file names"
+        echo "  jwgitdiff -- file.txt         # Show changes for specific file"
+        echo
+        echo "Quick options:"
+        echo "  --cached      Show staged changes"
+        echo "  --stat        Show file statistics"
+        echo "  --name-only   Show only file names"
+        echo "  --word-diff   Show word-level changes"
+        echo
+        echo "Current status:"
+        if git status --porcelain | grep -q .; then
+            echo "Modified files:"
+            git status --porcelain | grep "^ M\|^M " | head -5 | sed 's/^/  /'
+            echo "Staged files:"
+            git status --porcelain | grep "^[MADRC]" | head -5 | sed 's/^/  /'
+        else
+            echo "  (no changes to show)"
+        fi
+        echo
+        return 1
+    fi
+
+    local OPTIONS=""
+    local COMMIT1=""
+    local COMMIT2=""
+    local FILE=""
+    local CACHED=""
+    local STAT_ONLY=""
+    local NAME_ONLY=""
+    
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --cached|--staged)
+                CACHED="--cached"
+                shift
+                ;;
+            --stat)
+                STAT_ONLY="--stat"
+                shift
+                ;;
+            --name-only)
+                NAME_ONLY="--name-only"
+                shift
+                ;;
+            --word-diff|--color-words)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            --)
+                shift
+                FILE="$*"
+                break
+                ;;
+            -*)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            *)
+                if [ -z "$COMMIT1" ]; then
+                    COMMIT1="$1"
+                elif [ -z "$COMMIT2" ]; then
+                    COMMIT2="$1"
+                else
+                    OPTIONS="$OPTIONS $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    echo "📊 Git Diff"
+    echo "=================================================="
+    echo
+    
+    # Determine what we're comparing
+    local diff_description=""
+    if [ -n "$CACHED" ]; then
+        diff_description="Staged changes (ready to commit)"
+    elif [ -n "$COMMIT1" ] && [ -n "$COMMIT2" ]; then
+        diff_description="Comparing $COMMIT1 with $COMMIT2"
+    elif [ -n "$COMMIT1" ]; then
+        diff_description="Changes from $COMMIT1 to working directory"
+    else
+        diff_description="Unstaged changes in working directory"
+    fi
+    
+    echo "---[ Diff Info ]------------------------------------"
+    echo "Comparing: $diff_description"
+    if [ -n "$FILE" ]; then
+        echo "File filter: $FILE"
+    fi
+    echo
+    
+    # Build diff command
+    local diff_cmd="git diff"
+    
+    if [ -n "$CACHED" ]; then
+        diff_cmd="$diff_cmd --cached"
+    fi
+    
+    if [ -n "$STAT_ONLY" ]; then
+        diff_cmd="$diff_cmd --stat"
+    elif [ -n "$NAME_ONLY" ]; then
+        diff_cmd="$diff_cmd --name-only"
+    fi
+    
+    if [ -n "$OPTIONS" ]; then
+        diff_cmd="$diff_cmd $OPTIONS"
+    fi
+    
+    if [ -n "$COMMIT1" ]; then
+        diff_cmd="$diff_cmd $COMMIT1"
+        if [ -n "$COMMIT2" ]; then
+            diff_cmd="$diff_cmd $COMMIT2"
+        fi
+    fi
+    
+    if [ -n "$FILE" ]; then
+        diff_cmd="$diff_cmd -- $FILE"
+    fi
+    
+    # Show summary first
+    echo "---[ Summary ]--------------------------------------"
+    local summary_cmd="git diff"
+    if [ -n "$CACHED" ]; then
+        summary_cmd="$summary_cmd --cached"
+    fi
+    if [ -n "$COMMIT1" ]; then
+        summary_cmd="$summary_cmd $COMMIT1"
+        if [ -n "$COMMIT2" ]; then
+            summary_cmd="$summary_cmd $COMMIT2"
+        fi
+    fi
+    if [ -n "$FILE" ]; then
+        summary_cmd="$summary_cmd -- $FILE"
+    fi
+    
+    # Get file count and line changes
+    local files_changed
+    local insertions
+    local deletions
+    
+    local stat_output
+    stat_output=$(eval "$summary_cmd --stat" 2>/dev/null)
+    
+    if [ -n "$stat_output" ]; then
+        files_changed=$(echo "$stat_output" | tail -1 | grep -o '[0-9]* file' | cut -d' ' -f1 || echo "0")
+        insertions=$(echo "$stat_output" | tail -1 | grep -o '[0-9]* insertion' | cut -d' ' -f1 || echo "0")
+        deletions=$(echo "$stat_output" | tail -1 | grep -o '[0-9]* deletion' | cut -d' ' -f1 || echo "0")
+        
+        echo "Files changed: $files_changed"
+        echo "Insertions: +$insertions"
+        echo "Deletions: -$deletions"
+        echo
+        
+        # Show file list with changes
+        echo "---[ Changed Files ]--------------------------------"
+        eval "$summary_cmd --name-status" | while read -r status file; do
+            case $status in
+                A) echo "  ✅ $file (added)" ;;
+                M) echo "  📝 $file (modified)" ;;
+                D) echo "  🗑️  $file (deleted)" ;;
+                R*) echo "  🔄 $file (renamed)" ;;
+                C*) echo "  📋 $file (copied)" ;;
+                *) echo "  $status $file" ;;
+            esac
+        done
+        echo
+    else
+        echo "No changes to show"
+        return 0
+    fi
+    
+    # Show the actual diff
+    if [ -z "$STAT_ONLY" ] && [ -z "$NAME_ONLY" ]; then
+        echo "---[ Diff Content ]---------------------------------"
+        eval "$diff_cmd" 2>/dev/null || {
+            echo "❌ Failed to show diff"
+            if [ -n "$COMMIT1" ]; then
+                echo "Commit '$COMMIT1' may not exist"
+            fi
+            if [ -n "$COMMIT2" ]; then
+                echo "Commit '$COMMIT2' may not exist"
+            fi
+            return 1
+        }
+    else
+        # For stat or name-only, show the output
+        echo "---[ Diff Output ]----------------------------------"
+        eval "$diff_cmd"
+    fi
+    
+    echo
+    echo "💡 Use 'jwgitdiff --help' for more options"
+    echo
+}
+
+
+jwgitblame() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitblame <file> [options]"
+        echo "Examples:"
+        echo "  jwgitblame file.txt           # Show line-by-line authorship"
+        echo "  jwgitblame file.txt -L 10,20  # Show lines 10-20 only"
+        echo "  jwgitblame file.txt --since=\"1 month ago\""
+        echo "  jwgitblame file.txt -w        # Ignore whitespace changes"
+        echo
+        echo "Available files to blame:"
+        if git ls-files >/dev/null 2>&1; then
+            git ls-files | head -20 | sed 's/^/  /'
+            local total_files
+            total_files=$(git ls-files | wc -l)
+            if [ "$total_files" -gt 20 ]; then
+                echo "  ... and $((total_files - 20)) more files"
+            fi
+        else
+            echo "  (not in a git repository)"
+        fi
+        echo
+        return 1
+    fi
+
+    local FILE=$1
+    shift
+    local OPTIONS="$*"
+    
+    # Check if file exists
+    if [ ! -f "$FILE" ]; then
+        echo "❌ File '$FILE' not found"
+        echo
+        echo "Available files:"
+        git ls-files | grep -i "$(basename "$FILE")" | head -10 | sed 's/^/  /' || echo "  (no matching files)"
+        return 1
+    fi
+    
+    # Check if file is tracked by git
+    if ! git ls-files --error-unmatch "$FILE" >/dev/null 2>&1; then
+        echo "❌ File '$FILE' is not tracked by git"
+        echo "💡 Add it first with: jwgitadd $FILE"
+        return 1
+    fi
+    
+    echo "🔍 Git Blame: $FILE"
+    echo "=================================================="
+    echo
+    
+    # Show file info
+    echo "---[ File Info ]------------------------------------"
+    echo "File: $FILE"
+    echo "Size: $(wc -l < "$FILE") lines"
+    
+    # Show recent commits affecting this file
+    echo "Recent commits affecting this file:"
+    git log --oneline -5 -- "$FILE" | sed 's/^/  /' 2>/dev/null || echo "  (no commits found)"
+    echo
+    
+    # Show blame with enhanced formatting
+    echo "---[ Blame Output ]---------------------------------"
+    echo "Format: [commit] (author date) line_number: content"
+    echo
+    
+    # Build blame command
+    local blame_cmd="git blame"
+    
+    # Add color and formatting options
+    blame_cmd="$blame_cmd --color-lines --color-by-age"
+    
+    if [ -n "$OPTIONS" ]; then
+        blame_cmd="$blame_cmd $OPTIONS"
+    fi
+    
+    blame_cmd="$blame_cmd \"$FILE\""
+    
+    # Execute blame
+    eval "$blame_cmd" 2>/dev/null || {
+        echo "❌ Failed to show blame for '$FILE'"
+        echo
+        echo "Possible reasons:"
+        echo "  - File has no commit history"
+        echo "  - Invalid line range specified"
+        echo "  - File was recently added but not committed"
+        return 1
+    }
+    
+    echo
+    echo "---[ Blame Summary ]--------------------------------"
+    
+    # Show author statistics
+    echo "Authors contributing to this file:"
+    git blame --porcelain "$FILE" 2>/dev/null | grep "^author " | sort | uniq -c | sort -rn | head -10 | while read -r count author_line; do
+        local author
+        author=$(echo "$author_line" | cut -d' ' -f2-)
+        echo "  $author: $count lines"
+    done
+    
+    echo
+    echo "💡 Use 'git show <commit>' to see full commit details"
+    echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# maintenance & cleanup
+# ---------------------------------------------------------------------------------
+
+jwgitclean() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitclean [options]"
+        echo "Examples:"
+        echo "  jwgitclean                    # Show what would be cleaned (dry run)"
+        echo "  jwgitclean -f                 # Remove untracked files"
+        echo "  jwgitclean -fd                # Remove untracked files and directories"
+        echo "  jwgitclean -fx                # Remove untracked and ignored files"
+        echo "  jwgitclean -i                 # Interactive cleaning"
+        echo
+        echo "⚠️  WARNING: This will permanently delete files!"
+        echo
+        echo "Current untracked files:"
+        if git status --porcelain | grep "^??" | grep -q .; then
+            git status --porcelain | grep "^??" | head -10 | sed 's/^??/  /' | sed 's/^ */  /'
+            local untracked_count
+            untracked_count=$(git status --porcelain | grep -c "^??" || echo "0")
+            if [ "$untracked_count" -gt 10 ]; then
+                echo "  ... and $((untracked_count - 10)) more files"
+            fi
+        else
+            echo "  (no untracked files)"
+        fi
+        echo
+        return 1
+    fi
+
+    local FORCE=""
+    local DIRECTORIES=""
+    local IGNORED=""
+    local INTERACTIVE=""
+    local DRY_RUN=""
+    
+    # Parse options
+    while [ $# -gt 0 ]; do
+        case $1 in
+            -f|--force)
+                FORCE="-f"
+                shift
+                ;;
+            -d)
+                DIRECTORIES="-d"
+                shift
+                ;;
+            -x)
+                IGNORED="-x"
+                shift
+                ;;
+            -i|--interactive)
+                INTERACTIVE="-i"
+                shift
+                ;;
+            -n|--dry-run)
+                DRY_RUN="-n"
+                shift
+                ;;
+            -fd|-df)
+                FORCE="-f"
+                DIRECTORIES="-d"
+                shift
+                ;;
+            -fx|-xf)
+                FORCE="-f"
+                IGNORED="-x"
+                shift
+                ;;
+            -fdx|-dfx|-xfd|-xdf|-fxd|-dxf)
+                FORCE="-f"
+                DIRECTORIES="-d"
+                IGNORED="-x"
+                shift
+                ;;
+            *)
+                echo "❌ Unknown option: $1"
+                return 1
+                ;;
+        esac
+    done
+    
+    # Default to dry run if no force flag
+    if [ -z "$FORCE" ] && [ -z "$INTERACTIVE" ]; then
+        DRY_RUN="-n"
+    fi
+    
+    echo "🧹 Git Clean"
+    echo "=================================================="
+    echo
+    
+    # Show what will be cleaned
+    echo "---[ Clean Preview ]--------------------------------"
+    
+    local clean_cmd="git clean"
+    if [ -n "$DRY_RUN" ]; then
+        clean_cmd="$clean_cmd -n"
+    fi
+    if [ -n "$DIRECTORIES" ]; then
+        clean_cmd="$clean_cmd -d"
+    fi
+    if [ -n "$IGNORED" ]; then
+        clean_cmd="$clean_cmd -x"
+    fi
+    
+    local files_to_clean
+    files_to_clean=$(eval "$clean_cmd" 2>/dev/null)
+    
+    if [ -z "$files_to_clean" ]; then
+        echo "✅ No files to clean"
+        return 0
+    fi
+    
+    echo "Files that will be removed:"
+    echo "$files_to_clean" | sed 's/^Would remove /  🗑️  /' | sed 's/^Removing /  🗑️  /'
+    
+    local file_count
+    file_count=$(echo "$files_to_clean" | wc -l)
+    echo
+    echo "Total items: $file_count"
+    
+    # Explain what each option does
+    echo
+    echo "---[ Clean Options ]--------------------------------"
+    if [ -n "$DIRECTORIES" ]; then
+        echo "✅ Will remove untracked directories"
+    else
+        echo "⚠️  Will NOT remove directories (use -d to include)"
+    fi
+    
+    if [ -n "$IGNORED" ]; then
+        echo "✅ Will remove ignored files (.gitignore)"
+    else
+        echo "⚠️  Will NOT remove ignored files (use -x to include)"
+    fi
+    
+    if [ -n "$INTERACTIVE" ]; then
+        echo "✅ Interactive mode - you'll be prompted for each file"
+    fi
+    
+    # If this is a dry run, show how to actually clean
+    if [ -n "$DRY_RUN" ]; then
+        echo
+        echo "---[ To Actually Clean ]----------------------------"
+        echo "This was a dry run. To actually remove files:"
+        
+        local actual_cmd="jwgitclean -f"
+        if [ -n "$DIRECTORIES" ]; then
+            actual_cmd="${actual_cmd}d"
+        fi
+        if [ -n "$IGNORED" ]; then
+            actual_cmd="${actual_cmd}x"
+        fi
+        
+        echo "  $actual_cmd"
+        echo
+        echo "Or use interactive mode:"
+        echo "  jwgitclean -i"
+        return 0
+    fi
+    
+    # Confirmation for destructive operation
+    if [ -z "$INTERACTIVE" ]; then
+        echo
+        echo "⚠️  WARNING: This will permanently delete $file_count items!"
+        echo -n "Continue? [y/N] "
+        read -r response
+        
+        if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+            echo "Clean cancelled"
+            return 1
+        fi
+    fi
+    
+    # Perform the clean
+    echo
+    echo "---[ Cleaning ]-------------------------------------"
+    
+    local final_cmd="git clean"
+    if [ -n "$FORCE" ]; then
+        final_cmd="$final_cmd -f"
+    fi
+    if [ -n "$DIRECTORIES" ]; then
+        final_cmd="$final_cmd -d"
+    fi
+    if [ -n "$IGNORED" ]; then
+        final_cmd="$final_cmd -x"
+    fi
+    if [ -n "$INTERACTIVE" ]; then
+        final_cmd="$final_cmd -i"
+    fi
+    
+    eval "$final_cmd"
+    
+    local clean_result=$?
+    
+    if [ $clean_result -eq 0 ]; then
+        echo
+        echo "✅ Clean completed successfully!"
+        echo
+        echo "---[ Final Status ]---------------------------------"
+        local remaining_untracked
+        remaining_untracked=$(git status --porcelain | grep -c "^??" || echo "0")
+        echo "Remaining untracked files: $remaining_untracked"
+        
+        if [ "$remaining_untracked" -gt 0 ]; then
+            echo "Remaining files:"
+            git status --porcelain | grep "^??" | head -5 | sed 's/^??/  /' | sed 's/^ */  /'
+        fi
+        
+    else
+        echo "❌ Clean failed!"
+        return 1
+    fi
+    echo
+}
+
+
+jwgitprune() {
+    echo "🧹 Git Repository Maintenance"
+    echo "=================================================="
+    echo
+    
+    echo "This will perform repository cleanup and optimization:"
+    echo "  - Remove unreachable objects"
+    echo "  - Optimize repository structure"
+    echo "  - Clean up reflog entries"
+    echo "  - Prune remote tracking branches"
+    echo
+    echo -n "Continue with maintenance? [y/N] "
+    read -r response
+    
+    if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+        echo "Maintenance cancelled"
+        return 1
+    fi
+    
+    echo
+    echo "---[ Repository Size Before ]----------------------"
+    local size_before
+    size_before=$(du -sh .git 2>/dev/null | cut -f1 || echo "unknown")
+    echo "Repository size: $size_before"
+    echo
+    
+    echo "---[ Pruning Remote Branches ]---------------------"
+    echo "Removing stale remote tracking branches..."
+    git remote prune origin 2>/dev/null || echo "No origin remote or nothing to prune"
+    
+    # Prune all remotes
+    git remote | while read -r remote; do
+        if [ "$remote" != "origin" ]; then
+            echo "Pruning remote: $remote"
+            git remote prune "$remote" 2>/dev/null || echo "Nothing to prune for $remote"
+        fi
+    done
+    echo
+    
+    echo "---[ Cleaning Reflog ]------------------------------"
+    echo "Cleaning reflog entries older than 30 days..."
+    git reflog expire --expire=30.days.ago --all
+    echo
+    
+    echo "---[ Garbage Collection ]---------------------------"
+    echo "Running garbage collection..."
+    git gc --prune=now --aggressive
+    echo
+    
+    echo "---[ Repository Size After ]-----------------------"
+    local size_after
+    size_after=$(du -sh .git 2>/dev/null | cut -f1 || echo "unknown")
+    echo "Repository size: $size_after"
+    echo
+    
+    echo "---[ Maintenance Summary ]--------------------------"
+    echo "Before: $size_before"
+    echo "After:  $size_after"
+    
+    # Show object count
+    local object_count
+    object_count=$(git count-objects -v | grep "count" | cut -d' ' -f2 || echo "unknown")
+    echo "Objects: $object_count"
+    
+    # Show pack info
+    local pack_count
+    pack_count=$(git count-objects -v | grep "packs" | cut -d' ' -f2 || echo "0")
+    echo "Packs: $pack_count"
+    
+    echo
+    echo "✅ Repository maintenance completed!"
+    echo
+}
+
+
+jwgitgc() {
+    echo "🗑️  Git Garbage Collection"
+    echo "=================================================="
+    echo
+    
+    # Show repository info before cleanup
+    echo "---[ Before Cleanup ]-------------------------------"
+    echo "Repository statistics:"
+    git count-objects -v | while read -r line; do
+        echo "  $line"
+    done
+    echo
+    
+    local repo_size_before
+    repo_size_before=$(du -sh .git 2>/dev/null | cut -f1 || echo "unknown")
+    echo "Repository size: $repo_size_before"
+    echo
+    
+    echo "Garbage collection will:"
+    echo "  - Remove unreachable objects"
+    echo "  - Compress object database"
+    echo "  - Optimize pack files"
+    echo "  - Clean up temporary files"
+    echo
+    echo -n "Continue with garbage collection? [y/N] "
+    read -r response
+    
+    if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+        echo "Garbage collection cancelled"
+        return 1
+    fi
+    
+    echo
+    echo "---[ Running Garbage Collection ]-------------------"
+    
+    # Run garbage collection with progress
+    echo "Phase 1: Cleaning up loose objects..."
+    git gc --prune=now
+    
+    echo
+    echo "Phase 2: Aggressive optimization..."
+    git gc --aggressive
+    
+    echo
+    echo "---[ After Cleanup ]--------------------------------"
+    echo "Repository statistics:"
+    git count-objects -v | while read -r line; do
+        echo "  $line"
+    done
+    echo
+    
+    local repo_size_after
+    repo_size_after=$(du -sh .git 2>/dev/null | cut -f1 || echo "unknown")
+    echo "Repository size: $repo_size_after"
+    echo
+    
+    echo "---[ Cleanup Summary ]------------------------------"
+    echo "Size before: $repo_size_before"
+    echo "Size after:  $repo_size_after"
+    
+    # Calculate objects cleaned up
+    local objects_after
+    objects_after=$(git count-objects | cut -d' ' -f1 || echo "0")
+    echo "Loose objects remaining: $objects_after"
+    
+    echo
+    echo "✅ Garbage collection completed!"
+    echo "💡 Repository is now optimized for better performance"
+    echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# advanced operations
+# ---------------------------------------------------------------------------------
+
+jwgitcherry() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitcherry <commit> [target_branch]"
+        echo "Examples:"
+        echo "  jwgitcherry abc123            # Cherry-pick commit to current branch"
+        echo "  jwgitcherry abc123 main       # Cherry-pick commit to main branch"
+        echo "  jwgitcherry --continue        # Continue after resolving conflicts"
+        echo "  jwgitcherry --abort           # Abort cherry-pick"
+        echo "  jwgitcherry --skip            # Skip current commit"
+        echo
+        echo "Recent commits available for cherry-picking:"
+        if git log --oneline -10 >/dev/null 2>&1; then
+            git log --oneline -10 | sed 's/^/  /'
+        else
+            echo "  (no commits available)"
+        fi
+        echo
+        return 1
+    fi
+
+    local COMMIT=$1
+    local TARGET_BRANCH=$2
+    
+    # Handle cherry-pick control commands
+    case $COMMIT in
+        --continue)
+            echo "Continuing cherry-pick after conflict resolution..."
+            
+            # Check if there are unresolved conflicts
+            if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "❌ There are still unresolved conflicts:"
+                git diff --name-only --diff-filter=U | sed 's/^/  /'
+                echo
+                echo "💡 Resolve conflicts and run 'git add <file>' for each resolved file"
+                return 1
+            fi
+            
+            if git cherry-pick --continue; then
+                echo "✅ Cherry-pick completed successfully"
+                echo "Latest commit: $(git log -1 --oneline)"
+            else
+                echo "❌ Failed to continue cherry-pick"
+                return 1
+            fi
+            return 0
+            ;;
+            
+        --abort)
+            echo "Aborting current cherry-pick..."
+            if git cherry-pick --abort; then
+                echo "✅ Cherry-pick aborted successfully"
+            else
+                echo "❌ Failed to abort cherry-pick (no cherry-pick in progress?)"
+                return 1
+            fi
+            return 0
+            ;;
+            
+        --skip)
+            echo "Skipping current commit during cherry-pick..."
+            if git cherry-pick --skip; then
+                echo "✅ Commit skipped, continuing cherry-pick"
+            else
+                echo "❌ Failed to skip commit"
+                return 1
+            fi
+            return 0
+            ;;
+    esac
+    
+    # Validate commit
+    if ! git rev-parse --verify "$COMMIT" >/dev/null 2>&1; then
+        echo "❌ Invalid commit: $COMMIT"
+        echo
+        echo "Recent commits:"
+        git log --oneline -10 | sed 's/^/  /'
+        return 1
+    fi
+    
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    
+    # Switch to target branch if specified
+    if [ -n "$TARGET_BRANCH" ]; then
+        if [ "$TARGET_BRANCH" != "$current_branch" ]; then
+            echo "Switching to branch: $TARGET_BRANCH"
+            if ! git checkout "$TARGET_BRANCH"; then
+                echo "❌ Failed to switch to branch '$TARGET_BRANCH'"
+                return 1
+            fi
+            current_branch="$TARGET_BRANCH"
+        fi
+    fi
+    
+    if [ -z "$current_branch" ]; then
+        echo "❌ Cannot cherry-pick in detached HEAD state"
+        echo "💡 Switch to a branch first"
+        return 1
+    fi
+    
+    # Check for uncommitted changes
+    if ! git diff-index --quiet HEAD --; then
+        echo "⚠️  You have uncommitted changes!"
+        git status --porcelain | head -5 | sed 's/^/  /'
+        echo
+        echo "💡 Commit or stash your changes before cherry-picking"
+        return 1
+    fi
+    
+    echo "🍒 Cherry-picking commit to '$current_branch'"
+    echo "=================================================="
+    echo
+    
+    # Show commit information
+    echo "---[ Commit to Cherry-pick ]------------------------"
+    git show --stat --oneline "$COMMIT" | head -10
+    echo
+    
+    # Check if commit is already in current branch
+    if git merge-base --is-ancestor "$COMMIT" HEAD 2>/dev/null; then
+        echo "⚠️  This commit is already in the current branch history"
+        echo -n "Continue anyway? [y/N] "
+        read -r response
+        if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+            echo "Cherry-pick cancelled"
+            return 1
+        fi
+    fi
+    
+    echo "---[ Cherry-pick Operation ]------------------------"
+    echo "Target branch: $current_branch"
+    echo "Commit: $(git log -1 --oneline "$COMMIT")"
+    echo
+    echo -n "Proceed with cherry-pick? [y/N] "
+    read -r response
+    
+    if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+        echo "Cherry-pick cancelled"
+        return 1
+    fi
+    
+    # Perform cherry-pick
+    echo "Cherry-picking..."
+    git cherry-pick "$COMMIT"
+    
+    local cherry_result=$?
+    
+    if [ $cherry_result -eq 0 ]; then
+        echo
+        echo "✅ Cherry-pick completed successfully!"
+        echo
+        echo "---[ Cherry-pick Summary ]--------------------------"
+        echo "Branch: $current_branch"
+        echo "Cherry-picked: $(git log -1 --oneline "$COMMIT")"
+        echo "New commit: $(git log -1 --oneline)"
+        
+    else
+        echo
+        echo "❌ Cherry-pick failed due to conflicts!"
+        echo
+        echo "---[ Conflicted Files ]-----------------------------"
+        git diff --name-only --diff-filter=U | sed 's/^/  /'
+        echo
+        echo "💡 To resolve conflicts:"
+        echo "   1. Edit the conflicted files"
+        echo "   2. Run 'git add <file>' for each resolved file"
+        echo "   3. Run 'jwgitcherry --continue' to complete the cherry-pick"
+        echo "   4. Or run 'jwgitcherry --abort' to cancel the cherry-pick"
+        echo "   5. Or run 'jwgitcherry --skip' to skip this commit"
+        
+        return 1
+    fi
+    echo
+}
+
+
+jwgitbisect() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitbisect <start|good|bad|reset|skip|run> [commit]"
+        echo "Examples:"
+        echo "  jwgitbisect start             # Start bisect session"
+        echo "  jwgitbisect bad               # Mark current commit as bad"
+        echo "  jwgitbisect good abc123       # Mark commit as good"
+        echo "  jwgitbisect skip              # Skip current commit"
+        echo "  jwgitbisect reset             # End bisect session"
+        echo "  jwgitbisect run \"make test\"   # Automate bisect with command"
+        echo
+        echo "Git bisect helps you find the commit that introduced a bug by"
+        echo "using binary search through your commit history."
+        echo
+        echo "Typical workflow:"
+        echo "  1. jwgitbisect start"
+        echo "  2. jwgitbisect bad            # Current commit has the bug"
+        echo "  3. jwgitbisect good <commit>  # Known good commit"
+        echo "  4. Test each commit git shows you"
+        echo "  5. jwgitbisect good/bad for each test"
+        echo "  6. jwgitbisect reset when done"
+        echo
+        return 1
+    fi
+
+    local ACTION=$1
+    shift
+    local ARGS="$*"
+    
+    case $ACTION in
+        start)
+            echo "🔍 Starting Git Bisect Session"
+            echo "=================================================="
+            echo
+            
+            # Check if already in bisect
+            if [ -d ".git/BISECT_LOG" ]; then
+                echo "⚠️  Bisect session already in progress"
+                echo "Use 'jwgitbisect reset' to end current session first"
+                return 1
+            fi
+            
+            echo "Starting bisect session..."
+            git bisect start
+            
+            if [ $? -eq 0 ]; then
+                echo "✅ Bisect session started!"
+                echo
+                echo "Next steps:"
+                echo "  1. Mark the current (bad) commit: jwgitbisect bad"
+                echo "  2. Mark a known good commit: jwgitbisect good <commit>"
+                echo
+                echo "Recent commits:"
+                git log --oneline -10 | sed 's/^/  /'
+            else
+                echo "❌ Failed to start bisect session"
+                return 1
+            fi
+            ;;
+            
+        bad)
+            if [ ! -d ".git/BISECT_LOG" ]; then
+                echo "❌ No bisect session in progress"
+                echo "Start one with: jwgitbisect start"
+                return 1
+            fi
+            
+            local COMMIT=${ARGS:-HEAD}
+            echo "Marking commit as BAD: $COMMIT"
+            
+            git bisect bad "$COMMIT"
+            local result=$?
+            
+            if [ $result -eq 0 ]; then
+                echo "✅ Commit marked as bad"
+                _jwgitbisect_status
+            else
+                echo "❌ Failed to mark commit as bad"
+                return 1
+            fi
+            ;;
+            
+        good)
+            if [ ! -d ".git/BISECT_LOG" ]; then
+                echo "❌ No bisect session in progress"
+                echo "Start one with: jwgitbisect start"
+                return 1
+            fi
+            
+            local COMMIT=${ARGS:-HEAD}
+            echo "Marking commit as GOOD: $COMMIT"
+            
+            git bisect good "$COMMIT"
+            local result=$?
+            
+            if [ $result -eq 0 ]; then
+                echo "✅ Commit marked as good"
+                _jwgitbisect_status
+            else
+                echo "❌ Failed to mark commit as good"
+                return 1
+            fi
+            ;;
+            
+        skip)
+            if [ ! -d ".git/BISECT_LOG" ]; then
+                echo "❌ No bisect session in progress"
+                echo "Start one with: jwgitbisect start"
+                return 1
+            fi
+            
+            echo "Skipping current commit..."
+            git bisect skip
+            
+            if [ $? -eq 0 ]; then
+                echo "✅ Commit skipped"
+                _jwgitbisect_status
+            else
+                echo "❌ Failed to skip commit"
+                return 1
+            fi
+            ;;
+            
+        reset)
+            if [ ! -d ".git/BISECT_LOG" ]; then
+                echo "No bisect session in progress"
+                return 0
+            fi
+            
+            echo "Ending bisect session..."
+            git bisect reset
+            
+            if [ $? -eq 0 ]; then
+                echo "✅ Bisect session ended"
+                echo "Returned to original branch"
+            else
+                echo "❌ Failed to reset bisect session"
+                return 1
+            fi
+            ;;
+            
+        run)
+            if [ ! -d ".git/BISECT_LOG" ]; then
+                echo "❌ No bisect session in progress"
+                echo "Start one with: jwgitbisect start"
+                return 1
+            fi
+            
+            if [ -z "$ARGS" ]; then
+                echo "Usage: jwgitbisect run \"<command>\""
+                echo "Example: jwgitbisect run \"make test\""
+                return 1
+            fi
+            
+            echo "Running automated bisect with command: $ARGS"
+            echo "Command should exit with:"
+            echo "  - 0 for good commits"
+            echo "  - 1-124, 126-127 for bad commits"
+            echo "  - 125 for untestable commits (skip)"
+            echo
+            echo -n "Continue? [y/N] "
+            read -r response
+            
+            if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                git bisect run $ARGS
+                
+                if [ $? -eq 0 ]; then
+                    echo "✅ Automated bisect completed!"
+                    _jwgitbisect_status
+                else
+                    echo "❌ Automated bisect failed"
+                    return 1
+                fi
+            else
+                echo "Automated bisect cancelled"
+            fi
+            ;;
+            
+        status)
+            _jwgitbisect_status
+            ;;
+            
+        *)
+            echo "❌ Unknown bisect action: $ACTION"
+            echo "Valid actions: start, good, bad, skip, reset, run, status"
+            return 1
+            ;;
+    esac
+    echo
+}
+
+_jwgitbisect_status() {
+    if [ ! -d ".git/BISECT_LOG" ]; then
+        echo "No bisect session in progress"
+        return 0
+    fi
+    
+    echo
+    echo "---[ Bisect Status ]--------------------------------"
+    
+    # Show current commit being tested
+    local current_commit
+    current_commit=$(git rev-parse --short HEAD)
+    echo "Testing commit: $current_commit"
+    echo "Commit info: $(git log -1 --oneline)"
+    
+    # Show bisect log
+    if [ -f ".git/BISECT_LOG" ]; then
+        echo
+        echo "Bisect progress:"
+        local good_commits
+        local bad_commits
+        good_commits=$(grep -c "^git bisect good" .git/BISECT_LOG 2>/dev/null || echo "0")
+        bad_commits=$(grep -c "^git bisect bad" .git/BISECT_LOG 2>/dev/null || echo "0")
+        
+        echo "  Good commits marked: $good_commits"
+        echo "  Bad commits marked: $bad_commits"
+    fi
+    
+    # Show remaining commits to test
+    local remaining
+    remaining=$(git bisect visualize --oneline 2>/dev/null | wc -l || echo "unknown")
+    if [ "$remaining" != "unknown" ] && [ "$remaining" -gt 0 ]; then
+        echo "  Commits remaining: ~$remaining"
+    fi
+    
+    echo
+    echo "Next steps:"
+    echo "  - Test current commit for the bug"
+    echo "  - Run 'jwgitbisect good' if commit is good"
+    echo "  - Run 'jwgitbisect bad' if commit is bad"
+    echo "  - Run 'jwgitbisect skip' if commit is untestable"
+    echo "  - Run 'jwgitbisect reset' to end session"
+}
+
+
+jwgitreflog() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgitreflog [branch|HEAD] [options]"
+        echo "Examples:"
+        echo "  jwgitreflog                   # Show HEAD reflog"
+        echo "  jwgitreflog main              # Show main branch reflog"
+        echo "  jwgitreflog --all             # Show all reflogs"
+        echo "  jwgitreflog -10               # Show last 10 entries"
+        echo "  jwgitreflog --since=\"1 week\"  # Show entries from last week"
+        echo
+        echo "Reflog shows the history of where HEAD (or branch) has been."
+        echo "Useful for recovering lost commits or understanding recent changes."
+        echo
+        return 1
+    fi
+
+    local REF="HEAD"
+    local OPTIONS=""
+    local LIMIT=""
+    local SHOW_ALL=""
+    
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --all)
+                SHOW_ALL="--all"
+                shift
+                ;;
+            --since=*|--until=*)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            --since|--until)
+                OPTIONS="$OPTIONS $1 $2"
+                shift 2
+                ;;
+            -[0-9]*)
+                LIMIT="$1"
+                shift
+                ;;
+            -*)
+                OPTIONS="$OPTIONS $1"
+                shift
+                ;;
+            *)
+                REF="$1"
+                shift
+                ;;
+        esac
+    done
+    
+    echo "📚 Git Reflog"
+    echo "=================================================="
+    echo
+    
+    if [ -n "$SHOW_ALL" ]; then
+        echo "---[ All Reflogs ]----------------------------------"
+        
+        # Show available reflogs
+        echo "Available reflogs:"
+        git reflog --all --format="%gd" | cut -d'@' -f1 | sort -u | while read -r ref_name; do
+            if [ -n "$ref_name" ]; then
+                local entry_count
+                entry_count=$(git reflog "$ref_name" | wc -l 2>/dev/null || echo "0")
+                echo "  $ref_name ($entry_count entries)"
+            fi
+        done
+        echo
+        
+        # Show combined reflog
+        echo "---[ Combined Reflog Entries ]---------------------"
+        local reflog_cmd="git reflog --all"
+        
+        if [ -n "$LIMIT" ]; then
+            reflog_cmd="$reflog_cmd $LIMIT"
+        else
+            reflog_cmd="$reflog_cmd -20"
+        fi
+        
+        if [ -n "$OPTIONS" ]; then
+            reflog_cmd="$reflog_cmd $OPTIONS"
+        fi
+        
+        eval "$reflog_cmd" --format="%C(yellow)%gd%C(reset) %C(green)(%cr)%C(reset) %gs %C(blue)%h%C(reset) %s"
+        
+    else
+        # Validate reference
+        if ! git show-ref --verify --quiet "refs/heads/$REF" 2>/dev/null && [ "$REF" != "HEAD" ]; then
+            if ! git rev-parse --verify "$REF" >/dev/null 2>&1; then
+                echo "❌ Invalid reference: $REF"
+                echo
+                echo "Available branches:"
+                git branch --format="  %(refname:short)" | head -10
+                echo "  HEAD"
+                return 1
+            fi
+        fi
+        
+        echo "---[ Reflog for: $REF ]-----------------------------"
+        
+        # Show reflog statistics
+        local total_entries
+        total_entries=$(git reflog "$REF" | wc -l 2>/dev/null || echo "0")
+        echo "Total reflog entries: $total_entries"
+        
+        if [ "$total_entries" -eq 0 ]; then
+            echo "No reflog entries found for $REF"
+            return 0
+        fi
+        
+        # Show current position
+        if [ "$REF" = "HEAD" ]; then
+            local current_branch
+            current_branch=$(git branch --show-current 2>/dev/null)
+            if [ -n "$current_branch" ]; then
+                echo "Current branch: $current_branch"
+            else
+                echo "Current: $(git rev-parse --short HEAD) (detached)"
+            fi
+        fi
+        echo
+        
+        # Build reflog command
+        local reflog_cmd="git reflog $REF"
+        
+        if [ -n "$LIMIT" ]; then
+            reflog_cmd="$reflog_cmd $LIMIT"
+        else
+            reflog_cmd="$reflog_cmd -20"
+        fi
+        
+        if [ -n "$OPTIONS" ]; then
+            reflog_cmd="$reflog_cmd $OPTIONS"
+        fi
+        
+        # Show reflog with enhanced formatting
+        echo "---[ Reflog Entries ]-------------------------------"
+        echo "Format: [ref] (time) action commit_hash commit_message"
+        echo
+        
+        eval "$reflog_cmd" --format="%C(yellow)%gd%C(reset) %C(green)(%cr)%C(reset) %gs %C(blue)%h%C(reset) %s"
+    fi
+    
+    echo
+    echo "---[ Reflog Help ]----------------------------------"
+    echo "Reflog entries show:"
+    echo "  - Branch switches (checkout)"
+    echo "  - Commits and amends"
+    echo "  - Merges and rebases"
+    echo "  - Resets and other ref updates"
+    echo
+    echo "To recover a lost commit:"
+    echo "  1. Find the commit hash in reflog"
+    echo "  2. Create a branch: git branch recovery <hash>"
+    echo "  3. Or cherry-pick: jwgitcherry <hash>"
+    echo
+    echo "💡 Reflog entries expire after 90 days by default"
+    echo
+}

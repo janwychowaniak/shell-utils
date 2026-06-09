@@ -83,6 +83,33 @@ for sh in "${SHELLS[@]}"; do
   [ "$n" -eq 0 ] && echo "  ✅ $sh: all clean"
 done
 
+# Part C — bash-vs-zsh stdout parity for deterministic (read-only) functions.
+# Any difference is a shell-specific OUTPUT bug (e.g. zsh printing a stale
+# value when a bare `local x` re-declares an already-set var, or leading-space
+# stripping by `read -r` without IFS=). Catches the class that Part A (stderr
+# signatures only) cannot see.
+echo "=== Part C: bash-vs-zsh stdout parity (read-only functions) ==="
+if [ "${#SHELLS[@]}" -ge 2 ]; then
+  RO=(
+    'jwgit_status' 'jwgit_log --oneline -5' 'jwgit_diff' 'jwgit_diff --cached'
+    'jwgit_blame a.txt' 'jwgit_reflog' 'jwgit_branch list --all'
+    'jwgit_remote show' 'jwgit_tag'
+  )
+  n=0
+  for inv in "${RO[@]}"; do
+    b=$( cd "$WORK" && timeout 15 bash -c "source '$LIB'; $inv" </dev/null 2>/dev/null )
+    z=$( cd "$WORK" && timeout 15 zsh  -c "source '$LIB'; $inv" </dev/null 2>/dev/null )
+    if [ "$b" != "$z" ]; then
+      printf "  ❌ stdout differs (bash vs zsh): %s\n" "$inv"
+      diff <(printf '%s\n' "$b") <(printf '%s\n' "$z") | grep -E '^[<>]' | head -4 | sed 's/^/      /'
+      FAILED=$((FAILED + 1)); n=$((n + 1))
+    fi
+  done
+  [ "$n" -eq 0 ] && echo "  ✅ identical output in bash and zsh"
+else
+  echo "  ⏭️  skipped (needs both bash and zsh)"
+fi
+
 # Part B — real-arg invocations of read-only / non-destructive functions
 B=(
   'jwgit_status'

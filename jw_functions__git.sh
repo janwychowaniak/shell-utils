@@ -2897,7 +2897,8 @@ jwgit_status() {
     local modified_count
     local untracked_count
     local deleted_count
-    
+    local line st file
+
     staged_count=$(git status --porcelain | grep -c "^[MADRC]")
     modified_count=$(git status --porcelain | grep -c "^ [MD]")
     untracked_count=$(git status --porcelain | grep -c "^??")
@@ -2915,12 +2916,9 @@ jwgit_status() {
         # Staged files
         if [ "$staged_count" -gt 0 ]; then
             echo "---[ Staged Files ]---------------------------------"
-            git status --porcelain | grep "^[MADRC]" | head -10 | while read -r line; do
-                local st
-                local file
+            git status --porcelain | grep "^[MADRC]" | head -10 | while IFS= read -r line; do
                 st=$(echo "$line" | cut -c1-2)
                 file=$(echo "$line" | cut -c4-)
-                
                 case $st in
                     A*) echo "  ✅ $file (new file)" ;;
                     M*) echo "  📝 $file (modified)" ;;
@@ -2940,12 +2938,9 @@ jwgit_status() {
         # Modified files
         if [ "$modified_count" -gt 0 ]; then
             echo "---[ Modified Files ]-------------------------------"
-            git status --porcelain | grep "^ [MD]" | head -10 | while read -r line; do
-                local st
-                local file
+            git status --porcelain | grep "^ [MD]" | head -10 | while IFS= read -r line; do
                 st=$(echo "$line" | cut -c1-2)
                 file=$(echo "$line" | cut -c4-)
-                
                 case $st in
                     " M") echo "  📝 $file (modified)" ;;
                     " D") echo "  🗑️  $file (deleted)" ;;
@@ -2962,8 +2957,7 @@ jwgit_status() {
         # Untracked files
         if [ "$untracked_count" -gt 0 ]; then
             echo "---[ Untracked Files ]------------------------------"
-            git status --porcelain | grep "^??" | head -10 | while read -r line; do
-                local file
+            git status --porcelain | grep "^??" | head -10 | while IFS= read -r line; do
                 file=$(echo "$line" | cut -c4-)
                 echo "  ❓ $file"
             done
@@ -3016,13 +3010,11 @@ jwgit_status() {
     fi
     
     if [ -n "$upstream" ]; then
-        local behind
         behind=$(git rev-list --count HEAD.."$upstream" 2>/dev/null || echo "0")
         if [ "$behind" -gt 0 ]; then
             echo "💡 Pull updates: jwgit_pull"
         fi
-        
-        local ahead
+
         ahead=$(git rev-list --count "$upstream"..HEAD 2>/dev/null || echo "0")
         if [ "$ahead" -gt 0 ]; then
             echo "💡 Push changes: jwgit_push"

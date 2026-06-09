@@ -19,12 +19,14 @@ jwgit_toc() {
     echo " - ⚪ jwgit_checkout"
     echo " - ⚪ jwgit_merge"
     echo " - ⚪ jwgit_rebase"
+    echo " - 🔵 jwgit_tag"
     echo
     echo " -----------------------------  staging & commits"
     echo " - ⚪ jwgit_add"
     echo " - 🔵 jwgit_commit"
     echo " - ⚪ jwgit_stash"
     echo " - 🔴 jwgit_reset"
+    echo " - ⚪ jwgit_revert"
     echo
     echo " -----------------------------  remote operations"
     echo " - ⚪ jwgit_push"
@@ -1022,6 +1024,109 @@ jwgit_rebase() {
 }
 
 
+jwgit_tag() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgit_tag [name] [commit] | -a <name> -m <msg> [commit] | -d <name> | list"
+        echo "Examples:"
+        echo "  jwgit_tag                         # List all tags"
+        echo "  jwgit_tag v1.0                    # Lightweight tag at HEAD"
+        echo "  jwgit_tag v1.0 abc123             # Lightweight tag at a commit"
+        echo "  jwgit_tag -a v1.0 -m \"Release\"    # Annotated tag"
+        echo "  jwgit_tag -d v1.0                 # Delete a tag"
+        echo
+        echo "Existing tags:"
+        if git tag >/dev/null 2>&1; then
+            git tag --sort=-creatordate | head -10 | sed 's/^/  /' || echo "  (none)"
+        else
+            echo "  (not in a git repository)"
+        fi
+        echo
+        return 1
+    fi
+
+    case $1 in
+        list|ls)
+            echo "🏷️  Git Tags"
+            echo "=================================================="
+            git tag -n --sort=-creatordate | sed 's/^/  /' || echo "  (no tags)"
+            return 0
+            ;;
+
+        -d|--delete)
+            local TAG=$2
+            if [ -z "$TAG" ]; then
+                echo "Usage: jwgit_tag -d <name>"
+                return 1
+            fi
+            if ! git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+                echo "❌ Tag '$TAG' does not exist"
+                return 1
+            fi
+            echo "⚠️  This will delete tag '$TAG' ($(git rev-list -n1 --abbrev-commit "$TAG"))"
+            echo -n "Continue? [y/N] "
+            read -r response
+            if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+                git tag -d "$TAG"
+            else
+                echo "Operation cancelled"
+            fi
+            return 0
+            ;;
+
+        -a|--annotate)
+            shift
+            local NAME="" MSG="" COMMIT=""
+            while [ $# -gt 0 ]; do
+                case $1 in
+                    -m)
+                        shift
+                        MSG="$1"
+                        [ $# -gt 0 ] && shift
+                        ;;
+                    *)
+                        if [ -z "$NAME" ]; then
+                            NAME="$1"
+                        elif [ -z "$COMMIT" ]; then
+                            COMMIT="$1"
+                        fi
+                        shift
+                        ;;
+                esac
+            done
+            if [ -z "$NAME" ]; then
+                echo "Usage: jwgit_tag -a <name> -m <msg> [commit]"
+                return 1
+            fi
+            local -a CMD=(tag -a "$NAME")
+            [ -n "$MSG" ] && CMD+=(-m "$MSG")
+            [ -n "$COMMIT" ] && CMD+=("$COMMIT")
+            if git "${CMD[@]}"; then
+                echo "✅ Annotated tag '$NAME' created"
+            else
+                echo "❌ Failed to create tag"
+                return 1
+            fi
+            return 0
+            ;;
+
+        *)
+            # Lightweight tag: jwgit_tag <name> [commit]
+            local NAME=$1
+            local COMMIT=$2
+            local -a CMD=(tag "$NAME")
+            [ -n "$COMMIT" ] && CMD+=("$COMMIT")
+            if git "${CMD[@]}"; then
+                echo "✅ Tag '$NAME' created at $(git rev-list -n1 --abbrev-commit "$NAME")"
+            else
+                echo "❌ Failed to create tag"
+                return 1
+            fi
+            return 0
+            ;;
+    esac
+}
+
+
 # ---------------------------------------------------------------------------------
 # staging & commits
 # ---------------------------------------------------------------------------------
@@ -1797,6 +1902,64 @@ jwgit_reset() {
         
     else
         echo "❌ Reset failed!"
+        return 1
+    fi
+    echo
+}
+
+
+jwgit_revert() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgit_revert <commit> [options] | --continue | --abort | --skip"
+        echo "Examples:"
+        echo "  jwgit_revert abc123               # Create a commit that undoes abc123"
+        echo "  jwgit_revert --no-commit abc123   # Stage the revert without committing"
+        echo "  jwgit_revert --continue           # Continue after resolving conflicts"
+        echo "  jwgit_revert --abort              # Abort the in-progress revert"
+        echo
+        echo "Recent commits:"
+        git log --oneline -10 2>/dev/null | sed 's/^/  /' || echo "  (no commits)"
+        echo
+        return 1
+    fi
+
+    # Control commands
+    case $1 in
+        --continue)
+            if git diff --name-only --diff-filter=U | grep -q .; then
+                echo "❌ Unresolved conflicts remain:"
+                git diff --name-only --diff-filter=U | sed 's/^/  /'
+                return 1
+            fi
+            if git revert --continue; then
+                echo "✅ Revert completed"
+            else
+                echo "❌ Failed to continue revert"
+                return 1
+            fi
+            return 0
+            ;;
+        --abort)
+            if git revert --abort; then echo "✅ Revert aborted"; else echo "❌ Failed to abort revert"; return 1; fi
+            return 0
+            ;;
+        --skip)
+            if git revert --skip; then echo "✅ Commit skipped"; else echo "❌ Failed to skip"; return 1; fi
+            return 0
+            ;;
+    esac
+
+    # Forward all args (commit + options) verbatim — "$@" is zsh/bash safe
+    echo "↩️  Reverting: $*"
+    echo
+    if git revert "$@"; then
+        echo
+        echo "✅ Revert completed successfully!"
+        echo "Latest commit: $(git log -1 --oneline)"
+    else
+        echo
+        echo "❌ Revert failed (conflicts?)"
+        echo "💡 Resolve conflicts, then 'jwgit_revert --continue' (or --abort)"
         return 1
     fi
     echo

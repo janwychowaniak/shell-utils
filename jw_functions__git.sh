@@ -3716,7 +3716,7 @@ jwgit_bisect() {
             echo
             
             # Check if already in bisect
-            if [ -d ".git/BISECT_LOG" ]; then
+            if [ -f ".git/BISECT_LOG" ]; then
                 echo "⚠️  Bisect session already in progress"
                 echo "Use 'jwgit_bisect reset' to end current session first"
                 return 1
@@ -3741,7 +3741,7 @@ jwgit_bisect() {
             ;;
             
         bad)
-            if [ ! -d ".git/BISECT_LOG" ]; then
+            if [ ! -f ".git/BISECT_LOG" ]; then
                 echo "❌ No bisect session in progress"
                 echo "Start one with: jwgit_bisect start"
                 return 1
@@ -3763,7 +3763,7 @@ jwgit_bisect() {
             ;;
             
         good)
-            if [ ! -d ".git/BISECT_LOG" ]; then
+            if [ ! -f ".git/BISECT_LOG" ]; then
                 echo "❌ No bisect session in progress"
                 echo "Start one with: jwgit_bisect start"
                 return 1
@@ -3785,7 +3785,7 @@ jwgit_bisect() {
             ;;
             
         skip)
-            if [ ! -d ".git/BISECT_LOG" ]; then
+            if [ ! -f ".git/BISECT_LOG" ]; then
                 echo "❌ No bisect session in progress"
                 echo "Start one with: jwgit_bisect start"
                 return 1
@@ -3804,7 +3804,7 @@ jwgit_bisect() {
             ;;
             
         reset)
-            if [ ! -d ".git/BISECT_LOG" ]; then
+            if [ ! -f ".git/BISECT_LOG" ]; then
                 echo "No bisect session in progress"
                 return 0
             fi
@@ -3822,7 +3822,7 @@ jwgit_bisect() {
             ;;
             
         run)
-            if [ ! -d ".git/BISECT_LOG" ]; then
+            if [ ! -f ".git/BISECT_LOG" ]; then
                 echo "❌ No bisect session in progress"
                 echo "Start one with: jwgit_bisect start"
                 return 1
@@ -3844,7 +3844,7 @@ jwgit_bisect() {
             read -r response
             
             if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-                git bisect run $ARGS
+                git bisect run sh -c "$ARGS"
                 
                 if [ $? -eq 0 ]; then
                     echo "✅ Automated bisect completed!"
@@ -3872,7 +3872,7 @@ jwgit_bisect() {
 }
 
 __jwgit_bisect_status__() {
-    if [ ! -d ".git/BISECT_LOG" ]; then
+    if [ ! -f ".git/BISECT_LOG" ]; then
         echo "No bisect session in progress"
         return 0
     fi
@@ -3892,8 +3892,8 @@ __jwgit_bisect_status__() {
         echo "Bisect progress:"
         local good_commits
         local bad_commits
-        good_commits=$(grep -c "^git bisect good" .git/BISECT_LOG 2>/dev/null || echo "0")
-        bad_commits=$(grep -c "^git bisect bad" .git/BISECT_LOG 2>/dev/null || echo "0")
+        good_commits=$(grep -c "^git bisect good" .git/BISECT_LOG 2>/dev/null)
+        bad_commits=$(grep -c "^git bisect bad" .git/BISECT_LOG 2>/dev/null)
         
         echo "  Good commits marked: $good_commits"
         echo "  Bad commits marked: $bad_commits"
@@ -3933,7 +3933,7 @@ jwgit_reflog() {
     fi
 
     local REF="HEAD"
-    local OPTIONS=""
+    local -a OPTS=()
     local LIMIT=""
     local SHOW_ALL=""
     
@@ -3945,11 +3945,11 @@ jwgit_reflog() {
                 shift
                 ;;
             --since=*|--until=*)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             --since|--until)
-                OPTIONS="$OPTIONS $1 $2"
+                OPTS+=("$1" "$2")
                 shift 2
                 ;;
             -[0-9]*)
@@ -3957,7 +3957,7 @@ jwgit_reflog() {
                 shift
                 ;;
             -*)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             *)
@@ -3987,19 +3987,10 @@ jwgit_reflog() {
         
         # Show combined reflog
         echo "---[ Combined Reflog Entries ]---------------------"
-        local reflog_cmd="git reflog --all"
-        
-        if [ -n "$LIMIT" ]; then
-            reflog_cmd="$reflog_cmd $LIMIT"
-        else
-            reflog_cmd="$reflog_cmd -20"
-        fi
-        
-        if [ -n "$OPTIONS" ]; then
-            reflog_cmd="$reflog_cmd $OPTIONS"
-        fi
-        
-        eval "$reflog_cmd" --format="%C(yellow)%gd%C(reset) %C(green)(%cr)%C(reset) %gs %C(blue)%h%C(reset) %s"
+        local -a CMD=(reflog --all)
+        if [ -n "$LIMIT" ]; then CMD+=("$LIMIT"); else CMD+=(-20); fi
+        CMD+=("${OPTS[@]}")
+        git "${CMD[@]}" --format="%C(yellow)%gd%C(reset) %C(green)(%cr)%C(reset) %gs %C(blue)%h%C(reset) %s"
         
     else
         # Validate reference
@@ -4039,24 +4030,16 @@ jwgit_reflog() {
         echo
         
         # Build reflog command
-        local reflog_cmd="git reflog $REF"
-        
-        if [ -n "$LIMIT" ]; then
-            reflog_cmd="$reflog_cmd $LIMIT"
-        else
-            reflog_cmd="$reflog_cmd -20"
-        fi
-        
-        if [ -n "$OPTIONS" ]; then
-            reflog_cmd="$reflog_cmd $OPTIONS"
-        fi
+        local -a CMD=(reflog "$REF")
+        if [ -n "$LIMIT" ]; then CMD+=("$LIMIT"); else CMD+=(-20); fi
+        CMD+=("${OPTS[@]}")
         
         # Show reflog with enhanced formatting
         echo "---[ Reflog Entries ]-------------------------------"
         echo "Format: [ref] (time) action commit_hash commit_message"
         echo
         
-        eval "$reflog_cmd" --format="%C(yellow)%gd%C(reset) %C(green)(%cr)%C(reset) %gs %C(blue)%h%C(reset) %s"
+        git "${CMD[@]}" --format="%C(yellow)%gd%C(reset) %C(green)(%cr)%C(reset) %gs %C(blue)%h%C(reset) %s"
     fi
     
     echo

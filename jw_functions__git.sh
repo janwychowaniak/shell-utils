@@ -2638,7 +2638,7 @@ jwgit_fetch() {
         if [ -n "$REMOTE" ]; then
             git branch -r | grep "^  $REMOTE/" | head -10 | sed 's/^/  /'
             local remote_branch_count
-            remote_branch_count=$(git branch -r | grep -c "^  $REMOTE/" || echo "0")
+            remote_branch_count=$(git branch -r | grep -c "^  $REMOTE/")
             if [ "$remote_branch_count" -gt 10 ]; then
                 echo "  ... and $((remote_branch_count - 10)) more branches"
             fi
@@ -2898,10 +2898,10 @@ jwgit_status() {
     local untracked_count
     local deleted_count
     
-    staged_count=$(git status --porcelain | grep -c "^[MADRC]" || echo "0")
-    modified_count=$(git status --porcelain | grep -c "^ [MD]" || echo "0")
+    staged_count=$(git status --porcelain | grep -c "^[MADRC]")
+    modified_count=$(git status --porcelain | grep -c "^ [MD]")
     untracked_count=$(git status --porcelain | grep -c "^??")
-    deleted_count=$(git status --porcelain | grep -c "^ D\|^D " || echo "0")
+    deleted_count=$(git status --porcelain | grep -c "^ D\|^D ")
     
     echo "Staged files: $staged_count"
     echo "Modified files: $modified_count"
@@ -2916,18 +2916,18 @@ jwgit_status() {
         if [ "$staged_count" -gt 0 ]; then
             echo "---[ Staged Files ]---------------------------------"
             git status --porcelain | grep "^[MADRC]" | head -10 | while read -r line; do
-                local status
+                local st
                 local file
-                status=$(echo "$line" | cut -c1-2)
+                st=$(echo "$line" | cut -c1-2)
                 file=$(echo "$line" | cut -c4-)
                 
-                case $status in
+                case $st in
                     A*) echo "  ✅ $file (new file)" ;;
                     M*) echo "  📝 $file (modified)" ;;
                     D*) echo "  🗑️  $file (deleted)" ;;
                     R*) echo "  🔄 $file (renamed)" ;;
                     C*) echo "  📋 $file (copied)" ;;
-                    *) echo "  $status $file" ;;
+                    *) echo "  $st $file" ;;
                 esac
             done
             
@@ -2941,15 +2941,15 @@ jwgit_status() {
         if [ "$modified_count" -gt 0 ]; then
             echo "---[ Modified Files ]-------------------------------"
             git status --porcelain | grep "^ [MD]" | head -10 | while read -r line; do
-                local status
+                local st
                 local file
-                status=$(echo "$line" | cut -c1-2)
+                st=$(echo "$line" | cut -c1-2)
                 file=$(echo "$line" | cut -c4-)
                 
-                case $status in
+                case $st in
                     " M") echo "  📝 $file (modified)" ;;
                     " D") echo "  🗑️  $file (deleted)" ;;
-                    *) echo "  $status $file" ;;
+                    *) echo "  $st $file" ;;
                 esac
             done
             
@@ -3176,14 +3176,14 @@ jwgit_diff() {
         
         # Show file list with changes
         echo "---[ Changed Files ]--------------------------------"
-        git "${SUM[@]}" --name-status | while read -r status file; do
-            case $status in
+        git "${SUM[@]}" --name-status | while read -r st file; do
+            case $st in
                 A) echo "  ✅ $file (added)" ;;
                 M) echo "  📝 $file (modified)" ;;
                 D) echo "  🗑️  $file (deleted)" ;;
                 R*) echo "  🔄 $file (renamed)" ;;
                 C*) echo "  📋 $file (copied)" ;;
-                *) echo "  $status $file" ;;
+                *) echo "  $st $file" ;;
             esac
         done
         echo

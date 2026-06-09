@@ -283,10 +283,9 @@ jwgit_remote() {
                 return 0
             fi
             
+            local remote fetch_url push_url branch_count
             while IFS= read -r remote; do
                 echo "---[ Remote: $remote ]------------------------------"
-                local fetch_url
-                local push_url
                 fetch_url=$(git remote get-url "$remote" 2>/dev/null)
                 push_url=$(git remote get-url --push "$remote" 2>/dev/null)
                 
@@ -298,8 +297,7 @@ jwgit_remote() {
                 # Show remote branches
                 echo "Branches:"
                 git branch -r | grep "^  $remote/" | sed 's/^/  /' | head -10
-                
-                local branch_count
+
                 branch_count=$(git branch -r | grep -c "^  $remote/")
                 if [ "$branch_count" -gt 10 ]; then
                     echo "  ... and $((branch_count - 10)) more branches"
@@ -388,7 +386,7 @@ jwgit_branch() {
                     echo "Current branch: $current_branch"
                     
                     # Show branch info
-                    local upstream
+                    local upstream=""
                     upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
                     if [ -n "$upstream" ]; then
                         echo "Upstream: $upstream"
@@ -498,7 +496,7 @@ jwgit_branch() {
                 echo "✅ Branch renamed successfully!"
                 
                 # Update upstream if it exists
-                local upstream
+                local upstream=""
                 upstream=$(git rev-parse --abbrev-ref "$NEW_NAME@{upstream}" 2>/dev/null)
                 if [ -n "$upstream" ]; then
                     echo "💡 Consider updating upstream reference if needed"
@@ -646,7 +644,7 @@ jwgit_checkout() {
             echo "✅ Switched to branch '$TARGET'"
             
             # Show branch info
-            local upstream
+            local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$TARGET@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
                 echo "Upstream: $upstream"
@@ -1415,7 +1413,7 @@ jwgit_commit() {
             echo "Branch: $current_branch"
             
             # Show ahead/behind status if upstream exists
-            local upstream
+            local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
                 local ahead_behind
@@ -1987,7 +1985,7 @@ jwgit_push() {
         if [ -n "$current_branch" ]; then
             echo "Branch: $current_branch"
             
-            local upstream
+            local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
                 echo "Upstream: $upstream"
@@ -2065,7 +2063,7 @@ jwgit_push() {
     
     if [ -z "$REMOTE" ]; then
         # Try to get upstream remote
-        local upstream
+        local upstream=""
         upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
         if [ -n "$upstream" ]; then
             REMOTE=$(echo "$upstream" | cut -d'/' -f1)
@@ -2188,7 +2186,7 @@ jwgit_push() {
             fi
             
             # Show final status
-            local upstream
+            local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$BRANCH@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
                 echo "Status: up to date with $upstream"
@@ -2226,7 +2224,7 @@ jwgit_pull() {
         if [ -n "$current_branch" ]; then
             echo "Branch: $current_branch"
             
-            local upstream
+            local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
                 echo "Upstream: $upstream"
@@ -2300,7 +2298,7 @@ jwgit_pull() {
     
     if [ -z "$REMOTE" ] && [ -z "$BRANCH" ]; then
         # Use upstream if available
-        local upstream
+        local upstream=""
         upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
         if [ -n "$upstream" ]; then
             REMOTE=$(echo "$upstream" | cut -d'/' -f1)
@@ -2424,7 +2422,7 @@ jwgit_pull() {
         
         # Show final status
         if [ -n "$current_branch" ]; then
-            local upstream
+            local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
                 echo "Status: up to date with $upstream"
@@ -2481,7 +2479,7 @@ jwgit_fetch() {
         local current_branch
         current_branch=$(git branch --show-current 2>/dev/null)
         if [ -n "$current_branch" ]; then
-            local upstream
+            local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
                 echo "  Branch: $current_branch -> $upstream"
@@ -2556,7 +2554,7 @@ jwgit_fetch() {
     current_branch=$(git branch --show-current 2>/dev/null)
     
     if [ -n "$current_branch" ]; then
-        local upstream
+        local upstream=""
         upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
         if [ -n "$upstream" ]; then
             echo "Current branch: $current_branch"
@@ -2600,18 +2598,17 @@ jwgit_fetch() {
         
         # Show updated status for current branch
         if [ -n "$current_branch" ]; then
-            local upstream
+            local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
                 echo "Current branch: $current_branch"
                 echo "Upstream: $upstream"
                 
                 # Show updated ahead/behind status
-                local ahead_behind
+                local ahead_behind=""
                 ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
                 if [ -n "$ahead_behind" ]; then
-                    local ahead
-                    local behind
+                    local ahead="" behind=""
                     ahead=$(echo "$ahead_behind" | cut -f1)
                     behind=$(echo "$ahead_behind" | cut -f2)
                     echo "Status: $ahead ahead, $behind behind"
@@ -2848,7 +2845,7 @@ jwgit_status() {
         echo "Current branch: $current_branch"
         
         # Upstream information
-        local upstream
+        local upstream=""
         upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
         if [ -n "$upstream" ]; then
             echo "Upstream: $upstream"
@@ -3293,8 +3290,8 @@ jwgit_blame() {
     
     # Show author statistics
     echo "Authors contributing to this file:"
+    local count author_line author
     git blame --porcelain "$FILE" 2>/dev/null | grep "^author " | sort | uniq -c | sort -rn | head -10 | while read -r count author_line; do
-        local author
         author=$(echo "$author_line" | cut -d' ' -f2-)
         echo "  $author: $count lines"
     done
@@ -4145,9 +4142,9 @@ jwgit_reflog() {
         
         # Show available reflogs
         echo "Available reflogs:"
+        local ref_name entry_count
         git reflog --all --format="%gd" | cut -d'@' -f1 | sort -u | while read -r ref_name; do
             if [ -n "$ref_name" ]; then
-                local entry_count
                 entry_count=$(git reflog "$ref_name" | wc -l 2>/dev/null || echo "0")
                 echo "  $ref_name ($entry_count entries)"
             fi

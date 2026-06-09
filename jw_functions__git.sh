@@ -2738,7 +2738,7 @@ jwgit_status() {
     
     staged_count=$(git status --porcelain | grep -c "^[MADRC]" || echo "0")
     modified_count=$(git status --porcelain | grep -c "^ [MD]" || echo "0")
-    untracked_count=$(git status --porcelain | grep -c "^??" || echo "0")
+    untracked_count=$(git status --porcelain | grep -c "^??")
     deleted_count=$(git status --porcelain | grep -c "^ D\|^D " || echo "0")
     
     echo "Staged files: $staged_count"
@@ -3171,7 +3171,7 @@ jwgit_clean() {
         if git status --porcelain | grep "^??" | grep -q .; then
             git status --porcelain | grep "^??" | head -10 | sed 's/^??/  /' | sed 's/^ */  /'
             local untracked_count
-            untracked_count=$(git status --porcelain | grep -c "^??" || echo "0")
+            untracked_count=$(git status --porcelain | grep -c "^??")
             if [ "$untracked_count" -gt 10 ]; then
                 echo "  ... and $((untracked_count - 10)) more files"
             fi
@@ -3246,19 +3246,14 @@ jwgit_clean() {
     # Show what will be cleaned
     echo "---[ Clean Preview ]--------------------------------"
     
-    local clean_cmd="git clean"
-    if [ -n "$DRY_RUN" ]; then
-        clean_cmd="$clean_cmd -n"
-    fi
-    if [ -n "$DIRECTORIES" ]; then
-        clean_cmd="$clean_cmd -d"
-    fi
-    if [ -n "$IGNORED" ]; then
-        clean_cmd="$clean_cmd -x"
-    fi
-    
+    # Preview is ALWAYS a dry run (-n) so the file list shows even in force
+    # mode; building argv as an array avoids eval.
+    local -a PREVIEW=(clean -n)
+    [ -n "$DIRECTORIES" ] && PREVIEW+=(-d)
+    [ -n "$IGNORED" ] && PREVIEW+=(-x)
+
     local files_to_clean
-    files_to_clean=$(eval "$clean_cmd" 2>/dev/null)
+    files_to_clean=$(git "${PREVIEW[@]}" 2>/dev/null)
     
     if [ -z "$files_to_clean" ]; then
         echo "✅ No files to clean"
@@ -3330,22 +3325,13 @@ jwgit_clean() {
     echo
     echo "---[ Cleaning ]-------------------------------------"
     
-    local final_cmd="git clean"
-    if [ -n "$FORCE" ]; then
-        final_cmd="$final_cmd -f"
-    fi
-    if [ -n "$DIRECTORIES" ]; then
-        final_cmd="$final_cmd -d"
-    fi
-    if [ -n "$IGNORED" ]; then
-        final_cmd="$final_cmd -x"
-    fi
-    if [ -n "$INTERACTIVE" ]; then
-        final_cmd="$final_cmd -i"
-    fi
-    
-    eval "$final_cmd"
-    
+    local -a FINAL=(clean)
+    [ -n "$FORCE" ] && FINAL+=(-f)
+    [ -n "$DIRECTORIES" ] && FINAL+=(-d)
+    [ -n "$IGNORED" ] && FINAL+=(-x)
+    [ -n "$INTERACTIVE" ] && FINAL+=(-i)
+
+    git "${FINAL[@]}"
     local clean_result=$?
     
     if [ $clean_result -eq 0 ]; then
@@ -3354,7 +3340,7 @@ jwgit_clean() {
         echo
         echo "---[ Final Status ]---------------------------------"
         local remaining_untracked
-        remaining_untracked=$(git status --porcelain | grep -c "^??" || echo "0")
+        remaining_untracked=$(git status --porcelain | grep -c "^??")
         echo "Remaining untracked files: $remaining_untracked"
         
         if [ "$remaining_untracked" -gt 0 ]; then
@@ -3480,13 +3466,10 @@ jwgit_gc() {
     echo
     echo "---[ Running Garbage Collection ]-------------------"
     
-    # Run garbage collection with progress
-    echo "Phase 1: Cleaning up loose objects..."
-    git gc --prune=now
-    
-    echo
-    echo "Phase 2: Aggressive optimization..."
-    git gc --aggressive
+    # One aggressive pass that also prunes unreachable objects now (a second
+    # plain 'git gc --aggressive' would revert to the default 2-week window)
+    echo "Optimizing (aggressive, pruning unreachable objects immediately)..."
+    git gc --prune=now --aggressive
     
     echo
     echo "---[ After Cleanup ]--------------------------------"

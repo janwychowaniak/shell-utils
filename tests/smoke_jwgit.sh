@@ -46,12 +46,17 @@ trap 'rm -rf "$T"' EXIT
   echo b1 > b.txt; git add b.txt; git commit -qm c2
   git tag v0.1
   echo c1 > c.txt; git add c.txt; git commit -qm c3
+  # a second author touches a.txt -> blame has 2 authors (exercises the loop >1x)
+  echo a_bob >> a.txt; git add a.txt
+  git -c user.name=bob -c user.email=bob@test.local commit -qm c4
   echo a2 >> a.txt; git add a.txt          # staged change
   echo c2 >> c.txt                          # modified (unstaged)
   echo u  > untracked.txt                   # untracked
   echo s  > s.txt && git stash -q -u
   git init --bare -q ../remote.git
+  git init --bare -q ../remote2.git
   git remote add origin ../remote.git
+  git remote add upstream ../remote2.git    # 2nd remote -> remote-show loops >1x
   git push -q -u origin master
 ) >/dev/null 2>&1 || { echo "❌ failed to build throwaway repo"; exit 2; }
 WORK="$T/work"

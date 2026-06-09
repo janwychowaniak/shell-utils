@@ -42,7 +42,7 @@ jwgit_toc() {
     echo " -----------------------------  maintenance & cleanup"
     echo " - 🔴 jwgit_clean"
     echo " - 🔴 jwgit_prune"
-    echo " - 🔴 jwgit_gc"
+    echo " - ⚪ jwgit_gc"
     echo
     echo " -----------------------------  advanced operations"
     echo " - ⚪ jwgit_cherry-pick"
@@ -3558,8 +3558,10 @@ jwgit_prune() {
     echo
     
     echo "---[ Cleaning Reflog ]------------------------------"
-    echo "Cleaning reflog entries older than 30 days..."
-    git reflog expire --expire=30.days.ago --all
+    echo "Expiring reflog entries for unreachable commits..."
+    # Only drop reflog for unreachable commits (keeps your branches' normal
+    # reflog window intact, unlike --expire=<date> --all which also trims it)
+    git reflog expire --expire-unreachable=now --all
     echo
     
     echo "---[ Garbage Collection ]---------------------------"
@@ -3594,6 +3596,18 @@ jwgit_prune() {
 
 
 jwgit_gc() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwgit_gc [--deep]"
+        echo "  jwgit_gc           # Safe routine gc — keeps Git's prune grace period"
+        echo "  jwgit_gc --deep    # Aggressive: --prune=now --aggressive (drops the safety net)"
+        return 0
+    fi
+
+    local DEEP=""
+    if [ "$1" = "--deep" ] || [ "$1" = "--aggressive" ]; then
+        DEEP=1
+    fi
+
     echo "🗑️  Git Garbage Collection"
     echo "=================================================="
     echo
@@ -3611,11 +3625,17 @@ jwgit_gc() {
     echo "Repository size: $repo_size_before"
     echo
     
-    echo "Garbage collection will:"
-    echo "  - Remove unreachable objects"
-    echo "  - Compress object database"
-    echo "  - Optimize pack files"
-    echo "  - Clean up temporary files"
+    if [ -n "$DEEP" ]; then
+        echo "⚠️  DEEP garbage collection will:"
+        echo "  - Aggressively repack the object database"
+        echo "  - Prune ALL unreachable objects immediately (no grace period)"
+        echo "  - Remove the recovery safety net for recently-dangling commits"
+    else
+        echo "Garbage collection will (safe — keeps Git's recovery grace period):"
+        echo "  - Compress and optimize the object database"
+        echo "  - Remove only objects unreachable past Git's default window (~2 weeks)"
+        echo "  💡 Use 'jwgit_gc --deep' to reclaim maximum space (destroys the safety net)"
+    fi
     echo
     echo -n "Continue with garbage collection? [y/N] "
     read -r response
@@ -3628,10 +3648,13 @@ jwgit_gc() {
     echo
     echo "---[ Running Garbage Collection ]-------------------"
     
-    # One aggressive pass that also prunes unreachable objects now (a second
-    # plain 'git gc --aggressive' would revert to the default 2-week window)
-    echo "Optimizing (aggressive, pruning unreachable objects immediately)..."
-    git gc --prune=now --aggressive
+    if [ -n "$DEEP" ]; then
+        echo "Deep optimization (aggressive, pruning unreachable objects now)..."
+        git gc --prune=now --aggressive
+    else
+        echo "Optimizing (safe — respecting Git's prune grace period)..."
+        git gc
+    fi
     
     echo
     echo "---[ After Cleanup ]--------------------------------"

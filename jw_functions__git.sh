@@ -94,8 +94,9 @@ jwgit_init() {
     else
         git init "$DIR"
     fi
-    
-    if [ $? -eq 0 ]; then
+    local rc=$?
+
+    if [ "$rc" -eq 0 ]; then
         echo "✅ Repository initialized successfully!"
         if [ "$DIR" != "." ]; then
             echo "💡 Run 'cd $DIR' to enter the repository"
@@ -466,8 +467,9 @@ jwgit_branch() {
             else
                 git branch -d "$BRANCH_NAME"
             fi
-            
-            if [ $? -eq 0 ]; then
+            local rc=$?
+
+            if [ "$rc" -eq 0 ]; then
                 echo "✅ Branch deleted successfully!"
             else
                 echo "❌ Failed to delete branch"
@@ -1211,8 +1213,9 @@ jwgit_commit() {
             echo "Opening editor to modify commit message..."
             git commit --amend
         fi
-        
-        if [ $? -eq 0 ]; then
+        local rc=$?
+
+        if [ "$rc" -eq 0 ]; then
             echo "✅ Commit amended successfully!"
             echo "Latest commit: $(git log -1 --oneline)"
         else
@@ -1456,9 +1459,7 @@ jwgit_stash() {
             echo
             
             # Apply the stash
-            git stash apply "$STASH_REF"
-            
-            if [ $? -eq 0 ]; then
+            if git stash apply "$STASH_REF"; then
                 echo "✅ Stash applied successfully!"
                 echo "💡 Stash is still saved in stash list"
                 echo
@@ -1545,8 +1546,7 @@ jwgit_stash() {
             read -r response
             
             if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-                git stash drop "$STASH_REF"
-                if [ $? -eq 0 ]; then
+                if git stash drop "$STASH_REF"; then
                     echo "✅ Stash dropped successfully!"
                 else
                     echo "❌ Failed to drop stash"
@@ -1579,8 +1579,7 @@ jwgit_stash() {
             read -r response
             
             if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-                git stash clear
-                if [ $? -eq 0 ]; then
+                if git stash clear; then
                     echo "✅ All stashes cleared successfully!"
                 else
                     echo "❌ Failed to clear stashes"
@@ -3723,9 +3722,7 @@ jwgit_bisect() {
             fi
             
             echo "Starting bisect session..."
-            git bisect start
-            
-            if [ $? -eq 0 ]; then
+            if git bisect start; then
                 echo "✅ Bisect session started!"
                 echo
                 echo "Next steps:"
@@ -3792,9 +3789,7 @@ jwgit_bisect() {
             fi
             
             echo "Skipping current commit..."
-            git bisect skip
-            
-            if [ $? -eq 0 ]; then
+            if git bisect skip; then
                 echo "✅ Commit skipped"
                 __jwgit_bisect_status__
             else
@@ -3810,9 +3805,7 @@ jwgit_bisect() {
             fi
             
             echo "Ending bisect session..."
-            git bisect reset
-            
-            if [ $? -eq 0 ]; then
+            if git bisect reset; then
                 echo "✅ Bisect session ended"
                 echo "Returned to original branch"
             else
@@ -3844,9 +3837,7 @@ jwgit_bisect() {
             read -r response
             
             if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-                git bisect run sh -c "$ARGS"
-                
-                if [ $? -eq 0 ]; then
+                if git bisect run sh -c "$ARGS"; then
                     echo "✅ Automated bisect completed!"
                     __jwgit_bisect_status__
                 else

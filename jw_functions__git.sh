@@ -2532,9 +2532,9 @@ jwgit_log() {
         return 1
     fi
 
-    local OPTIONS=""
+    local -a OPTS=()
     local BRANCH=""
-    local FILE=""
+    local -a FILES=()
     local SHOW_GRAPH=""
     local SHOW_STAT=""
     local ONELINE=""
@@ -2556,19 +2556,19 @@ jwgit_log() {
                 shift
                 ;;
             --patch|-p)
-                OPTIONS="$OPTIONS --patch"
+                OPTS+=(--patch)
                 shift
                 ;;
             --all)
-                OPTIONS="$OPTIONS --all"
+                OPTS+=(--all)
                 shift
                 ;;
             --since=*|--until=*|--author=*|--grep=*)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             --since|--until|--author|--grep)
-                OPTIONS="$OPTIONS $1 $2"
+                OPTS+=("$1" "$2")
                 shift 2
                 ;;
             -[0-9]*)
@@ -2577,18 +2577,18 @@ jwgit_log() {
                 ;;
             --)
                 shift
-                FILE="$*"
+                FILES=("$@")
                 break
                 ;;
             -*)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             *)
                 if [ -z "$BRANCH" ]; then
                     BRANCH="$1"
                 else
-                    OPTIONS="$OPTIONS $1"
+                    OPTS+=("$1")
                 fi
                 shift
                 ;;
@@ -2596,7 +2596,7 @@ jwgit_log() {
     done
     
     # Set default limit if not specified
-    if [ -z "$LIMIT" ] && [ -z "$OPTIONS" ]; then
+    if [ -z "$LIMIT" ] && [ ${#OPTS[@]} -eq 0 ]; then
         LIMIT="-20"
     fi
     
@@ -2616,10 +2616,10 @@ jwgit_log() {
         echo "Showing: $BRANCH"
     fi
     
-    if [ -n "$FILE" ]; then
-        echo "File filter: $FILE"
+    if [ ${#FILES[@]} -gt 0 ]; then
+        echo "File filter: ${FILES[*]}"
     fi
-    
+
     local total_commits
     if [ -n "$BRANCH" ]; then
         total_commits=$(git rev-list --count "$BRANCH" 2>/dev/null || echo "0")
@@ -2629,43 +2629,23 @@ jwgit_log() {
     echo "Total commits: $total_commits"
     echo
     
-    # Build git log command
-    local log_cmd="git log"
-    
-    # Add formatting options
+    # Build the git log argv as an array (no eval — safe under bash and zsh)
+    local -a CMD=(log)
     if [ -n "$ONELINE" ]; then
-        log_cmd="$log_cmd --oneline"
+        CMD+=(--oneline)
     else
-        log_cmd="$log_cmd --format='%C(yellow)%h%C(reset) - %C(green)(%cr)%C(reset) %s %C(blue)<%an>%C(reset)'"
+        CMD+=("--format=%C(yellow)%h%C(reset) - %C(green)(%cr)%C(reset) %s %C(blue)<%an>%C(reset)")
     fi
-    
-    if [ -n "$SHOW_GRAPH" ]; then
-        log_cmd="$log_cmd --graph"
-    fi
-    
-    if [ -n "$SHOW_STAT" ]; then
-        log_cmd="$log_cmd --stat"
-    fi
-    
-    if [ -n "$LIMIT" ]; then
-        log_cmd="$log_cmd $LIMIT"
-    fi
-    
-    if [ -n "$OPTIONS" ]; then
-        log_cmd="$log_cmd $OPTIONS"
-    fi
-    
-    if [ -n "$BRANCH" ]; then
-        log_cmd="$log_cmd $BRANCH"
-    fi
-    
-    if [ -n "$FILE" ]; then
-        log_cmd="$log_cmd -- $FILE"
-    fi
-    
+    [ -n "$SHOW_GRAPH" ] && CMD+=(--graph)
+    [ -n "$SHOW_STAT" ] && CMD+=(--stat)
+    [ -n "$LIMIT" ] && CMD+=("$LIMIT")
+    CMD+=("${OPTS[@]}")
+    [ -n "$BRANCH" ] && CMD+=("$BRANCH")
+    [ ${#FILES[@]} -gt 0 ] && CMD+=(-- "${FILES[@]}")
+
     # Execute the log command
     echo "---[ Commit History ]-------------------------------"
-    eval "$log_cmd" 2>/dev/null || {
+    git "${CMD[@]}" 2>/dev/null || {
         echo "❌ Failed to show log"
         if [ -n "$BRANCH" ]; then
             echo "Branch '$BRANCH' may not exist"
@@ -2921,10 +2901,10 @@ jwgit_diff() {
         return 1
     fi
 
-    local OPTIONS=""
+    local -a OPTS=()
     local COMMIT1=""
     local COMMIT2=""
-    local FILE=""
+    local -a FILES=()
     local CACHED=""
     local STAT_ONLY=""
     local NAME_ONLY=""
@@ -2945,16 +2925,16 @@ jwgit_diff() {
                 shift
                 ;;
             --word-diff|--color-words)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             --)
                 shift
-                FILE="$*"
+                FILES=("$@")
                 break
                 ;;
             -*)
-                OPTIONS="$OPTIONS $1"
+                OPTS+=("$1")
                 shift
                 ;;
             *)
@@ -2963,7 +2943,7 @@ jwgit_diff() {
                 elif [ -z "$COMMIT2" ]; then
                     COMMIT2="$1"
                 else
-                    OPTIONS="$OPTIONS $1"
+                    OPTS+=("$1")
                 fi
                 shift
                 ;;
@@ -2988,54 +2968,31 @@ jwgit_diff() {
     
     echo "---[ Diff Info ]------------------------------------"
     echo "Comparing: $diff_description"
-    if [ -n "$FILE" ]; then
-        echo "File filter: $FILE"
+    if [ ${#FILES[@]} -gt 0 ]; then
+        echo "File filter: ${FILES[*]}"
     fi
     echo
     
-    # Build diff command
-    local diff_cmd="git diff"
-    
-    if [ -n "$CACHED" ]; then
-        diff_cmd="$diff_cmd --cached"
-    fi
-    
+    # Build the diff argv as arrays (no eval — safe under bash and zsh)
+    local -a DIFF=(diff)
+    [ -n "$CACHED" ] && DIFF+=(--cached)
     if [ -n "$STAT_ONLY" ]; then
-        diff_cmd="$diff_cmd --stat"
+        DIFF+=(--stat)
     elif [ -n "$NAME_ONLY" ]; then
-        diff_cmd="$diff_cmd --name-only"
+        DIFF+=(--name-only)
     fi
-    
-    if [ -n "$OPTIONS" ]; then
-        diff_cmd="$diff_cmd $OPTIONS"
-    fi
-    
-    if [ -n "$COMMIT1" ]; then
-        diff_cmd="$diff_cmd $COMMIT1"
-        if [ -n "$COMMIT2" ]; then
-            diff_cmd="$diff_cmd $COMMIT2"
-        fi
-    fi
-    
-    if [ -n "$FILE" ]; then
-        diff_cmd="$diff_cmd -- $FILE"
-    fi
-    
+    DIFF+=("${OPTS[@]}")
+    [ -n "$COMMIT1" ] && DIFF+=("$COMMIT1")
+    [ -n "$COMMIT2" ] && DIFF+=("$COMMIT2")
+    [ ${#FILES[@]} -gt 0 ] && DIFF+=(-- "${FILES[@]}")
+
     # Show summary first
     echo "---[ Summary ]--------------------------------------"
-    local summary_cmd="git diff"
-    if [ -n "$CACHED" ]; then
-        summary_cmd="$summary_cmd --cached"
-    fi
-    if [ -n "$COMMIT1" ]; then
-        summary_cmd="$summary_cmd $COMMIT1"
-        if [ -n "$COMMIT2" ]; then
-            summary_cmd="$summary_cmd $COMMIT2"
-        fi
-    fi
-    if [ -n "$FILE" ]; then
-        summary_cmd="$summary_cmd -- $FILE"
-    fi
+    local -a SUM=(diff)
+    [ -n "$CACHED" ] && SUM+=(--cached)
+    [ -n "$COMMIT1" ] && SUM+=("$COMMIT1")
+    [ -n "$COMMIT2" ] && SUM+=("$COMMIT2")
+    [ ${#FILES[@]} -gt 0 ] && SUM+=(-- "${FILES[@]}")
     
     # Get file count and line changes
     local files_changed
@@ -3043,7 +3000,7 @@ jwgit_diff() {
     local deletions
     
     local stat_output
-    stat_output=$(eval "$summary_cmd --stat" 2>/dev/null)
+    stat_output=$(git "${SUM[@]}" --stat 2>/dev/null)
     
     if [ -n "$stat_output" ]; then
         files_changed=$(echo "$stat_output" | tail -1 | grep -o '[0-9]* file' | cut -d' ' -f1 || echo "0")
@@ -3057,7 +3014,7 @@ jwgit_diff() {
         
         # Show file list with changes
         echo "---[ Changed Files ]--------------------------------"
-        eval "$summary_cmd --name-status" | while read -r status file; do
+        git "${SUM[@]}" --name-status | while read -r status file; do
             case $status in
                 A) echo "  ✅ $file (added)" ;;
                 M) echo "  📝 $file (modified)" ;;
@@ -3076,7 +3033,7 @@ jwgit_diff() {
     # Show the actual diff
     if [ -z "$STAT_ONLY" ] && [ -z "$NAME_ONLY" ]; then
         echo "---[ Diff Content ]---------------------------------"
-        eval "$diff_cmd" 2>/dev/null || {
+        git "${DIFF[@]}" 2>/dev/null || {
             echo "❌ Failed to show diff"
             if [ -n "$COMMIT1" ]; then
                 echo "Commit '$COMMIT1' may not exist"
@@ -3089,7 +3046,7 @@ jwgit_diff() {
     else
         # For stat or name-only, show the output
         echo "---[ Diff Output ]----------------------------------"
-        eval "$diff_cmd"
+        git "${DIFF[@]}"
     fi
     
     echo
@@ -3124,7 +3081,7 @@ jwgit_blame() {
 
     local FILE=$1
     shift
-    local OPTIONS="$*"
+    local -a OPTS=("$@")
     
     # Check if file exists
     if [ ! -f "$FILE" ]; then
@@ -3161,20 +3118,13 @@ jwgit_blame() {
     echo "Format: [commit] (author date) line_number: content"
     echo
     
-    # Build blame command
-    local blame_cmd="git blame"
-    
-    # Add color and formatting options
-    blame_cmd="$blame_cmd --color-lines --color-by-age"
-    
-    if [ -n "$OPTIONS" ]; then
-        blame_cmd="$blame_cmd $OPTIONS"
-    fi
-    
-    blame_cmd="$blame_cmd \"$FILE\""
-    
+    # Build the blame argv as an array (no eval — safe under bash and zsh)
+    local -a CMD=(blame --color-lines --color-by-age)
+    CMD+=("${OPTS[@]}")
+    CMD+=("$FILE")
+
     # Execute blame
-    eval "$blame_cmd" 2>/dev/null || {
+    git "${CMD[@]}" 2>/dev/null || {
         echo "❌ Failed to show blame for '$FILE'"
         echo
         echo "Possible reasons:"

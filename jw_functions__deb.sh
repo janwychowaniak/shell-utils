@@ -688,7 +688,7 @@ jwdeb_upgrade() {
     
     # Show upgrade simulation
     echo "---[ Upgrade Simulation ]---------------------------"
-    apt-get upgrade -s 2>/dev/null | grep -E "^(Inst|Conf)" | wc -l | xargs echo "Operations to perform:"
+    apt-get upgrade -s 2>/dev/null | grep -cE "^(Inst|Conf)" | xargs echo "Operations to perform:"
     echo
     
     # Check for held packages
@@ -696,7 +696,7 @@ jwdeb_upgrade() {
     held_packages=$(apt-mark showhold 2>/dev/null)
     if [ -n "$held_packages" ]; then
         echo "---[ Held Packages (will not be upgraded) ]--------"
-        echo "$held_packages" | sed 's/^/  🔒 /'
+        printf '%s\n' "$held_packages" | sed 's/^/  🔒 /'
         echo
     fi
     
@@ -726,7 +726,7 @@ jwdeb_upgrade() {
             echo "🔄 System reboot is required to complete the upgrade"
             if [ -f /var/run/reboot-required.pkgs ]; then
                 echo "Packages requiring reboot:"
-                cat /var/run/reboot-required.pkgs | sed 's/^/  - /'
+                sed 's/^/  - /' /var/run/reboot-required.pkgs
             fi
         fi
     else
@@ -757,9 +757,9 @@ jwdeb_dist-upgrade() {
     local upgrade_count
     local remove_count
     
-    install_count=$(echo "$simulation" | grep "^Inst" | wc -l)
-    upgrade_count=$(echo "$simulation" | grep "^Inst.*\[upgrade" | wc -l)
-    remove_count=$(echo "$simulation" | grep "^Remv" | wc -l)
+    install_count=$(echo "$simulation" | grep -c "^Inst")
+    upgrade_count=$(echo "$simulation" | grep -c "^Inst.*\[upgrade")
+    remove_count=$(echo "$simulation" | grep -c "^Remv")
     
     echo "Packages to install: $install_count"
     echo "Packages to upgrade: $upgrade_count"
@@ -813,7 +813,7 @@ jwdeb_dist-upgrade() {
             echo "🔄 System reboot is required to complete the upgrade"
             if [ -f /var/run/reboot-required.pkgs ]; then
                 echo "Packages requiring reboot:"
-                cat /var/run/reboot-required.pkgs | sed 's/^/  - /'
+                sed 's/^/  - /' /var/run/reboot-required.pkgs
             fi
         fi
         

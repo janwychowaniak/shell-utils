@@ -1466,7 +1466,7 @@ jwdeb_broken() {
         echo "✅ No broken packages found"
     else
         echo "❌ Issues detected:"
-        echo "$broken_packages" | sed 's/^/  /'
+        printf '%s\n' "$broken_packages" | sed 's/^/  /'
         echo
     fi
     
@@ -1479,7 +1479,7 @@ jwdeb_broken() {
         echo "✅ All packages in consistent state"
     else
         echo "⚠️  Packages in inconsistent state:"
-        echo "$inconsistent_packages" | sed 's/^/  /' | head -10
+        printf '%s\n' "$inconsistent_packages" | sed 's/^/  /' | head -10
         echo
     fi
     
@@ -1492,7 +1492,7 @@ jwdeb_broken() {
         echo "✅ No held packages"
     else
         echo "🔒 Held packages (won't be upgraded):"
-        echo "$held_packages" | sed 's/^/  /'
+        printf '%s\n' "$held_packages" | sed 's/^/  /'
         echo
     fi
     
@@ -1505,7 +1505,7 @@ jwdeb_broken() {
         echo "✅ No unmet dependencies"
     else
         echo "❌ Unmet dependencies found:"
-        echo "$unmet_deps" | sed 's/^/  /'
+        printf '%s\n' "$unmet_deps" | sed 's/^/  /'
         echo
     fi
     
@@ -1518,7 +1518,7 @@ jwdeb_broken() {
         echo "✅ All packages properly configured"
     else
         echo "⚠️  Packages needing configuration:"
-        echo "$unconfigured" | sed 's/^/  /'
+        printf '%s\n' "$unconfigured" | sed 's/^/  /'
         echo
     fi
     
@@ -1592,7 +1592,7 @@ jwdeb_fix() {
         echo "✅ Package system appears to be fixed!"
     else
         echo "⚠️  Some issues remain:"
-        echo "$final_check" | sed 's/^/  /'
+        printf '%s\n' "$final_check" | sed 's/^/  /'
         echo
         echo "Manual steps that might help:"
         echo "  sudo apt-get autoremove              # Remove unused packages"
@@ -1603,7 +1603,7 @@ jwdeb_fix() {
     echo
     echo "---[ Cleanup Recommendations ]---------------------"
     local autoremove_count
-    autoremove_count=$(apt-get autoremove -s 2>/dev/null | grep "^Remv" | wc -l)
+    autoremove_count=$(apt-get autoremove -s 2>/dev/null | grep -c "^Remv")
     
     if [ "$autoremove_count" -gt 0 ]; then
         echo "💡 $autoremove_count packages can be autoremoved"
@@ -1624,7 +1624,7 @@ jwdeb_diag() {
     echo
     
     echo "---[ System Information ]---------------------------"
-    echo "OS: $(lsb_release -d 2>/dev/null | cut -f2 || cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)"
+    echo "OS: $(lsb_release -d 2>/dev/null | cut -f2 || grep PRETTY_NAME /etc/os-release | cut -d'"' -f2)"
     echo "Architecture: $(dpkg --print-architecture)"
     echo "Kernel: $(uname -r)"
     echo "Date: $(date)"
@@ -1637,10 +1637,10 @@ jwdeb_diag() {
     local autoremovable_packages
     
     total_packages=$(apt-cache pkgnames | wc -l)
-    installed_packages=$(dpkg -l | grep "^ii" | wc -l)
+    installed_packages=$(dpkg -l | grep -c "^ii")
     upgradable_packages=$(apt list --upgradable 2>/dev/null | wc -l)
     upgradable_packages=$((upgradable_packages - 1))  # Subtract header
-    autoremovable_packages=$(apt-get autoremove -s 2>/dev/null | grep "^Remv" | wc -l)
+    autoremovable_packages=$(apt-get autoremove -s 2>/dev/null | grep -c "^Remv")
     
     echo "Total available packages: $total_packages"
     echo "Installed packages: $installed_packages"
@@ -1650,7 +1650,7 @@ jwdeb_diag() {
     
     echo "---[ Repository Status ]----------------------------"
     echo "Active repositories:"
-    grep -E "^deb " /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null | wc -l | xargs echo "  Count:"
+    echo "  Count: $(awk '/^deb /{n++} END{print n+0}' /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null)"
     
     echo "Last update:"
     if [ -f /var/lib/apt/periodic/update-success-stamp ]; then
@@ -1675,9 +1675,7 @@ jwdeb_diag() {
     if [ -r /var/log/dpkg.log ]; then
         echo "Recent package operations (last 5):"
         tail -5 /var/log/dpkg.log | while read -r line; do
-            local date_time
-            local operation
-            local package
+            local date_time="" operation="" package=""
             date_time=$(echo "$line" | awk '{print $1, $2}')
             operation=$(echo "$line" | awk '{print $3}')
             package=$(echo "$line" | awk '{print $4}')
@@ -1724,7 +1722,7 @@ jwdeb_diag() {
         echo "⚠️  Yes"
         if [ -f /var/run/reboot-required.pkgs ]; then
             echo "  Packages requiring reboot:"
-            cat /var/run/reboot-required.pkgs | sed 's/^/    /'
+            sed 's/^/    /' /var/run/reboot-required.pkgs
         fi
     else
         echo "✅ No"

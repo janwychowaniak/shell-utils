@@ -21,6 +21,10 @@ jwdeb_toc() {
     echo " - 🔵 jwdeb_install"
     echo " - 🔴 jwdeb_remove"
     echo " - 🔴 jwdeb_purge"
+    echo " - ⚪ jwdeb_reinstall"
+    echo " - 🔵 jwdeb_download"
+    echo " - ⚪ jwdeb_hold"
+    echo " - ⚪ jwdeb_unhold"
     echo
     echo " -----------------------------  system updates"
     echo " - ⚪ jwdeb_update"
@@ -650,6 +654,226 @@ jwdeb_purge() {
         echo "💡 Run 'jwdeb_autoremove' to clean up unused dependencies"
     else
         echo "Purge cancelled."
+    fi
+    echo
+}
+
+
+jwdeb_reinstall() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdeb_reinstall <package_name> [package2] ..."
+        echo "Examples:"
+        echo "  jwdeb_reinstall nginx        # Re-install nginx (repair its files)"
+        echo "  jwdeb_reinstall python3 curl"
+        echo
+        echo "Re-downloads and reinstalls already-installed packages at the same"
+        echo "version — useful to repair corrupted or deleted files."
+        echo
+        return 1
+    fi
+
+    echo "♻️  Reinstalling packages: $*"
+    echo "=================================================="
+    echo
+
+    local not_installed=() pkg
+    for pkg in "$@"; do
+        if ! dpkg -l "$pkg" 2>/dev/null | grep -q "^ii"; then
+            not_installed+=("$pkg")
+        fi
+    done
+
+    if [ ${#not_installed[@]} -gt 0 ]; then
+        echo "⚠️  Not installed (reinstall needs an installed package):"
+        for pkg in "${not_installed[@]}"; do
+            echo "  - $pkg"
+        done
+        echo
+        echo "💡 Use 'jwdeb_install' to install them first."
+        return 1
+    fi
+
+    echo -n "Proceed with reinstall? [y/N] "
+    read -r response
+
+    if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+        echo "Reinstalling..."
+        sudo apt-get install --reinstall -y "$@"
+        echo
+        echo "✅ Reinstall complete"
+    else
+        echo "Reinstall cancelled."
+    fi
+    echo
+}
+
+
+jwdeb_download() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdeb_download <package_name> [package2] ..."
+        echo "Examples:"
+        echo "  jwdeb_download nginx         # Fetch nginx's .deb into the current dir"
+        echo "  jwdeb_download nginx curl"
+        echo
+        echo "Downloads the .deb file(s) into \$PWD without installing — no sudo"
+        echo "needed. Install a local file later with: jwdeb_install ./<file>.deb"
+        echo
+        return 1
+    fi
+
+    echo "⬇️  Downloading .deb package(s) into: $PWD"
+    echo "=================================================="
+    echo
+
+    local missing=() pkg
+    for pkg in "$@"; do
+        if ! apt-cache show "$pkg" >/dev/null 2>&1; then
+            missing+=("$pkg")
+        fi
+    done
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo "❌ Not found in repositories:"
+        for pkg in "${missing[@]}"; do
+            echo "  - $pkg"
+        done
+        echo
+        echo "💡 Try searching first: jwdeb_search <term>"
+        return 1
+    fi
+
+    if apt-get download "$@"; then
+        echo
+        echo "✅ Done — .deb file(s) saved to $PWD"
+        echo "💡 Install a local .deb with: jwdeb_install ./<file>.deb"
+    else
+        echo
+        echo "❌ Download failed"
+        return 1
+    fi
+    echo
+}
+
+
+jwdeb_hold() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_hold [package_name ...]"
+        echo "Examples:"
+        echo "  jwdeb_hold                   # List packages currently on hold"
+        echo "  jwdeb_hold nginx             # Hold nginx at its current version"
+        echo "  jwdeb_hold nginx curl        # Hold several packages"
+        echo
+        echo "A held package is kept at its current version (skipped by upgrades)."
+        echo "Release a hold with jwdeb_unhold."
+        return 0
+    fi
+
+    # No-args: list current holds (read-only default).
+    if [ $# -eq 0 ]; then
+        echo "🔒 Packages on hold"
+        echo "=================================================="
+        echo
+        local held
+        held=$(apt-mark showhold 2>/dev/null)
+        if [ -n "$held" ]; then
+            printf '%s\n' "$held" | sed 's/^/  🔒 /'
+        else
+            echo "  (no packages are held)"
+        fi
+        echo
+        return 0
+    fi
+
+    echo "🔒 Holding packages: $*"
+    echo "=================================================="
+    echo
+
+    local to_hold=() missing=() pkg
+    for pkg in "$@"; do
+        if dpkg -l "$pkg" 2>/dev/null | grep -q "^ii"; then
+            to_hold+=("$pkg")
+        else
+            missing+=("$pkg")
+        fi
+    done
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo "⚠️  Not installed (cannot hold):"
+        for pkg in "${missing[@]}"; do
+            echo "  - $pkg"
+        done
+        echo
+    fi
+
+    if [ ${#to_hold[@]} -eq 0 ]; then
+        echo "❌ No installed packages to hold."
+        return 1
+    fi
+
+    sudo apt-mark hold "${to_hold[@]}"
+    echo
+    echo "---[ Now on hold ]---------------------------------"
+    apt-mark showhold 2>/dev/null | sed 's/^/  🔒 /'
+    echo
+}
+
+
+jwdeb_unhold() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_unhold <package_name ...>"
+        echo "Examples:"
+        echo "  jwdeb_unhold nginx           # Release the hold on nginx"
+        echo "  jwdeb_unhold nginx curl      # Release several"
+        echo
+        echo "Currently held packages:"
+        local held
+        held=$(apt-mark showhold 2>/dev/null)
+        if [ -n "$held" ]; then
+            printf '%s\n' "$held" | sed 's/^/  🔒 /'
+        else
+            echo "  (none)"
+        fi
+        echo
+        return 1
+    fi
+
+    echo "🔓 Releasing hold: $*"
+    echo "=================================================="
+    echo
+
+    local held_now
+    held_now=$(apt-mark showhold 2>/dev/null)
+    local to_unhold=() not_held=() pkg
+    for pkg in "$@"; do
+        if printf '%s\n' "$held_now" | grep -qxF "$pkg"; then
+            to_unhold+=("$pkg")
+        else
+            not_held+=("$pkg")
+        fi
+    done
+
+    if [ ${#not_held[@]} -gt 0 ]; then
+        echo "⚠️  Not currently held:"
+        for pkg in "${not_held[@]}"; do
+            echo "  - $pkg"
+        done
+        echo
+    fi
+
+    if [ ${#to_unhold[@]} -eq 0 ]; then
+        echo "❌ No held packages to release."
+        return 1
+    fi
+
+    sudo apt-mark unhold "${to_unhold[@]}"
+    echo
+    echo "---[ Still on hold ]-------------------------------"
+    local still
+    still=$(apt-mark showhold 2>/dev/null)
+    if [ -n "$still" ]; then
+        printf '%s\n' "$still" | sed 's/^/  🔒 /'
+    else
+        echo "  (none)"
     fi
     echo
 }

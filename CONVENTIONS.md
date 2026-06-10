@@ -107,6 +107,13 @@ echo "  jwdocker_image-build myapp:v1.0 ./Dockerfile ."
 - Consistent formatting with headers, separators, and sections using `---[ Title ]---` pattern
 - Color output via the `jw_colors.sh` helpers (`jwpaintfgRed`, `jwpaintfgGreen`, …) rather than raw ANSI codes; emoji for status indicators (✅ ❌ ⚠️ 💡)
 - Structured information display with clear labels
+- **Column-align `Label: value` rows** in info/summary blocks via a tiny per-area helper `__jw<area>_kv__` instead of ragged `echo "Label: $val"`, so values line up in a column:
+  ```bash
+  __jwgit_kv__() { printf "%-${3:-18}s%s\n" "$1" "$2"; }   # 3rd arg = optional column width
+  ```
+  - The default width is tuned to the busiest block in the file; pass an explicit width for blocks whose longest label differs (so the gutter stays ~2 spaces — e.g. in git: blame `File Info`=8, prune `Maintenance Summary`=10, gc `Cleanup Summary`=16, everything else 18).
+  - `printf` is byte-width and identical in bash + zsh, so keep **labels ASCII** (emoji only on non-aligned lines) and pass the value as the `%s` argument (a `%` or `—` in the value is then inert).
+  - Apply only to **grouped rows (≥2 in one visual block)**; leave standalone single lines, `---[ ]---` headers, file/commit lists, and `💡` hints alone. Reference: `__jwgit_kv__` in `jw_functions__git.sh`.
 - Progress indicators and completion summaries
 - State-changing operations (start, stop, build, pull) should display the resulting state after the action completes
 

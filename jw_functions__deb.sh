@@ -4,13 +4,13 @@
 # package search and information
 # ---------------------------------------------------------------------------------
 
-jwdebsearch() {
+jwdeb_search() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebsearch <search_term> [options]"
+        echo "Usage: jwdeb_search <search_term> [options]"
         echo "Examples:"
-        echo "  jwdebsearch nginx"
-        echo "  jwdebsearch python3 --installed"
-        echo "  jwdebsearch editor --names-only"
+        echo "  jwdeb_search nginx"
+        echo "  jwdeb_search python3 --installed"
+        echo "  jwdeb_search editor --names-only"
         echo
         echo "Options:"
         echo "  --installed     Search only installed packages"
@@ -54,12 +54,12 @@ jwdebsearch() {
 }
 
 
-jwdebinfo() {
+jwdeb_info() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebinfo <package_name>"
+        echo "Usage: jwdeb_info <package_name>"
         echo "Examples:"
-        echo "  jwdebinfo nginx"
-        echo "  jwdebinfo python3-pip"
+        echo "  jwdeb_info nginx"
+        echo "  jwdeb_info python3-pip"
         echo
         echo "Available packages (recently updated):"
         apt list --upgradable 2>/dev/null | head -5 | tail -n +2 | cut -d'/' -f1 | sed 's/^/- /'
@@ -116,12 +116,12 @@ jwdebinfo() {
 }
 
 
-jwdebdepends() {
+jwdeb_depends() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebdepends <package_name> [--tree]"
+        echo "Usage: jwdeb_depends <package_name> [--tree]"
         echo "Examples:"
-        echo "  jwdebdepends nginx"
-        echo "  jwdebdepends python3 --tree"
+        echo "  jwdeb_depends nginx"
+        echo "  jwdeb_depends python3 --tree"
         echo
         echo "Available installed packages:"
         dpkg -l | grep "^ii" | awk '{print $2}' | head -10 | sed 's/^/- /'
@@ -161,12 +161,12 @@ jwdebdepends() {
 }
 
 
-jwdebfiles() {
+jwdeb_files() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebfiles <package_name>"
+        echo "Usage: jwdeb_files <package_name>"
         echo "Examples:"
-        echo "  jwdebfiles nginx"
-        echo "  jwdebfiles python3-pip"
+        echo "  jwdeb_files nginx"
+        echo "  jwdeb_files python3-pip"
         echo
         echo "Recently installed packages:"
         grep " install " /var/log/dpkg.log 2>/dev/null | tail -5 | awk '{print $4}' | sed 's/^/- /' || echo "- (log not accessible)"
@@ -209,13 +209,13 @@ jwdebfiles() {
 }
 
 
-jwdebwhich() {
+jwdeb_which() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebwhich <file_path>"
+        echo "Usage: jwdeb_which <file_path>"
         echo "Examples:"
-        echo "  jwdebwhich /usr/bin/nginx"
-        echo "  jwdebwhich /etc/nginx/nginx.conf"
-        echo "  jwdebwhich nginx"
+        echo "  jwdeb_which /usr/bin/nginx"
+        echo "  jwdeb_which /etc/nginx/nginx.conf"
+        echo "  jwdeb_which nginx"
         echo
         return 1
     fi
@@ -280,13 +280,13 @@ jwdebwhich() {
 # package management
 # ---------------------------------------------------------------------------------
 
-jwdebinstall() {
+jwdeb_install() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebinstall <package_name> [package2] [package3] ..."
+        echo "Usage: jwdeb_install <package_name> [package2] [package3] ..."
         echo "Examples:"
-        echo "  jwdebinstall nginx"
-        echo "  jwdebinstall python3-pip python3-venv"
-        echo "  jwdebinstall ./package.deb"
+        echo "  jwdeb_install nginx"
+        echo "  jwdeb_install python3-pip python3-venv"
+        echo "  jwdeb_install ./package.deb"
         echo
         echo "Popular packages you might want to install:"
         echo "- curl wget git vim nano htop tree"
@@ -316,7 +316,7 @@ jwdebinstall() {
             echo "  - $pkg"
         done
         echo
-        echo "💡 Try searching first: jwdebsearch <term>"
+        echo "💡 Try searching first: jwdeb_search <term>"
         return 1
     fi
     
@@ -352,12 +352,12 @@ jwdebinstall() {
 }
 
 
-jwdebremove() {
+jwdeb_remove() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebremove <package_name> [package2] [package3] ..."
+        echo "Usage: jwdeb_remove <package_name> [package2] [package3] ..."
         echo "Examples:"
-        echo "  jwdebremove nginx"
-        echo "  jwdebremove python3-pip python3-venv"
+        echo "  jwdeb_remove nginx"
+        echo "  jwdeb_remove python3-pip python3-venv"
         echo
         echo "Recently installed packages:"
         grep " install " /var/log/dpkg.log 2>/dev/null | tail -10 | awk '{print $4}' | sed 's/^/- /' || echo "- (log not accessible)"
@@ -412,7 +412,7 @@ jwdebremove() {
     echo
     
     echo "⚠️  This will remove packages but keep configuration files."
-    echo "   Use 'jwdebpurge' to remove configuration files too."
+    echo "   Use 'jwdeb_purge' to remove configuration files too."
     echo
     echo -n "Proceed with removal? [y/N] "
     read -r response
@@ -434,7 +434,7 @@ jwdebremove() {
         done
         
         echo
-        echo "💡 Run 'jwdebautoremove' to clean up unused dependencies"
+        echo "💡 Run 'jwdeb_autoremove' to clean up unused dependencies"
     else
         echo "Removal cancelled."
     fi
@@ -442,12 +442,12 @@ jwdebremove() {
 }
 
 
-jwdebpurge() {
+jwdeb_purge() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebpurge <package_name> [package2] [package3] ..."
+        echo "Usage: jwdeb_purge <package_name> [package2] [package3] ..."
         echo "Examples:"
-        echo "  jwdebpurge nginx"
-        echo "  jwdebpurge python3-pip python3-venv"
+        echo "  jwdeb_purge nginx"
+        echo "  jwdeb_purge python3-pip python3-venv"
         echo
         echo "⚠️  WARNING: This completely removes packages AND their configuration files!"
         echo
@@ -535,7 +535,7 @@ jwdebpurge() {
         done
         
         echo
-        echo "💡 Run 'jwdebautoremove' to clean up unused dependencies"
+        echo "💡 Run 'jwdeb_autoremove' to clean up unused dependencies"
     else
         echo "Purge cancelled."
     fi
@@ -547,7 +547,7 @@ jwdebpurge() {
 # system updates
 # ---------------------------------------------------------------------------------
 
-jwdebupdate() {
+jwdeb_update() {
     echo "🔄 Updating package lists..."
     echo "=================================================="
     echo
@@ -590,7 +590,7 @@ jwdebupdate() {
             echo "  📦 $package $version_info"
         done
         echo
-        echo "💡 Run 'jwdebupgrade' to install available updates"
+        echo "💡 Run 'jwdeb_upgrade' to install available updates"
     else
         echo "✅ All packages are up to date!"
     fi
@@ -598,9 +598,9 @@ jwdebupdate() {
 }
 
 
-jwdebupgrade() {
+jwdeb_upgrade() {
     if [ "$1" = "--dist" ]; then
-        jwdebdistupgrade
+        jwdeb_dist-upgrade
         return
     fi
     
@@ -685,7 +685,7 @@ jwdebupgrade() {
 }
 
 
-jwdebdistupgrade() {
+jwdeb_dist-upgrade() {
     echo "🚀 Performing distribution upgrade..."
     echo "=================================================="
     echo
@@ -733,7 +733,7 @@ jwdebdistupgrade() {
         echo
     fi
     
-    echo "💡 This is more aggressive than 'jwdebupgrade' and may change system behavior"
+    echo "💡 This is more aggressive than 'jwdeb_upgrade' and may change system behavior"
     echo
     echo -n "Proceed with distribution upgrade? [y/N] "
     read -r response
@@ -767,7 +767,7 @@ jwdebdistupgrade() {
         fi
         
         echo
-        echo "💡 Consider running 'jwdebautoremove' to clean up unused packages"
+        echo "💡 Consider running 'jwdeb_autoremove' to clean up unused packages"
     else
         echo "Distribution upgrade cancelled."
     fi
@@ -779,7 +779,7 @@ jwdebdistupgrade() {
 # system maintenance
 # ---------------------------------------------------------------------------------
 
-jwdebautoremove() {
+jwdeb_autoremove() {
     echo "🧹 Removing automatically installed unused packages..."
     echo "=================================================="
     echo
@@ -837,7 +837,7 @@ jwdebautoremove() {
         fi
         
         echo
-        echo "💡 Run 'jwdebautoclean' to clean package cache"
+        echo "💡 Run 'jwdeb_autoclean' to clean package cache"
     else
         echo "Autoremove cancelled."
     fi
@@ -845,7 +845,7 @@ jwdebautoremove() {
 }
 
 
-jwdebautoclean() {
+jwdeb_autoclean() {
     echo "🧹 Cleaning package cache..."
     echo "=================================================="
     echo
@@ -920,7 +920,7 @@ jwdebautoclean() {
         fi
         
         echo
-        echo "💡 Use 'jwdebclean' for more aggressive cache cleaning"
+        echo "💡 Use 'jwdeb_clean' for more aggressive cache cleaning"
     else
         echo "Autoclean cancelled."
     fi
@@ -928,7 +928,7 @@ jwdebautoclean() {
 }
 
 
-jwdebclean() {
+jwdeb_clean() {
     echo "🧹 Cleaning ALL package cache files..."
     echo "=================================================="
     echo
@@ -1003,15 +1003,15 @@ jwdebclean() {
 # package analysis
 # ---------------------------------------------------------------------------------
 
-jwdebinstalled() {
+jwdeb_installed() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebinstalled [filter] [--size|--date|--manual]"
+        echo "Usage: jwdeb_installed [filter] [--size|--date|--manual]"
         echo "Examples:"
-        echo "  jwdebinstalled                    # List all installed packages"
-        echo "  jwdebinstalled python             # Filter packages containing 'python'"
-        echo "  jwdebinstalled --size             # Sort by size"
-        echo "  jwdebinstalled --date             # Sort by installation date"
-        echo "  jwdebinstalled --manual           # Show manually installed packages only"
+        echo "  jwdeb_installed                    # List all installed packages"
+        echo "  jwdeb_installed python             # Filter packages containing 'python'"
+        echo "  jwdeb_installed --size             # Sort by size"
+        echo "  jwdeb_installed --date             # Sort by installation date"
+        echo "  jwdeb_installed --manual           # Show manually installed packages only"
         echo
         return 1
     fi
@@ -1166,13 +1166,13 @@ jwdebinstalled() {
 }
 
 
-jwdebsize() {
+jwdeb_size() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdebsize [package_name] [--top N]"
+        echo "Usage: jwdeb_size [package_name] [--top N]"
         echo "Examples:"
-        echo "  jwdebsize                    # Show largest packages"
-        echo "  jwdebsize nginx              # Show size of specific package"
-        echo "  jwdebsize --top 20           # Show top 20 largest packages"
+        echo "  jwdeb_size                    # Show largest packages"
+        echo "  jwdeb_size nginx              # Show size of specific package"
+        echo "  jwdeb_size --top 20           # Show top 20 largest packages"
         echo
         return 1
     fi
@@ -1292,7 +1292,7 @@ jwdebsize() {
 }
 
 
-jwdeborphans() {
+jwdeb_orphans() {
     echo "🔍 Finding orphaned packages..."
     echo "=================================================="
     echo
@@ -1316,7 +1316,7 @@ jwdeborphans() {
             fi
             echo
             echo "💡 These packages were installed as dependencies and are no longer needed"
-            echo "   Run 'jwdebautoremove' to remove them"
+            echo "   Run 'jwdeb_autoremove' to remove them"
         else
             echo "✅ No packages marked for autoremoval found"
         fi
@@ -1392,7 +1392,7 @@ jwdeborphans() {
 # troubleshooting
 # ---------------------------------------------------------------------------------
 
-jwdebbroken() {
+jwdeb_broken() {
     echo "🔧 Checking for broken packages..."
     echo "=================================================="
     echo
@@ -1482,7 +1482,7 @@ jwdebbroken() {
         echo "  sudo apt-get update                    # Update package lists"
         echo "  sudo apt-get -f install                # Fix broken dependencies"
         echo "  sudo dpkg --configure -a               # Configure pending packages"
-        echo "  jwdebfix                               # Run automated fix"
+        echo "  jwdeb_fix                               # Run automated fix"
     else
         echo "✅ System appears to be in good condition"
     fi
@@ -1490,7 +1490,7 @@ jwdebbroken() {
 }
 
 
-jwdebfix() {
+jwdeb_fix() {
     echo "🔧 Attempting to fix package system issues..."
     echo "=================================================="
     echo
@@ -1561,18 +1561,18 @@ jwdebfix() {
     
     if [ "$autoremove_count" -gt 0 ]; then
         echo "💡 $autoremove_count packages can be autoremoved"
-        echo "   Run 'jwdebautoremove' to clean them up"
+        echo "   Run 'jwdeb_autoremove' to clean them up"
     fi
     
     local cache_size
     cache_size=$(du -sh /var/cache/apt/archives 2>/dev/null | cut -f1)
     echo "💡 Package cache size: $cache_size"
-    echo "   Run 'jwdebautoclean' or 'jwdebclean' to free space"
+    echo "   Run 'jwdeb_autoclean' or 'jwdeb_clean' to free space"
     echo
 }
 
 
-jwdebdiag() {
+jwdeb_diag() {
     echo "🔍 System Package Diagnostics"
     echo "=================================================="
     echo
@@ -1688,21 +1688,21 @@ jwdebdiag() {
     echo "---[ Recommendations ]------------------------------"
     
     if [ "$upgradable_packages" -gt 0 ]; then
-        echo "💡 $upgradable_packages packages can be upgraded - run 'jwdebupgrade'"
+        echo "💡 $upgradable_packages packages can be upgraded - run 'jwdeb_upgrade'"
     fi
     
     if [ "$autoremovable_packages" -gt 0 ]; then
-        echo "💡 $autoremovable_packages packages can be autoremoved - run 'jwdebautoremove'"
+        echo "💡 $autoremovable_packages packages can be autoremoved - run 'jwdeb_autoremove'"
     fi
     
     local cache_files
     cache_files=$(find /var/cache/apt/archives -name "*.deb" | wc -l)
     if [ "$cache_files" -gt 100 ]; then
-        echo "💡 $cache_files cached packages - consider running 'jwdebautoclean'"
+        echo "💡 $cache_files cached packages - consider running 'jwdeb_autoclean'"
     fi
     
     if [ -n "$broken_check" ]; then
-        echo "💡 Package issues detected - run 'jwdebfix' to attempt repair"
+        echo "💡 Package issues detected - run 'jwdeb_fix' to attempt repair"
     fi
     
     echo

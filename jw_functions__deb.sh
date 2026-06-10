@@ -1123,8 +1123,7 @@ jwdeb_installed() {
             
             echo "$manual_packages" | while read -r package; do
                 if dpkg -l "$package" 2>/dev/null | grep -q "^ii"; then
-                    local version
-                    local description
+                    local version="" description=""
                     version=$(dpkg -l "$package" 2>/dev/null | grep "^ii" | awk '{print $3}')
                     description=$(dpkg -s "$package" 2>/dev/null | grep "^Description:" | cut -d' ' -f2- | head -1)
                     printf "  %-25s %-15s %s\n" "$package" "$version" "$description"
@@ -1146,8 +1145,7 @@ jwdeb_installed() {
         echo "----------------------------------------"
         
         echo "$package_list" | while read -r package; do
-            local size
-            local description
+            local size="" description=""
             size=$(dpkg -s "$package" 2>/dev/null | grep "^Installed-Size:" | awk '{print $2}')
             description=$(dpkg -s "$package" 2>/dev/null | grep "^Description:" | cut -d' ' -f2- | head -1)
             
@@ -1176,8 +1174,7 @@ jwdeb_installed() {
             fi
             
             echo "$recent_installs" | while read -r line; do
-                local date_time
-                local package
+                local date_time="" package=""
                 date_time=$(echo "$line" | awk '{print $1, $2}')
                 package=$(echo "$line" | awk '{print $4}')
                 printf "  %-20s %s\n" "$date_time" "$package"
@@ -1197,7 +1194,7 @@ jwdeb_installed() {
         fi
         
         local count
-        count=$(echo "$package_list" | wc -l)
+        count=$(printf '%s\n' "$package_list" | grep -c .)
         echo "Found $count installed packages:"
         echo
         
@@ -1238,8 +1235,7 @@ jwdeb_size() {
         echo "--------------------------------------------------------"
         
         dpkg -l | grep "^ii" | awk '{print $2}' | while read -r package; do
-            local size
-            local description
+            local size="" description=""
             size=$(dpkg -s "$package" 2>/dev/null | grep "^Installed-Size:" | awk '{print $2}')
             description=$(dpkg -s "$package" 2>/dev/null | grep "^Description:" | cut -d' ' -f2- | head -1)
             
@@ -1319,10 +1315,10 @@ jwdeb_size() {
         local docs
         local libs
         
-        config_files=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -c "^/etc/" || echo "0")
-        executables=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -cE "^/(usr/)?s?bin/" || echo "0")
-        docs=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -c "^/usr/share/doc/" || echo "0")
-        libs=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -c "\.so" || echo "0")
+        config_files=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -c "^/etc/")
+        executables=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -cE "^/(usr/)?s?bin/")
+        docs=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -c "^/usr/share/doc/")
+        libs=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -c "\.so")
         
         echo "  Configuration files: $config_files"
         echo "  Executables: $executables"
@@ -1332,11 +1328,11 @@ jwdeb_size() {
         echo
         echo "---[ Dependencies Impact ]-------------------------"
         local dep_count
-        dep_count=$(apt-cache depends "$PACKAGE" 2>/dev/null | grep -c "Depends:" || echo "0")
+        dep_count=$(apt-cache depends "$PACKAGE" 2>/dev/null | grep -c "Depends:")
         echo "Direct dependencies: $dep_count"
-        
+
         local rdep_count
-        rdep_count=$(apt-cache rdepends "$PACKAGE" 2>/dev/null | grep -v "Reverse Depends:" | wc -l || echo "0")
+        rdep_count=$(apt-cache rdepends "$PACKAGE" 2>/dev/null | grep -cv "Reverse Depends:")
         echo "Packages depending on this: $rdep_count"
     fi
     echo
@@ -1418,11 +1414,10 @@ jwdeb_orphans() {
     echo "Orphans by category:"
     
     # Check different categories
+    local cat_orphans="" cat_count=""
     for category in libs oldlibs devel doc; do
-        local cat_orphans
         cat_orphans=$(deborphan --section="$category" 2>/dev/null)
         if [ -n "$cat_orphans" ]; then
-            local cat_count
             cat_count=$(echo "$cat_orphans" | wc -l)
             echo "  $category: $cat_count packages"
         fi

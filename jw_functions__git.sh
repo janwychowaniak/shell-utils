@@ -3047,7 +3047,7 @@ jwgit_log() {
     if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_log [options] [branch|commit] [-- file]"
         echo "Examples:"
-        echo "  jwgit_log                      # Show recent commits"
+        echo "  jwgit_log                      # Show commit history (most recent first)"
         echo "  jwgit_log --oneline            # Compact one-line format"
         echo "  jwgit_log --graph              # Show branch graph"
         echo "  jwgit_log -10                  # Show last 10 commits"
@@ -3129,11 +3129,9 @@ jwgit_log() {
         esac
     done
     
-    # Set default limit if not specified
-    if [ -z "$LIMIT" ] && [ ${#OPTS[@]} -eq 0 ]; then
-        LIMIT="-20"
-    fi
-    
+    # No artificial commit cap: with no -N given, show the full history and let
+    # git's pager handle volume (like native `git log`). Pass -N to limit.
+
     echo "📜 Git Commit History"
     echo "=================================================="
     echo
@@ -4536,7 +4534,7 @@ jwgit_reflog() {
         # Show combined reflog
         echo "---[ Combined Reflog Entries ]---------------------"
         local -a CMD=(reflog --all)
-        if [ -n "$LIMIT" ]; then CMD+=("$LIMIT"); else CMD+=(-20); fi
+        [ -n "$LIMIT" ] && CMD+=("$LIMIT")   # no default cap; pass -N to limit
         CMD+=("${OPTS[@]}")
         git "${CMD[@]}" --format="%C(yellow)%gd%C(reset) %C(green)(%cr)%C(reset) %gs %C(blue)%h%C(reset) %s"
         
@@ -4579,7 +4577,7 @@ jwgit_reflog() {
         
         # Build reflog command
         local -a CMD=(reflog "$REF")
-        if [ -n "$LIMIT" ]; then CMD+=("$LIMIT"); else CMD+=(-20); fi
+        [ -n "$LIMIT" ] && CMD+=("$LIMIT")   # no default cap; pass -N to limit
         CMD+=("${OPTS[@]}")
         
         # Show reflog with enhanced formatting

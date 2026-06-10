@@ -65,27 +65,34 @@ jwdeb_search() {
 
     local SEARCH_TERM=$1
     shift
-    local OPTIONS="$*"
+    local opt_installed="" opt_names="" opt_full="" opt
+    for opt in "$@"; do
+        case $opt in
+            --installed)  opt_installed="yes" ;;
+            --names-only) opt_names="yes" ;;
+            --full)       opt_full="yes" ;;
+        esac
+    done
     
     echo "Searching for packages matching '$SEARCH_TERM'..."
     echo
     
-    if echo "$OPTIONS" | grep -q -- "--installed"; then
+    if [ -n "$opt_installed" ]; then
         echo "---[ Installed Packages ]---------------------------"
-        if echo "$OPTIONS" | grep -q -- "--names-only"; then
+        if [ -n "$opt_names" ]; then
             dpkg -l | grep -i "$SEARCH_TERM" | awk '{printf "%-30s %s\n", $2, $3}'
         else
             apt list --installed 2>/dev/null | grep -i "$SEARCH_TERM" | head -20
         fi
-    elif echo "$OPTIONS" | grep -q -- "--names-only"; then
+    elif [ -n "$opt_names" ]; then
         echo "---[ Package Names ]--------------------------------"
         apt-cache pkgnames | grep -i "$SEARCH_TERM" | head -20
-    elif echo "$OPTIONS" | grep -q -- "--full"; then
+    elif [ -n "$opt_full" ]; then
         echo "---[ Detailed Search Results ]----------------------"
         apt-cache search "$SEARCH_TERM" | head -10
         echo
         echo "---[ Package Details ]------------------------------"
-        apt-cache search "$SEARCH_TERM" | head -3 | while read -r pkg desc; do
+        apt-cache search "$SEARCH_TERM" | head -3 | while read -r pkg _; do
             echo "Package: $pkg"
             apt-cache show "$pkg" 2>/dev/null | grep -E "^(Version|Description|Size|Depends):" | head -4
             echo
@@ -151,7 +158,7 @@ jwdeb_info() {
         local reverse_deps
         reverse_deps=$(apt-cache rdepends "$PACKAGE" 2>/dev/null | grep -v "Reverse Depends:" | head -10)
         if [ -n "$reverse_deps" ]; then
-            echo "$reverse_deps" | sed 's/^/  /'
+            printf '%s\n' "$reverse_deps" | sed 's/^/  /'
         else
             echo "  (no reverse dependencies found)"
         fi

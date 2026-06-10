@@ -13,6 +13,7 @@ jwgit_toc() {
     echo " - 🔵 jwgit_init"
     echo " - 🔵 jwgit_clone"
     echo " - ⚪ jwgit_remote"
+    echo " - ⚪ jwgit_config"
     echo
     echo " -----------------------------  branch operations"
     echo " - ⚪ jwgit_branch"
@@ -323,6 +324,380 @@ jwgit_remote() {
             fi
             ;;
     esac
+    echo
+}
+
+
+jwgit_config() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwgit_config <show|get|set|unset|edit> [args]"
+        echo "Examples:"
+        echo "  jwgit_config show                        # Layered effective config (all scopes)"
+        echo "  jwgit_config show user                   # Only entries matching 'user'"
+        echo "  jwgit_config get user.email              # Effective value + where it resolves from"
+        echo "  jwgit_config set user.email me@ex.com    # Set (defaults to --local), with confirm"
+        echo "  jwgit_config set core.editor vim --global"
+        echo "  jwgit_config unset user.email --local    # Remove a key from one scope"
+        echo "  jwgit_config edit --global               # Open a scope's file in \$EDITOR"
+        echo
+        echo "Scopes (low -> high precedence; higher wins):"
+        echo "  --system     /etc/gitconfig"
+        echo "  --global     ~/.gitconfig"
+        echo "  --local      .git/config            (default for set / unset / edit)"
+        echo "  --worktree   .git/config.worktree   (needs extensions.worktreeConfig)"
+        echo
+        return 1
+    fi
+
+    # local/worktree scopes and the repo header only make sense inside a repo
+    local in_repo=""
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 && in_repo=1
+
+    local ACTION=$1
+    shift
+
+    case $ACTION in
+        show|list|ls)
+            local FILTER=$1   # optional case-insensitive substring filter (key or value)
+            echo "⚙️  Effective Git Configuration"
+            echo "=================================================="
+            echo
+
+            echo "---[ Repository ]-----------------------------------"
+            local repo_root
+            repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
+            if [ -n "$repo_root" ]; then
+                echo "Repository: $(basename "$repo_root")"
+                echo "Location:   $repo_root"
+            else
+                echo "(not in a git repository — showing global / system layers only)"
+            fi
+            [ -n "$FILTER" ] && echo "Filter:     entries matching '$FILTER'"
+            echo
+
+            # Resolve each scope's backing file (shown even when the layer is empty)
+            local sys_file glob_file loc_file wt_file wt_on
+            sys_file="/etc/gitconfig"
+            glob_file=$(git config --global --list --show-origin 2>/dev/null | head -1 | cut -f1 | sed 's/^file://')
+            [ -n "$glob_file" ] || glob_file="$HOME/.gitconfig"
+            loc_file=$(git rev-parse --git-path config 2>/dev/null)
+            wt_file=$(git rev-parse --git-path config.worktree 2>/dev/null)
+            wt_on=""
+            [ "$(git config --get extensions.worktreeConfig 2>/dev/null)" = "true" ] && wt_on=1
+
+            # Per-layer entry counts
+            # Note: with extensions.worktreeConfig disabled, 'git config --worktree'
+            # silently FALLS BACK to --local — so the worktree layer is only real
+            # when wt_on; otherwise we must not count or dump it (it would duplicate
+            # local). System/global empty-notes carry no parens (the helper adds them).
+            local s_cnt g_cnt l_cnt w_cnt
+            s_cnt=$(git config --system --list 2>/dev/null | wc -l)
+            g_cnt=$(git config --global --list 2>/dev/null | wc -l)
+            l_cnt=$(git config --local  --list 2>/dev/null | wc -l)
+            if [ -n "$wt_on" ]; then
+                w_cnt=$(git config --worktree --list 2>/dev/null | wc -l)
+            else
+                w_cnt=0
+            fi
+
+            local loc_note wt_note
+            loc_note="none"; wt_note="none"
+            [ -n "$wt_on" ] || wt_note="not enabled"
+            if [ -z "$in_repo" ]; then
+                loc_note="not in a repo"; wt_note="not in a repo"
+            fi
+
+            echo "---[ Layers (low -> high precedence; higher wins) ]-"
+            __jwgit_config_layerline__ "🖥" "system  " "$sys_file"  "$s_cnt" "none"
+            __jwgit_config_layerline__ "👤" "global  " "$glob_file" "$g_cnt" "none"
+            __jwgit_config_layerline__ "📁" "local   " "$loc_file"  "$l_cnt" "$loc_note"
+            __jwgit_config_layerline__ "🌿" "worktree" "$wt_file"   "$w_cnt" "$wt_note"
+            echo
+
+            # Per-layer contents (printed low -> high); worktree only when truly active
+            __jwgit_config_dump__ "system" "🖥" "system  " "$sys_file"  "$FILTER"
+            __jwgit_config_dump__ "global" "👤" "global  " "$glob_file" "$FILTER"
+            __jwgit_config_dump__ "local"  "📁" "local   " "$loc_file"  "$FILTER"
+            [ -n "$wt_on" ] && __jwgit_config_dump__ "worktree" "🌿" "worktree" "$wt_file" "$FILTER"
+
+            # Override map: keys defined in more than one layer (effective = highest).
+            # --name-only + sort -u collapses multivar within a scope; awk counts
+            # distinct scopes per key; final sort makes the listing deterministic.
+            local overrides
+            overrides=$(git config --list --show-scope --name-only 2>/dev/null \
+                | sort -u \
+                | awk -F'\t' '{c[$2]++; s[$2]=s[$2]" "$1} END{for (k in c) if (c[k] > 1) print k"\t"s[k]}' \
+                | sort)
+
+            if [ -n "$overrides" ]; then
+                echo "---[ ⚠️  Overridden keys (shadowed -> effective) ]----"
+                # locals declared once up-front: a bare in-loop 'local' re-prints in zsh
+                local okey oscopes effscope sc val
+                okey=""; oscopes=""; effscope=""; sc=""; val=""
+                while IFS=$'\t' read -r okey oscopes; do
+                    [ -n "$okey" ] || continue
+                    echo "  $okey"
+                    effscope=""
+                    for sc in system global local worktree; do
+                        case " $oscopes " in *" $sc "*) effscope=$sc ;; esac
+                    done
+                    for sc in system global local worktree; do
+                        case " $oscopes " in
+                            *" $sc "*)
+                                val=$(git config --"$sc" --get "$okey" 2>/dev/null)
+                                if [ "$sc" = "$effscope" ]; then
+                                    echo "     $sc : $val   ✅ effective"
+                                else
+                                    echo "     $sc : $val   (shadowed)"
+                                fi
+                                ;;
+                        esac
+                    done
+                done <<< "$overrides"
+                echo
+            else
+                echo "---[ Overrides ]------------------------------------"
+                echo "  (no key is set in more than one layer)"
+                echo
+            fi
+            ;;
+
+        get)
+            local KEY=$1
+            if [ -z "$KEY" ]; then
+                echo "Usage: jwgit_config get <key>"
+                echo "Example: jwgit_config get user.email"
+                return 1
+            fi
+            echo "⚙️  $KEY"
+            echo "=================================================="
+
+            if ! git config --get "$KEY" >/dev/null 2>&1; then
+                # No single effective value: either unset, or a multivar key
+                if git config --get-all "$KEY" >/dev/null 2>&1; then
+                    echo "  (multivar — multiple values set)"
+                    git config --show-scope --get-all "$KEY" 2>/dev/null | sed -e 's/^/  /' -e 's/\t/ : /'
+                    echo
+                    echo "💡 Edit selectively with: jwgit_config edit <scope>"
+                    return 0
+                fi
+                echo "❌ '$KEY' is not set in any scope"
+                echo
+                echo "💡 Set it with: jwgit_config set $KEY <value> [--local|--global]"
+                return 1
+            fi
+
+            local meta eff_scope eff_file eff_val
+            meta=$(git config --show-scope --show-origin --get "$KEY" 2>/dev/null)
+            eff_scope=$(printf '%s' "$meta" | cut -f1)
+            eff_file=$(printf '%s' "$meta" | cut -f2 | sed 's/^file://')
+            eff_val=$(git config --get "$KEY" 2>/dev/null)
+            echo "  Effective: $eff_val"
+            echo "  Source:    $eff_scope ($eff_file)"
+            echo
+            echo "  Resolution chain (low -> high; higher wins):"
+            local sc v wt_on
+            sc=""; v=""; wt_on=""
+            [ "$(git config --get extensions.worktreeConfig 2>/dev/null)" = "true" ] && wt_on=1
+            for sc in system global local worktree; do
+                # skip the worktree probe unless it's a real layer: with the
+                # extension off, 'git config --worktree --get' falls back to local
+                [ "$sc" = "worktree" ] && [ -z "$wt_on" ] && continue
+                if v=$(git config --"$sc" --get "$KEY" 2>/dev/null); then
+                    if [ "$sc" = "$eff_scope" ]; then
+                        echo "     $sc : $v   ✅ effective"
+                    else
+                        echo "     $sc : $v   (shadowed)"
+                    fi
+                fi
+            done
+            echo
+            ;;
+
+        set)
+            local SCOPE="--local" KEY="" VALUE="" have_key="" have_val=""
+            while [ $# -gt 0 ]; do
+                case $1 in
+                    --local|--global|--system|--worktree) SCOPE=$1 ;;
+                    *)
+                        if [ -z "$have_key" ]; then
+                            KEY=$1; have_key=1
+                        elif [ -z "$have_val" ]; then
+                            VALUE=$1; have_val=1
+                        fi
+                        ;;
+                esac
+                shift
+            done
+            if [ -z "$have_key" ] || [ -z "$have_val" ]; then
+                echo "Usage: jwgit_config set <key> <value> [--local|--global|--system|--worktree]"
+                echo "  Scope defaults to --local."
+                echo "Examples:"
+                echo "  jwgit_config set user.email me@example.com"
+                echo "  jwgit_config set core.editor vim --global"
+                return 1
+            fi
+            local scope_name=${SCOPE#--}
+            if [ "$SCOPE" = "--worktree" ] && [ "$(git config --get extensions.worktreeConfig 2>/dev/null)" != "true" ]; then
+                echo "⚠️  Worktree config not enabled (extensions.worktreeConfig) — git will fall back to --local."
+                echo
+            fi
+            echo "⚙️  Setting $KEY  (scope: $scope_name)"
+            echo
+
+            local before eff_before
+            before=$(git config "$SCOPE" --get "$KEY" 2>/dev/null)
+            eff_before=$(git config --get "$KEY" 2>/dev/null)
+            if [ -n "$before" ]; then
+                echo "  Current ($scope_name): $before"
+            else
+                echo "  Current ($scope_name): (unset)"
+            fi
+            [ -n "$eff_before" ] && echo "  Current effective:    $eff_before"
+            echo "  New value:            $VALUE"
+            echo
+
+            if [ "$SCOPE" = "--global" ]; then
+                echo "⚠️  Writes to GLOBAL config — affects all your repositories."
+            elif [ "$SCOPE" = "--system" ]; then
+                echo "⚠️  Writes to SYSTEM config — affects all users (usually needs sudo)."
+            fi
+            echo -n "Proceed? [y/N] "
+            read -r response
+            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+                echo "Cancelled"
+                return 1
+            fi
+
+            if git config "$SCOPE" "$KEY" "$VALUE"; then
+                echo "✅ Set $KEY ($scope_name)"
+                local eff_after
+                eff_after=$(git config --get "$KEY" 2>/dev/null)
+                echo "  Effective now: $eff_after"
+            else
+                echo "❌ Failed to set $KEY"
+                return 1
+            fi
+            ;;
+
+        unset)
+            local SCOPE="--local" KEY="" have_key=""
+            while [ $# -gt 0 ]; do
+                case $1 in
+                    --local|--global|--system|--worktree) SCOPE=$1 ;;
+                    *) [ -z "$have_key" ] && { KEY=$1; have_key=1; } ;;
+                esac
+                shift
+            done
+            if [ -z "$have_key" ]; then
+                echo "Usage: jwgit_config unset <key> [--local|--global|--system|--worktree]"
+                echo "  Scope defaults to --local."
+                return 1
+            fi
+            local scope_name=${SCOPE#--}
+            if [ "$SCOPE" = "--worktree" ] && [ "$(git config --get extensions.worktreeConfig 2>/dev/null)" != "true" ]; then
+                echo "⚠️  Worktree config not enabled (extensions.worktreeConfig) — git will fall back to --local."
+                echo
+            fi
+
+            local cur
+            if ! cur=$(git config "$SCOPE" --get "$KEY" 2>/dev/null); then
+                # Either not set in this scope, or a multivar (--get refuses those)
+                local n
+                n=$(git config "$SCOPE" --get-all "$KEY" 2>/dev/null | wc -l)
+                if [ "$n" -eq 0 ]; then
+                    echo "❌ '$KEY' is not set in $scope_name scope"
+                    echo
+                    echo "Defined in:"
+                    local sc
+                    sc=""
+                    for sc in system global local worktree; do
+                        git config --"$sc" --get "$KEY" >/dev/null 2>&1 && echo "  - $sc"
+                    done
+                    return 1
+                fi
+                echo "⚠️  '$KEY' has $n values in $scope_name scope (multivar)."
+                echo "💡 Remove all:        git config $SCOPE --unset-all $KEY"
+                echo "   Or edit by hand:   jwgit_config edit $SCOPE"
+                return 1
+            fi
+
+            echo "⚙️  Unsetting $KEY  (scope: $scope_name)"
+            echo "  Current value: $cur"
+            echo
+            echo "⚠️  This removes the key from the $scope_name config."
+            echo -n "Proceed? [y/N] "
+            read -r response
+            if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+                echo "Cancelled"
+                return 1
+            fi
+
+            if git config "$SCOPE" --unset "$KEY"; then
+                echo "✅ Removed $KEY from $scope_name"
+                local eff_after
+                if eff_after=$(git config --get "$KEY" 2>/dev/null); then
+                    echo "  Now effective (from another layer): $eff_after"
+                else
+                    echo "  No longer set in any layer."
+                fi
+            else
+                echo "❌ Failed to unset $KEY"
+                return 1
+            fi
+            ;;
+
+        edit)
+            local SCOPE="--local"
+            case $1 in
+                --local|--global|--system|--worktree) SCOPE=$1 ;;
+                "") ;;
+                *)
+                    echo "Usage: jwgit_config edit [--local|--global|--system|--worktree]"
+                    echo "  Scope defaults to --local."
+                    return 1
+                    ;;
+            esac
+            local scope_name=${SCOPE#--}
+            echo "⚙️  Opening $scope_name config in your editor..."
+            git config "$SCOPE" --edit
+            ;;
+
+        *)
+            echo "❌ Unknown action: $ACTION"
+            echo "Valid actions: show, get, set, unset, edit"
+            echo "Run 'jwgit_config' (no args) for usage."
+            return 1
+            ;;
+    esac
+    echo
+}
+
+__jwgit_config_layerline__() {
+    # <emoji> <name> <file> <count> <empty_note>  -> one aligned summary row
+    local emoji=$1 name=$2 file=$3 cnt=$4 empty_note=$5 detail
+    if [ "$cnt" -eq 1 ]; then
+        detail="1 entry"
+    elif [ "$cnt" -gt 1 ]; then
+        detail="$cnt entries"
+    else
+        detail="$empty_note"
+    fi
+    echo "  $emoji $name  $file  ($detail)"
+}
+
+__jwgit_config_dump__() {
+    # <scope> <emoji> <name> <file> <filter>  -> print a scope's block (skip if empty)
+    local scope=$1 emoji=$2 name=$3 file=$4 filter=$5 body
+    body=$(git config --"$scope" --list 2>/dev/null)
+    [ -n "$body" ] || return 0
+    if [ -n "$filter" ]; then
+        body=$(printf '%s\n' "$body" | grep -iF -- "$filter")
+        [ -n "$body" ] || return 0
+    fi
+    echo "---[ $emoji $name  $file ]--------------------"
+    # split each 'key=value' on its FIRST '=' only (values may themselves contain '=')
+    printf '%s\n' "$body" | sed -e 's/^/  /' -e 's/=/ = /'
     echo
 }
 

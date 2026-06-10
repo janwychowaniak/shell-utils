@@ -15,6 +15,9 @@
 # the read-only / non-destructive functions. The fully-destructive paths
 # (reset --hard, clean -f, prune, gc --deep, conflicted merge/rebase/revert)
 # are intentionally NOT executed — they get only the no-args/usage smoke.
+# For jwgit_config: the read paths (show/get) and the cancel/not-set write
+# paths are exercised; confirmed set/unset writes and `edit` (interactive,
+# opens $EDITOR) and real --global/--system writes are NOT executed.
 #
 # Run:  bash tests/smoke_jwgit.sh   (or ./tests/smoke_jwgit.sh)
 # Exit: 0 = clean, 1 = runtime-error signature found, 2 = setup problem.
@@ -99,6 +102,7 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwgit_status' 'jwgit_log --oneline -5' 'jwgit_diff' 'jwgit_diff --cached'
     'jwgit_blame a.txt' 'jwgit_reflog' 'jwgit_branch list --all'
     'jwgit_remote show' 'jwgit_tag'
+    'jwgit_config show' 'jwgit_config show user' 'jwgit_config get user.email'
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -138,6 +142,12 @@ B=(
   'jwgit_branch create smoke-br'
   'jwgit_stash list'
   'jwgit_fetch'
+  'jwgit_config show'
+  'jwgit_config show user'
+  'jwgit_config get user.email'
+  'jwgit_config get no.suchkey'
+  'jwgit_config set smoke.flag x'
+  'jwgit_config unset no.suchkey'
 )
 echo "=== Part B: ${#B[@]} real-arg invocations (safe functions) ==="
 for sh in "${SHELLS[@]}"; do

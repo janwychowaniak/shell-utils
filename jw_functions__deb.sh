@@ -1,5 +1,49 @@
 # shellcheck shell=bash
 
+
+# ---------------------------------------------------------------------------------
+# table of contents
+# ---------------------------------------------------------------------------------
+
+jwdeb_toc() {
+    echo
+    echo "   blast radius:  🟢 tylko odczyt   🔵 tworzy   ⚪ zmiana stanu / transfer   🔴 kasuje (destructive)"
+    echo
+    echo " -----------------------------  package search & information"
+    echo " - 🟢 jwdeb_search"
+    echo " - 🟢 jwdeb_info"
+    echo " - 🟢 jwdeb_depends"
+    echo " - 🟢 jwdeb_files"
+    echo " - 🟢 jwdeb_which"
+    echo
+    echo " -----------------------------  package management"
+    echo " - 🔵 jwdeb_install"
+    echo " - 🔴 jwdeb_remove"
+    echo " - 🔴 jwdeb_purge"
+    echo
+    echo " -----------------------------  system updates"
+    echo " - ⚪ jwdeb_update"
+    echo " - ⚪ jwdeb_upgrade"
+    echo " - 🔴 jwdeb_dist-upgrade"
+    echo
+    echo " -----------------------------  system maintenance"
+    echo " - 🔴 jwdeb_autoremove"
+    echo " - 🔴 jwdeb_autoclean"
+    echo " - 🔴 jwdeb_clean"
+    echo
+    echo " -----------------------------  package analysis"
+    echo " - 🟢 jwdeb_installed"
+    echo " - 🟢 jwdeb_size"
+    echo " - 🟢 jwdeb_orphans"
+    echo
+    echo " -----------------------------  troubleshooting"
+    echo " - 🟢 jwdeb_broken"
+    echo " - ⚪ jwdeb_fix"
+    echo " - 🟢 jwdeb_diag"
+    echo
+}
+
+
 # ---------------------------------------------------------------------------------
 # package search and information
 # ---------------------------------------------------------------------------------

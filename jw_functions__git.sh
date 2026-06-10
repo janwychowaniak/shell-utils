@@ -3044,7 +3044,7 @@ jwgit_fetch() {
 # ---------------------------------------------------------------------------------
 
 jwgit_log() {
-    if [ $# -eq 0 ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_log [options] [branch|commit] [-- file]"
         echo "Examples:"
         echo "  jwgit_log                      # Show recent commits"
@@ -3063,7 +3063,7 @@ jwgit_log() {
         echo "  --patch       Show full diff"
         echo "  --all         Show all branches"
         echo
-        return 1
+        return 0
     fi
 
     local -a OPTS=()
@@ -3404,7 +3404,7 @@ jwgit_status() {
 
 
 jwgit_diff() {
-    if [ $# -eq 0 ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_diff [options] [commit] [commit] [-- file]"
         echo "Examples:"
         echo "  jwgit_diff                     # Show unstaged changes"
@@ -3431,7 +3431,7 @@ jwgit_diff() {
             echo "  (no changes to show)"
         fi
         echo
-        return 1
+        return 0
     fi
 
     local -a OPTS=()
@@ -4465,7 +4465,7 @@ __jwgit_bisect_status__() {
 
 
 jwgit_reflog() {
-    if [ $# -eq 0 ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_reflog [branch|HEAD] [options]"
         echo "Examples:"
         echo "  jwgit_reflog                   # Show HEAD reflog"
@@ -4477,7 +4477,7 @@ jwgit_reflog() {
         echo "Reflog shows the history of where HEAD (or branch) has been."
         echo "Useful for recovering lost commits or understanding recent changes."
         echo
-        return 1
+        return 0
     fi
 
     local REF="HEAD"

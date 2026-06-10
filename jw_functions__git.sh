@@ -3196,6 +3196,11 @@ jwgit_log() {
 }
 
 
+# row helper: left-pad a label to a fixed column so values line up in a column
+__jwgit_kv__() {
+    printf '%-18s%s\n' "$1" "$2"
+}
+
 jwgit_status() {
     echo "📊 Git Repository Status"
     echo "=================================================="
@@ -3206,8 +3211,8 @@ jwgit_status() {
     local repo_root
     repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
     if [ -n "$repo_root" ]; then
-        echo "Repository: $(basename "$repo_root")"
-        echo "Location: $repo_root"
+        __jwgit_kv__ "Repository:" "$(basename "$repo_root")"
+        __jwgit_kv__ "Location:" "$repo_root"
     else
         echo "❌ Not in a git repository"
         return 1
@@ -3217,14 +3222,14 @@ jwgit_status() {
     local current_branch
     current_branch=$(git branch --show-current 2>/dev/null)
     if [ -n "$current_branch" ]; then
-        echo "Current branch: $current_branch"
-        
+        __jwgit_kv__ "Current branch:" "$current_branch"
+
         # Upstream information
         local upstream=""
         upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
         if [ -n "$upstream" ]; then
-            echo "Upstream: $upstream"
-            
+            __jwgit_kv__ "Upstream:" "$upstream"
+
             # Ahead/behind status
             local ahead_behind
             ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
@@ -3233,23 +3238,23 @@ jwgit_status() {
                 local behind
                 ahead=$(echo "$ahead_behind" | cut -f1)
                 behind=$(echo "$ahead_behind" | cut -f2)
-                
+
                 if [ "$ahead" -gt 0 ] || [ "$behind" -gt 0 ]; then
-                    echo "Status: $ahead ahead, $behind behind"
+                    __jwgit_kv__ "Status:" "$ahead ahead, $behind behind"
                 else
-                    echo "Status: up to date"
+                    __jwgit_kv__ "Status:" "up to date"
                 fi
             fi
         else
-            echo "Upstream: (not set)"
+            __jwgit_kv__ "Upstream:" "(not set)"
         fi
     else
         local current_commit
         current_commit=$(git rev-parse --short HEAD 2>/dev/null)
         if [ -n "$current_commit" ]; then
-            echo "HEAD: $current_commit (detached)"
+            __jwgit_kv__ "HEAD:" "$current_commit (detached)"
         else
-            echo "HEAD: (no commits yet)"
+            __jwgit_kv__ "HEAD:" "(no commits yet)"
         fi
     fi
     
@@ -3257,7 +3262,7 @@ jwgit_status() {
     local latest_commit
     latest_commit=$(git log -1 --oneline 2>/dev/null)
     if [ -n "$latest_commit" ]; then
-        echo "Latest commit: $latest_commit"
+        __jwgit_kv__ "Latest commit:" "$latest_commit"
     fi
     echo
     
@@ -3276,10 +3281,10 @@ jwgit_status() {
     untracked_count=$(git status --porcelain | grep -c "^??")
     deleted_count=$(git status --porcelain | grep -c "^ D\|^D ")
     
-    echo "Staged files: $staged_count"
-    echo "Modified files: $modified_count"
-    echo "Untracked files: $untracked_count"
-    echo "Deleted files: $deleted_count"
+    __jwgit_kv__ "Staged files:" "$staged_count"
+    __jwgit_kv__ "Modified files:" "$modified_count"
+    __jwgit_kv__ "Untracked files:" "$untracked_count"
+    __jwgit_kv__ "Deleted files:" "$deleted_count"
     
     # Show detailed status if there are changes
     if [ "$staged_count" -gt 0 ] || [ "$modified_count" -gt 0 ] || [ "$untracked_count" -gt 0 ]; then
@@ -3350,7 +3355,7 @@ jwgit_status() {
     stash_count=$(git stash list | wc -l 2>/dev/null || echo "0")
     if [ "$stash_count" -gt 0 ]; then
         echo "---[ Stashes ]--------------------------------------"
-        echo "Stashed changes: $stash_count"
+        __jwgit_kv__ "Stashed changes:" "$stash_count"
         git stash list | head -3 | sed 's/^/  /'
         if [ "$stash_count" -gt 3 ]; then
             echo "  ... and $((stash_count - 3)) more stashes"

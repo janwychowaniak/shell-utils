@@ -879,7 +879,7 @@ jwdeb_autoremove() {
         
         # Check if there are still packages to remove
         local remaining_autoremove
-        remaining_autoremove=$(apt-get autoremove -s 2>/dev/null | grep "^Remv" | wc -l)
+        remaining_autoremove=$(apt-get autoremove -s 2>/dev/null | grep -c "^Remv")
         
         if [ "$remaining_autoremove" -eq 0 ]; then
             echo "✅ All unused packages removed successfully!"
@@ -931,7 +931,7 @@ jwdeb_autoclean() {
     
     if echo "$autoclean_simulation" | grep -q "Del"; then
         local files_to_remove
-        files_to_remove=$(echo "$autoclean_simulation" | grep "^Del" | wc -l)
+        files_to_remove=$(echo "$autoclean_simulation" | grep -c "^Del")
         echo "Obsolete package files to remove: $files_to_remove"
         
         echo "Files to be removed (first 10):"

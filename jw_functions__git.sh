@@ -162,13 +162,13 @@ jwgit_clone() {
             echo "📁 Location: $DIR"
             echo
             echo "---[ Repository Info ]------------------------------"
-            echo "Remote origin: $(git -C "$DIR" remote get-url origin 2>/dev/null || echo 'Not set')"
-            echo "Current branch: $(git -C "$DIR" branch --show-current 2>/dev/null || echo 'Unknown')"
-            echo "Latest commit: $(git -C "$DIR" log -1 --oneline 2>/dev/null || echo 'No commits')"
-            echo "Total commits: $(git -C "$DIR" rev-list --count HEAD 2>/dev/null || echo '0')"
+            __jwgit_kv__ "Remote origin:" "$(git -C "$DIR" remote get-url origin 2>/dev/null || echo 'Not set')"
+            __jwgit_kv__ "Current branch:" "$(git -C "$DIR" branch --show-current 2>/dev/null || echo 'Unknown')"
+            __jwgit_kv__ "Latest commit:" "$(git -C "$DIR" log -1 --oneline 2>/dev/null || echo 'No commits')"
+            __jwgit_kv__ "Total commits:" "$(git -C "$DIR" rev-list --count HEAD 2>/dev/null || echo '0')"
             local branch_count
             branch_count=$(git -C "$DIR" branch -r 2>/dev/null | wc -l)
-            echo "Remote branches: $branch_count"
+            __jwgit_kv__ "Remote branches:" "$branch_count"
         else
             echo "💡 cd into your new clone to inspect it"
         fi
@@ -758,14 +758,14 @@ jwgit_branch() {
                 current_branch=$(git branch --show-current)
                 if [ -n "$current_branch" ]; then
                     echo
-                    echo "Current branch: $current_branch"
-                    
+                    __jwgit_kv__ "Current branch:" "$current_branch"
+
                     # Show branch info
                     local upstream=""
                     upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
                     if [ -n "$upstream" ]; then
-                        echo "Upstream: $upstream"
-                        
+                        __jwgit_kv__ "Upstream:" "$upstream"
+
                         # Show ahead/behind status
                         local ahead_behind
                         ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
@@ -774,15 +774,15 @@ jwgit_branch() {
                             local behind
                             ahead=$(echo "$ahead_behind" | cut -f1)
                             behind=$(echo "$ahead_behind" | cut -f2)
-                            
+
                             if [ "$ahead" -gt 0 ] || [ "$behind" -gt 0 ]; then
-                                echo "Status: $ahead ahead, $behind behind"
+                                __jwgit_kv__ "Status:" "$ahead ahead, $behind behind"
                             else
-                                echo "Status: up to date"
+                                __jwgit_kv__ "Status:" "up to date"
                             fi
                         fi
                     else
-                        echo "Upstream: (not set)"
+                        __jwgit_kv__ "Upstream:" "(not set)"
                     fi
                 fi
             fi
@@ -1196,8 +1196,8 @@ jwgit_merge() {
         echo "✅ Merge completed successfully!"
         echo
         echo "---[ Merge Summary ]--------------------------------"
-        echo "Merged: $BRANCH -> $current_branch"
-        echo "Latest commit: $(git log -1 --oneline)"
+        __jwgit_kv__ "Merged:" "$BRANCH -> $current_branch"
+        __jwgit_kv__ "Latest commit:" "$(git log -1 --oneline)"
         
     else
         echo
@@ -1337,8 +1337,8 @@ jwgit_rebase() {
         fi
     else
         echo "---[ Rebase Information ]---------------------------"
-        echo "Target: $TARGET"
-        echo "Current branch: $current_branch"
+        __jwgit_kv__ "Target:" "$TARGET"
+        __jwgit_kv__ "Current branch:" "$current_branch"
         echo "⚠️  This will rewrite commit history!"
     fi
     
@@ -1374,8 +1374,8 @@ jwgit_rebase() {
         echo "✅ Rebase completed successfully!"
         echo
         echo "---[ Rebase Summary ]-------------------------------"
-        echo "Rebased: $current_branch onto $TARGET"
-        echo "Latest commit: $(git log -1 --oneline)"
+        __jwgit_kv__ "Rebased:" "$current_branch onto $TARGET"
+        __jwgit_kv__ "Latest commit:" "$(git log -1 --oneline)"
         
     else
         echo
@@ -1772,21 +1772,21 @@ jwgit_commit() {
         echo "✅ Commit created successfully!"
         echo
         echo "---[ Commit Information ]---------------------------"
-        echo "Commit: $(git log -1 --oneline)"
-        echo "Author: $(git log -1 --format='%an <%ae>')"
-        echo "Date: $(git log -1 --format='%ad' --date=format:'%Y-%m-%d %H:%M:%S')"
-        
+        __jwgit_kv__ "Commit:" "$(git log -1 --oneline)"
+        __jwgit_kv__ "Author:" "$(git log -1 --format='%an <%ae>')"
+        __jwgit_kv__ "Date:" "$(git log -1 --format='%ad' --date=format:'%Y-%m-%d %H:%M:%S')"
+
         # Show files changed
         local files_changed
         files_changed=$(git diff --name-only HEAD~1 HEAD | wc -l)
-        echo "Files changed: $files_changed"
-        
+        __jwgit_kv__ "Files changed:" "$files_changed"
+
         # Show branch status
         local current_branch
         current_branch=$(git branch --show-current)
         if [ -n "$current_branch" ]; then
-            echo "Branch: $current_branch"
-            
+            __jwgit_kv__ "Branch:" "$current_branch"
+
             # Show ahead/behind status if upstream exists
             local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
@@ -1798,7 +1798,7 @@ jwgit_commit() {
                     local behind
                     ahead=$(echo "$ahead_behind" | cut -f1)
                     behind=$(echo "$ahead_behind" | cut -f2)
-                    echo "Status: $ahead ahead, $behind behind $upstream"
+                    __jwgit_kv__ "Status:" "$ahead ahead, $behind behind $upstream"
                 fi
             fi
         fi
@@ -2183,8 +2183,8 @@ jwgit_reset() {
     
     # Show what will happen
     echo "---[ Reset Information ]----------------------------"
-    echo "Current HEAD: $(git rev-parse --short HEAD) ($(git log -1 --oneline))"
-    echo "Reset target: $(git rev-parse --short "$TARGET") ($(git log -1 --oneline "$TARGET"))"
+    __jwgit_kv__ "Current HEAD:" "$(git rev-parse --short HEAD) ($(git log -1 --oneline))"
+    __jwgit_kv__ "Reset target:" "$(git rev-parse --short "$TARGET") ($(git log -1 --oneline "$TARGET"))"
     echo
     
     # Show commits that will be affected
@@ -2452,18 +2452,18 @@ jwgit_push() {
     fi
     
     echo "📤 Pushing to remote repository..."
-    echo "Remote: $REMOTE"
+    __jwgit_kv__ "Remote:" "$REMOTE"
     if [ -n "$BRANCH" ]; then
-        echo "Branch: $BRANCH"
+        __jwgit_kv__ "Branch:" "$BRANCH"
     fi
     if [ ${#OPTS[@]} -gt 0 ]; then
-        echo "Options: ${OPTS[*]}"
+        __jwgit_kv__ "Options:" "${OPTS[*]}"
     fi
     if [ -n "$SET_UPSTREAM" ]; then
-        echo "Setting upstream: $REMOTE/$BRANCH"
+        __jwgit_kv__ "Setting upstream:" "$REMOTE/$BRANCH"
     fi
     if [ -n "$FORCE" ]; then
-        echo "Force push: $FORCE"
+        __jwgit_kv__ "Force push:" "$FORCE"
     fi
     echo
     
@@ -2551,20 +2551,20 @@ jwgit_push() {
         echo "✅ Push completed successfully!"
         echo
         echo "---[ Push Summary ]---------------------------------"
-        echo "Remote: $REMOTE"
+        __jwgit_kv__ "Remote:" "$REMOTE"
         if [ -n "$BRANCH" ]; then
-            echo "Branch: $BRANCH"
-            
+            __jwgit_kv__ "Branch:" "$BRANCH"
+
             # Update upstream info
             if [ -n "$SET_UPSTREAM" ]; then
-                echo "Upstream set: $REMOTE/$BRANCH"
+                __jwgit_kv__ "Upstream set:" "$REMOTE/$BRANCH"
             fi
-            
+
             # Show final status
             local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$BRANCH@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
-                echo "Status: up to date with $upstream"
+                __jwgit_kv__ "Status:" "up to date with $upstream"
             fi
         fi
         
@@ -2687,15 +2687,15 @@ jwgit_pull() {
     fi
     
     echo "📥 Pulling from remote repository..."
-    echo "Remote: $REMOTE"
+    __jwgit_kv__ "Remote:" "$REMOTE"
     if [ -n "$BRANCH" ] && [ -z "$HAS_ALL" ]; then
-        echo "Branch: $BRANCH"
+        __jwgit_kv__ "Branch:" "$BRANCH"
     fi
     if [ ${#OPTS[@]} -gt 0 ]; then
-        echo "Options: ${OPTS[*]}"
+        __jwgit_kv__ "Options:" "${OPTS[*]}"
     fi
     if [ -n "$REBASE" ]; then
-        echo "Mode: Rebase (instead of merge)"
+        __jwgit_kv__ "Mode:" "Rebase (instead of merge)"
     fi
     echo
     
@@ -2789,18 +2789,18 @@ jwgit_pull() {
         echo "✅ Pull completed successfully!"
         echo
         echo "---[ Pull Summary ]---------------------------------"
-        echo "Remote: $REMOTE"
+        __jwgit_kv__ "Remote:" "$REMOTE"
         if [ -n "$BRANCH" ]; then
-            echo "Branch: $BRANCH"
+            __jwgit_kv__ "Branch:" "$BRANCH"
         fi
-        echo "Latest commit: $(git log -1 --oneline)"
-        
+        __jwgit_kv__ "Latest commit:" "$(git log -1 --oneline)"
+
         # Show final status
         if [ -n "$current_branch" ]; then
             local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
-                echo "Status: up to date with $upstream"
+                __jwgit_kv__ "Status:" "up to date with $upstream"
             fi
         fi
         
@@ -2905,12 +2905,12 @@ jwgit_fetch() {
     
     echo "📡 Fetching from remote repository..."
     if [ -n "$FETCH_ALL" ]; then
-        echo "Mode: Fetch from all remotes"
+        __jwgit_kv__ "Mode:" "Fetch from all remotes"
     else
-        echo "Remote: $REMOTE"
+        __jwgit_kv__ "Remote:" "$REMOTE"
     fi
     if [ ${#OPTS[@]} -gt 0 ]; then
-        echo "Options: ${OPTS[*]}"
+        __jwgit_kv__ "Options:" "${OPTS[*]}"
     fi
     echo
     
@@ -2932,9 +2932,9 @@ jwgit_fetch() {
         local upstream=""
         upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
         if [ -n "$upstream" ]; then
-            echo "Current branch: $current_branch"
-            echo "Upstream: $upstream"
-            
+            __jwgit_kv__ "Current branch:" "$current_branch"
+            __jwgit_kv__ "Upstream:" "$upstream"
+
             # Show ahead/behind status
             local ahead_behind
             ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
@@ -2943,10 +2943,10 @@ jwgit_fetch() {
                 local behind
                 ahead=$(echo "$ahead_behind" | cut -f1)
                 behind=$(echo "$ahead_behind" | cut -f2)
-                echo "Status: $ahead ahead, $behind behind"
+                __jwgit_kv__ "Status:" "$ahead ahead, $behind behind"
             fi
         else
-            echo "Current branch: $current_branch (no upstream)"
+            __jwgit_kv__ "Current branch:" "$current_branch (no upstream)"
         fi
     fi
     echo
@@ -2976,9 +2976,9 @@ jwgit_fetch() {
             local upstream=""
             upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
             if [ -n "$upstream" ]; then
-                echo "Current branch: $current_branch"
-                echo "Upstream: $upstream"
-                
+                __jwgit_kv__ "Current branch:" "$current_branch"
+                __jwgit_kv__ "Upstream:" "$upstream"
+
                 # Show updated ahead/behind status
                 local ahead_behind=""
                 ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
@@ -2986,7 +2986,7 @@ jwgit_fetch() {
                     local ahead="" behind=""
                     ahead=$(echo "$ahead_behind" | cut -f1)
                     behind=$(echo "$ahead_behind" | cut -f2)
-                    echo "Status: $ahead ahead, $behind behind"
+                    __jwgit_kv__ "Status:" "$ahead ahead, $behind behind"
                     
                     if [ "$behind" -gt 0 ]; then
                         echo
@@ -3196,9 +3196,11 @@ jwgit_log() {
 }
 
 
-# row helper: left-pad a label to a fixed column so values line up in a column
+# row helper: left-pad a label to a fixed column so values line up in a column.
+# Optional 3rd arg overrides the column width (default 18) for blocks whose
+# longest label differs from the status block's (e.g. prune=10, blame=8).
 __jwgit_kv__() {
-    printf '%-18s%s\n' "$1" "$2"
+    printf "%-${3:-18}s%s\n" "$1" "$2"
 }
 
 jwgit_status() {
@@ -3498,9 +3500,9 @@ jwgit_diff() {
     fi
     
     echo "---[ Diff Info ]------------------------------------"
-    echo "Comparing: $diff_description"
+    __jwgit_kv__ "Comparing:" "$diff_description"
     if [ ${#FILES[@]} -gt 0 ]; then
-        echo "File filter: ${FILES[*]}"
+        __jwgit_kv__ "File filter:" "${FILES[*]}"
     fi
     echo
     
@@ -3538,9 +3540,9 @@ jwgit_diff() {
         insertions=$(echo "$stat_output" | tail -1 | grep -o '[0-9]* insertion' | cut -d' ' -f1 || echo "0")
         deletions=$(echo "$stat_output" | tail -1 | grep -o '[0-9]* deletion' | cut -d' ' -f1 || echo "0")
         
-        echo "Files changed: $files_changed"
-        echo "Insertions: +$insertions"
-        echo "Deletions: -$deletions"
+        __jwgit_kv__ "Files changed:" "$files_changed"
+        __jwgit_kv__ "Insertions:" "+$insertions"
+        __jwgit_kv__ "Deletions:" "-$deletions"
         echo
         
         # Show file list with changes
@@ -3636,8 +3638,8 @@ jwgit_blame() {
     
     # Show file info
     echo "---[ File Info ]------------------------------------"
-    echo "File: $FILE"
-    echo "Size: $(wc -l < "$FILE") lines"
+    __jwgit_kv__ "File:" "$FILE" 8
+    __jwgit_kv__ "Size:" "$(wc -l < "$FILE") lines" 8
     
     # Show recent commits affecting this file
     echo "Recent commits affecting this file:"
@@ -3945,18 +3947,18 @@ jwgit_prune() {
     echo
     
     echo "---[ Maintenance Summary ]--------------------------"
-    echo "Before: $size_before"
-    echo "After:  $size_after"
-    
+    __jwgit_kv__ "Before:" "$size_before" 10
+    __jwgit_kv__ "After:" "$size_after" 10
+
     # Show object count
     local object_count
     object_count=$(git count-objects -v | grep "count" | cut -d' ' -f2 || echo "unknown")
-    echo "Objects: $object_count"
-    
+    __jwgit_kv__ "Objects:" "$object_count" 10
+
     # Show pack info
     local pack_count
     pack_count=$(git count-objects -v | grep "packs" | cut -d' ' -f2 || echo "0")
-    echo "Packs: $pack_count"
+    __jwgit_kv__ "Packs:" "$pack_count" 10
     
     echo
     echo "✅ Repository maintenance completed!"
@@ -4039,13 +4041,13 @@ jwgit_gc() {
     echo
     
     echo "---[ Cleanup Summary ]------------------------------"
-    echo "Size before: $repo_size_before"
-    echo "Size after:  $repo_size_after"
-    
+    __jwgit_kv__ "Size before:" "$repo_size_before" 16
+    __jwgit_kv__ "Size after:" "$repo_size_after" 16
+
     # Calculate objects cleaned up
     local objects_after
     objects_after=$(git count-objects | cut -d' ' -f1 || echo "0")
-    echo "Loose objects remaining: $objects_after"
+    __jwgit_kv__ "Loose objects:" "$objects_after" 16
     
     echo
     echo "✅ Garbage collection completed!"
@@ -4188,8 +4190,8 @@ jwgit_cherry-pick() {
     fi
     
     echo "---[ Cherry-pick Operation ]------------------------"
-    echo "Target branch: $current_branch"
-    echo "Commit: $(git log -1 --oneline "$COMMIT")"
+    __jwgit_kv__ "Target branch:" "$current_branch"
+    __jwgit_kv__ "Commit:" "$(git log -1 --oneline "$COMMIT")"
     echo
     echo -n "Proceed with cherry-pick? [y/N] "
     read -r response
@@ -4210,9 +4212,9 @@ jwgit_cherry-pick() {
         echo "✅ Cherry-pick completed successfully!"
         echo
         echo "---[ Cherry-pick Summary ]--------------------------"
-        echo "Branch: $current_branch"
-        echo "Cherry-picked: $(git log -1 --oneline "$COMMIT")"
-        echo "New commit: $(git log -1 --oneline)"
+        __jwgit_kv__ "Branch:" "$current_branch"
+        __jwgit_kv__ "Cherry-picked:" "$(git log -1 --oneline "$COMMIT")"
+        __jwgit_kv__ "New commit:" "$(git log -1 --oneline)"
         
     else
         echo
@@ -4429,8 +4431,8 @@ __jwgit_bisect_status__() {
     # Show current commit being tested
     local current_commit
     current_commit=$(git rev-parse --short HEAD)
-    echo "Testing commit: $current_commit"
-    echo "Commit info: $(git log -1 --oneline)"
+    __jwgit_kv__ "Testing commit:" "$current_commit"
+    __jwgit_kv__ "Commit info:" "$(git log -1 --oneline)"
     
     # Show bisect log
     if [ -f ".git/BISECT_LOG" ]; then

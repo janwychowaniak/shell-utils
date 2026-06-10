@@ -352,18 +352,18 @@ jwdeb_install() {
     echo
     
     # Check if packages exist (for non-local .deb files)
-    local missing_packages=""
+    local missing_packages=()
     for package in "$@"; do
         if [[ "$package" != *.deb ]] && [[ "$package" != ./* ]] && [[ "$package" != /* ]]; then
             if ! apt-cache show "$package" >/dev/null 2>&1; then
-                missing_packages="$missing_packages $package"
+                missing_packages+=("$package")
             fi
         fi
     done
     
-    if [ -n "$missing_packages" ]; then
+    if [ ${#missing_packages[@]} -gt 0 ]; then
         echo "❌ The following packages were not found:"
-        for pkg in $missing_packages; do
+        for pkg in "${missing_packages[@]}"; do
             echo "  - $pkg"
         done
         echo
@@ -388,7 +388,7 @@ jwdeb_install() {
         for package in "$@"; do
             if [[ "$package" != *.deb ]] && [[ "$package" != ./* ]] && [[ "$package" != /* ]]; then
                 if dpkg -l "$package" 2>/dev/null | grep -q "^ii"; then
-                    local version
+                    local version=""
                     version=$(dpkg -l "$package" 2>/dev/null | grep "^ii" | awk '{print $3}')
                     echo "✅ $package ($version)"
                 else
@@ -421,43 +421,43 @@ jwdeb_remove() {
     echo
     
     # Check which packages are actually installed
-    local installed_packages=""
-    local not_installed=""
-    
+    local installed_packages=()
+    local not_installed=()
+
     for package in "$@"; do
         if dpkg -l "$package" 2>/dev/null | grep -q "^ii"; then
-            installed_packages="$installed_packages $package"
+            installed_packages+=("$package")
         else
-            not_installed="$not_installed $package"
+            not_installed+=("$package")
         fi
     done
-    
-    if [ -n "$not_installed" ]; then
+
+    if [ ${#not_installed[@]} -gt 0 ]; then
         echo "⚠️  The following packages are not installed:"
-        for pkg in $not_installed; do
+        for pkg in "${not_installed[@]}"; do
             echo "  - $pkg"
         done
         echo
     fi
-    
-    if [ -z "$installed_packages" ]; then
+
+    if [ ${#installed_packages[@]} -eq 0 ]; then
         echo "❌ No installed packages to remove."
         return 1
     fi
     
     # Show what will be removed
     echo "---[ Removal Plan ]--------------------------------"
-    apt-get remove -s $installed_packages 2>/dev/null | grep -E "^Remv" | head -10
+    apt-get remove -s "${installed_packages[@]}" 2>/dev/null | grep -E "^Remv" | head -10
     echo
-    
+
     # Show reverse dependencies
     echo "---[ Packages That Depend On These ]---------------"
-    for package in $installed_packages; do
-        local rdeps
+    local rdeps=""
+    for package in "${installed_packages[@]}"; do
         rdeps=$(apt-cache rdepends "$package" 2>/dev/null | grep -v "Reverse Depends:" | head -3)
         if [ -n "$rdeps" ]; then
             echo "$package:"
-            echo "$rdeps" | sed 's/^/  /'
+            printf '%s\n' "$rdeps" | sed 's/^/  /'
         fi
     done
     echo
@@ -470,11 +470,11 @@ jwdeb_remove() {
     
     if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
         echo "Removing packages..."
-        sudo apt-get remove -y $installed_packages
-        
+        sudo apt-get remove -y "${installed_packages[@]}"
+
         echo
         echo "---[ Removal Summary ]-----------------------------"
-        for package in $installed_packages; do
+        for package in "${installed_packages[@]}"; do
             if dpkg -l "$package" 2>/dev/null | grep -q "^rc"; then
                 echo "✅ $package (removed, config files remain)"
             elif ! dpkg -l "$package" 2>/dev/null | grep -q "^ii"; then
@@ -513,36 +513,36 @@ jwdeb_purge() {
     echo
     
     # Check package status
-    local can_purge=""
-    local not_found=""
-    
+    local can_purge=()
+    local not_found=()
+
     for package in "$@"; do
         if dpkg -l "$package" 2>/dev/null | grep -qE "^(ii|rc)"; then
-            can_purge="$can_purge $package"
+            can_purge+=("$package")
         else
-            not_found="$not_found $package"
+            not_found+=("$package")
         fi
     done
-    
-    if [ -n "$not_found" ]; then
+
+    if [ ${#not_found[@]} -gt 0 ]; then
         echo "⚠️  The following packages are not installed or available:"
-        for pkg in $not_found; do
+        for pkg in "${not_found[@]}"; do
             echo "  - $pkg"
         done
         echo
     fi
-    
-    if [ -z "$can_purge" ]; then
+
+    if [ ${#can_purge[@]} -eq 0 ]; then
         echo "❌ No packages available for purging."
         return 1
     fi
     
     # Show what will be purged
     echo "---[ Purge Plan ]----------------------------------"
-    for package in $can_purge; do
-        local status
-        status=$(dpkg -l "$package" 2>/dev/null | grep -E "^(ii|rc)" | awk '{print $1}')
-        case $status in
+    local pkg_state=""
+    for package in "${can_purge[@]}"; do
+        pkg_state=$(dpkg -l "$package" 2>/dev/null | grep -E "^(ii|rc)" | awk '{print $1}')
+        case $pkg_state in
             ii)
                 echo "  $package (installed - will remove and purge)"
                 ;;
@@ -555,12 +555,12 @@ jwdeb_purge() {
     
     # Show configuration files that will be removed
     echo "---[ Configuration Files To Be Removed ]-----------"
-    for package in $can_purge; do
-        local config_files
+    local config_files=""
+    for package in "${can_purge[@]}"; do
         config_files=$(dpkg -L "$package" 2>/dev/null | grep "^/etc/" | head -3)
         if [ -n "$config_files" ]; then
             echo "$package:"
-            echo "$config_files" | sed 's/^/  /'
+            printf '%s\n' "$config_files" | sed 's/^/  /'
         fi
     done
     echo
@@ -573,11 +573,11 @@ jwdeb_purge() {
     
     if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
         echo "Purging packages..."
-        sudo apt-get purge -y $can_purge
-        
+        sudo apt-get purge -y "${can_purge[@]}"
+
         echo
         echo "---[ Purge Summary ]-------------------------------"
-        for package in $can_purge; do
+        for package in "${can_purge[@]}"; do
             if ! dpkg -l "$package" 2>/dev/null | grep -qE "^(ii|rc)"; then
                 echo "✅ $package (completely purged)"
             else

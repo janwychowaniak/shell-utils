@@ -45,6 +45,18 @@ jwdeb_toc() {
 
 
 # ---------------------------------------------------------------------------------
+# internal helpers
+# ---------------------------------------------------------------------------------
+
+# Column-align "Label: value" rows in grouped info/summary blocks. Optional 3rd
+# arg overrides the column width (default 24) for blocks whose longest label
+# differs (e.g. diag package-stats=27, size deps / cache "final" totals=29).
+__jwdeb_kv__() {
+    printf "%-${3:-24}s%s\n" "$1" "$2"
+}
+
+
+# ---------------------------------------------------------------------------------
 # package search and information
 # ---------------------------------------------------------------------------------
 
@@ -914,10 +926,10 @@ jwdeb_autoclean() {
         total_size=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
         partial_files=$(find "$cache_dir" -name "*.deb.partial" | wc -l)
         
-        echo "Total cached packages: $total_files"
-        echo "Cache directory size: $total_size"
+        __jwdeb_kv__ "Total cached packages:" "$total_files"
+        __jwdeb_kv__ "Cache directory size:" "$total_size"
         if [ "$partial_files" -gt 0 ]; then
-            echo "Partial downloads: $partial_files"
+            __jwdeb_kv__ "Partial downloads:" "$partial_files"
         fi
     else
         echo "Cache directory not found"
@@ -966,8 +978,8 @@ jwdeb_autoclean() {
             final_files=$(find "$cache_dir" -name "*.deb" | wc -l)
             final_size=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
             
-            echo "Remaining cached packages: $final_files"
-            echo "Final cache directory size: $final_size"
+            __jwdeb_kv__ "Remaining cached packages:" "$final_files" 29
+            __jwdeb_kv__ "Final cache directory size:" "$final_size" 29
         fi
         
         echo
@@ -1001,8 +1013,8 @@ jwdeb_clean() {
         total_files=$(find "$cache_dir" -name "*.deb" | wc -l)
         total_size=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
         
-        echo "Total cached packages: $total_files"
-        echo "Cache directory size: $total_size"
+        __jwdeb_kv__ "Total cached packages:" "$total_files"
+        __jwdeb_kv__ "Cache directory size:" "$total_size"
         
         if [ "$total_files" -eq 0 ]; then
             echo "✅ Cache is already empty!"
@@ -1036,8 +1048,8 @@ jwdeb_clean() {
             final_files=$(find "$cache_dir" -name "*.deb" | wc -l)
             final_size=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
             
-            echo "Remaining cached packages: $final_files"
-            echo "Final cache directory size: $final_size"
+            __jwdeb_kv__ "Remaining cached packages:" "$final_files" 29
+            __jwdeb_kv__ "Final cache directory size:" "$final_size" 29
             
             if [ "$final_files" -eq 0 ]; then
                 echo "✅ Package cache completely cleaned!"
@@ -1320,20 +1332,20 @@ jwdeb_size() {
         docs=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -c "^/usr/share/doc/")
         libs=$(dpkg -L "$PACKAGE" 2>/dev/null | grep -c "\.so")
         
-        echo "  Configuration files: $config_files"
-        echo "  Executables: $executables"
-        echo "  Documentation: $docs"
-        echo "  Libraries: $libs"
+        __jwdeb_kv__ "  Configuration files:" "$config_files"
+        __jwdeb_kv__ "  Executables:" "$executables"
+        __jwdeb_kv__ "  Documentation:" "$docs"
+        __jwdeb_kv__ "  Libraries:" "$libs"
         
         echo
         echo "---[ Dependencies Impact ]-------------------------"
         local dep_count
         dep_count=$(apt-cache depends "$PACKAGE" 2>/dev/null | grep -c "Depends:")
-        echo "Direct dependencies: $dep_count"
+        __jwdeb_kv__ "Direct dependencies:" "$dep_count" 29
 
         local rdep_count
         rdep_count=$(apt-cache rdepends "$PACKAGE" 2>/dev/null | grep -cv "Reverse Depends:")
-        echo "Packages depending on this: $rdep_count"
+        __jwdeb_kv__ "Packages depending on this:" "$rdep_count" 29
     fi
     echo
 }
@@ -1642,10 +1654,10 @@ jwdeb_diag() {
     upgradable_packages=$((upgradable_packages - 1))  # Subtract header
     autoremovable_packages=$(apt-get autoremove -s 2>/dev/null | grep -c "^Remv")
     
-    echo "Total available packages: $total_packages"
-    echo "Installed packages: $installed_packages"
-    echo "Upgradable packages: $upgradable_packages"
-    echo "Autoremovable packages: $autoremovable_packages"
+    __jwdeb_kv__ "Total available packages:" "$total_packages" 27
+    __jwdeb_kv__ "Installed packages:" "$installed_packages" 27
+    __jwdeb_kv__ "Upgradable packages:" "$upgradable_packages" 27
+    __jwdeb_kv__ "Autoremovable packages:" "$autoremovable_packages" 27
     echo
     
     echo "---[ Repository Status ]----------------------------"

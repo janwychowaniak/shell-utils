@@ -55,6 +55,18 @@ __jwdeb_kv__() {
     printf "%-${3:-24}s%s\n" "$1" "$2"
 }
 
+# Print the first $1 lines of stdin, then disclose how many were withheld
+# ("... and N more") — a disclosed preview, never a silent cap
+# (CONVENTIONS.md → Default Values).
+__jwdeb_preview__() {
+    local cap=$1 buf total
+    buf=$(cat)
+    [ -z "$buf" ] && return 0
+    printf '%s\n' "$buf" | head -n "$cap"
+    total=$(printf '%s\n' "$buf" | grep -c .)
+    [ "$total" -gt "$cap" ] && echo "  ... and $((total - cap)) more"
+}
+
 
 # ---------------------------------------------------------------------------------
 # package search and information
@@ -94,14 +106,14 @@ jwdeb_search() {
         if [ -n "$opt_names" ]; then
             dpkg -l | grep -i "$SEARCH_TERM" | awk '{printf "%-30s %s\n", $2, $3}'
         else
-            apt list --installed 2>/dev/null | grep -i "$SEARCH_TERM" | head -20
+            apt list --installed 2>/dev/null | grep -i "$SEARCH_TERM" | __jwdeb_preview__ 20
         fi
     elif [ -n "$opt_names" ]; then
         echo "---[ Package Names ]--------------------------------"
-        apt-cache pkgnames | grep -i "$SEARCH_TERM" | head -20
+        apt-cache pkgnames | grep -i "$SEARCH_TERM" | __jwdeb_preview__ 20
     elif [ -n "$opt_full" ]; then
         echo "---[ Detailed Search Results ]----------------------"
-        apt-cache search "$SEARCH_TERM" | head -10
+        apt-cache search "$SEARCH_TERM" | __jwdeb_preview__ 10
         echo
         echo "---[ Package Details ]------------------------------"
         apt-cache search "$SEARCH_TERM" | head -3 | while read -r pkg _; do
@@ -111,7 +123,7 @@ jwdeb_search() {
         done
     else
         echo "---[ Search Results ]-------------------------------"
-        apt-cache search "$SEARCH_TERM" | head -15
+        apt-cache search "$SEARCH_TERM" | __jwdeb_preview__ 15
     fi
     echo
 }
@@ -1139,7 +1151,7 @@ jwdeb_installed() {
                     description=$(dpkg -s "$package" 2>/dev/null | grep "^Description:" | cut -d' ' -f2- | head -1)
                     printf "  %-25s %-15s %s\n" "$package" "$version" "$description"
                 fi
-            done | head -30
+            done | __jwdeb_preview__ 30
         else
             echo "No manually installed packages found matching filter."
         fi
@@ -1169,7 +1181,7 @@ jwdeb_installed() {
                 fi
                 printf "%s|%-25s %-9s %s\n" "$size" "$package" "$size" "$description"
             fi
-        done | sort -rn | head -30 | cut -d'|' -f2-
+        done | sort -rn | cut -d'|' -f2- | __jwdeb_preview__ 30
         
     elif [ "$SORT_MODE" = "date" ]; then
         echo "---[ Packages Sorted by Installation Date ]--------"

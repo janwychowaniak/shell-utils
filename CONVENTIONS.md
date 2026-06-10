@@ -78,7 +78,8 @@ fi
 # User Experience Design
 
 ### Parameter Handling
-- Functions called without required parameters print helpful usage examples and `return 1`
+- Functions with a **required** parameter, called without it, print helpful usage examples and `return 1`.
+- **Read-only functions with a sensible default** (e.g. `jwgit_status`, `jwgit_log`, `jwgit_diff`, `jwgit_reflog`) must instead **run that default on no-args** — and expose the usage block via `-h`/`--help` (returning 0). Do NOT blanket the usage-on-no-args guard onto a defaulting function: it makes the help contradict itself ("`jwgit_log` # Show recent commits" while no-args actually printed help). Required-arg functions (`jwgit_clone`, `jwgit_merge`, `jwgit_blame`, `jwgit_branch create`, …) keep usage-on-no-args.
 - Display available options (running containers, installed packages, etc.)
 - Provide multiple example use cases with different parameter combinations
 - Two styles for no-args help:

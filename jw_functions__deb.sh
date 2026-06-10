@@ -1067,25 +1067,24 @@ jwdeb_clean() {
 # ---------------------------------------------------------------------------------
 
 jwdeb_installed() {
-    if [ $# -eq 0 ]; then
-        echo "Usage: jwdeb_installed [filter] [--size|--date|--manual]"
-        echo "Examples:"
-        echo "  jwdeb_installed                    # List all installed packages"
-        echo "  jwdeb_installed python             # Filter packages containing 'python'"
-        echo "  jwdeb_installed --size             # Sort by size"
-        echo "  jwdeb_installed --date             # Sort by installation date"
-        echo "  jwdeb_installed --manual           # Show manually installed packages only"
-        echo
-        return 1
-    fi
-
     local FILTER=""
     local SORT_MODE=""
     local MANUAL_ONLY=""
-    
-    # Parse arguments
+
+    # No-args runs the default (list all installed packages); usage lives under
+    # -h/--help (CONVENTIONS.md → Parameter Handling).
     for arg in "$@"; do
         case $arg in
+            -h|--help)
+                echo "Usage: jwdeb_installed [filter] [--size|--date|--manual]"
+                echo "Examples:"
+                echo "  jwdeb_installed                    # List all installed packages"
+                echo "  jwdeb_installed python             # Filter packages containing 'python'"
+                echo "  jwdeb_installed --size             # Sort by size"
+                echo "  jwdeb_installed --date             # Sort by installation date"
+                echo "  jwdeb_installed --manual           # Show manually installed packages only"
+                return 0
+                ;;
             --size)
                 SORT_MODE="size"
                 ;;
@@ -1228,11 +1227,14 @@ jwdeb_installed() {
 
 jwdeb_size() {
     if [ $# -eq 0 ]; then
-        echo "Usage: jwdeb_size [package_name] [--top N]"
+        echo "Usage: jwdeb_size <package_name> | --top [N]"
         echo "Examples:"
-        echo "  jwdeb_size                    # Show largest packages"
-        echo "  jwdeb_size nginx              # Show size of specific package"
-        echo "  jwdeb_size --top 20           # Show top 20 largest packages"
+        echo "  jwdeb_size nginx              # Show size of a specific package"
+        echo "  jwdeb_size --top              # Show the 10 largest installed packages"
+        echo "  jwdeb_size --top 20           # Show the top 20 largest packages"
+        echo
+        echo "Note: --top scans every installed package (dpkg -s) and can take a"
+        echo "while on a large system."
         echo
         return 1
     fi

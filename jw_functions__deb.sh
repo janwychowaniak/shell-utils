@@ -12,6 +12,7 @@ jwdeb_toc() {
     echo " -----------------------------  package search & information"
     echo " - 🟢 jwdeb_search"
     echo " - 🟢 jwdeb_info"
+    echo " - 🟢 jwdeb_policy"
     echo " - 🟢 jwdeb_depends"
     echo " - 🟢 jwdeb_files"
     echo " - 🟢 jwdeb_which"
@@ -35,6 +36,7 @@ jwdeb_toc() {
     echo " - 🟢 jwdeb_installed"
     echo " - 🟢 jwdeb_size"
     echo " - 🟢 jwdeb_orphans"
+    echo " - 🟢 jwdeb_history"
     echo
     echo " -----------------------------  troubleshooting"
     echo " - 🟢 jwdeb_broken"
@@ -348,6 +350,41 @@ jwdeb_which() {
         fi
     fi
     echo
+}
+
+
+jwdeb_policy() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_policy [package_name ...]"
+        echo "Examples:"
+        echo "  jwdeb_policy                 # Repository priorities (apt pinning)"
+        echo "  jwdeb_policy nginx           # Installed/candidate versions for a package"
+        echo "  jwdeb_policy nginx curl      # ... for several packages"
+        return 0
+    fi
+
+    # No-args: overall repository priorities (read-only default).
+    if [ $# -eq 0 ]; then
+        echo "📊 APT Repository Priorities"
+        echo "=================================================="
+        echo
+        apt-cache policy
+        echo
+        return 0
+    fi
+
+    local pkg out
+    for pkg in "$@"; do
+        echo "📊 Policy: $pkg"
+        echo "=================================================="
+        out=$(apt-cache policy "$pkg" 2>/dev/null)
+        if [ -n "$out" ]; then
+            printf '%s\n' "$out"
+        else
+            echo "❌ Package '$pkg' not found"
+        fi
+        echo
+    done
 }
 
 
@@ -1456,6 +1493,51 @@ jwdeb_orphans() {
     echo "Commands to clean up:"
     echo "  deborphan | xargs sudo apt-get remove --purge    # Remove library orphans"
     echo "  deborphan -a | xargs sudo apt-get remove --purge # Remove all orphans"
+    echo
+}
+
+
+jwdeb_history() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_history [count] [--installs|--removes]"
+        echo "Examples:"
+        echo "  jwdeb_history                # Recent package operations (default 20)"
+        echo "  jwdeb_history 50             # Last 50 operations"
+        echo "  jwdeb_history --installs     # Recent installs only"
+        echo "  jwdeb_history --removes      # Recent removals/purges only"
+        return 0
+    fi
+
+    local count=20 actions="install|upgrade|remove|purge" label="operations"
+    local arg
+    for arg in "$@"; do
+        case $arg in
+            --installs) actions="install";      label="installs" ;;
+            --removes)  actions="remove|purge"; label="removals" ;;
+            --*)        echo "Unknown option: $arg"; return 1 ;;
+            *[!0-9]*)   echo "Invalid count: $arg"; return 1 ;;
+            *)          count="$arg" ;;
+        esac
+    done
+
+    echo "🕓 Package History"
+    echo "=================================================="
+    echo
+
+    if [ ! -r /var/log/dpkg.log ]; then
+        echo "⚠️  /var/log/dpkg.log is not readable — cannot show history"
+        echo
+        return 1
+    fi
+
+    echo "---[ Last $count $label ]--------------------------"
+    local rows
+    rows=$(grep -E "^[0-9-]+ [0-9:]+ ($actions) " /var/log/dpkg.log 2>/dev/null | tail -n "$count")
+    if [ -n "$rows" ]; then
+        printf '%s\n' "$rows" | awk '{printf "  %s %s  %-8s %s\n", $1, $2, $3, $4}'
+    else
+        echo "  (no matching operations found)"
+    fi
     echo
 }
 

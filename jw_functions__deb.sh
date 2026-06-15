@@ -1393,14 +1393,11 @@ jwdeb_installed() {
             echo "Found $count manually installed packages:"
             echo
             
-            echo "$manual_packages" | while read -r package; do
-                if dpkg -l "$package" 2>/dev/null | grep -q "^ii"; then
-                    local version="" description=""
-                    version=$(dpkg -l "$package" 2>/dev/null | grep "^ii" | awk '{print $3}')
-                    description=$(dpkg -s "$package" 2>/dev/null | grep "^Description:" | cut -d' ' -f2- | head -1)
-                    printf "  %-25s %-15s %s\n" "$package" "$version" "$description"
-                fi
-            done
+            awk -F'\t' '
+                FNR==NR { st[$1]=$2; ver[$1]=$3; sm[$1]=$4; next }
+                { pkg=$0; if (st[pkg] ~ /^ii/) printf "  %-25s %-15s %s\n", pkg, ver[pkg], sm[pkg] }' \
+                <(dpkg-query -W -f='${Package}\t${db:Status-Abbrev}\t${Version}\t${binary:Summary}\n' 2>/dev/null) \
+                <(printf '%s\n' "$manual_packages")
         else
             echo "No manually installed packages found matching filter."
         fi
@@ -1416,21 +1413,18 @@ jwdeb_installed() {
         echo "Package                   Size      Description"
         echo "----------------------------------------"
         
-        echo "$package_list" | while read -r package; do
-            local size="" description=""
-            size=$(dpkg -s "$package" 2>/dev/null | grep "^Installed-Size:" | awk '{print $2}')
-            description=$(dpkg -s "$package" 2>/dev/null | grep "^Description:" | cut -d' ' -f2- | head -1)
-            
-            if [ -n "$size" ]; then
-                # Convert KB to human readable
-                if [ "$size" -gt 1024 ]; then
-                    size="$((size / 1024))MB"
-                else
-                    size="${size}KB"
-                fi
-                printf "%s|%-25s %-9s %s\n" "$size" "$package" "$size" "$description"
-            fi
-        done | sort -rn | cut -d'|' -f2-
+        awk -F'\t' '
+            FNR==NR { sz[$1]=$2; sm[$1]=$3; next }
+            {
+                pkg=$0
+                if (!(pkg in sz) || sz[pkg]=="") next
+                s=sz[pkg]
+                if (s+0 > 1024) s=int(s/1024) "MB"; else s=s "KB"
+                printf "%s|%-25s %-9s %s\n", s, pkg, s, sm[pkg]
+            }' \
+            <(dpkg-query -W -f='${binary:Package}\t${Installed-Size}\t${binary:Summary}\n' 2>/dev/null) \
+            <(printf '%s\n' "$package_list") \
+          | sort -rn | cut -d'|' -f2-
         
     elif [ "$SORT_MODE" = "date" ]; then
         echo "---[ Packages Sorted by Installation Date ]--------"
@@ -1490,8 +1484,7 @@ jwdeb_size() {
         echo "  jwdeb_size --top              # Show the 10 largest installed packages"
         echo "  jwdeb_size --top 20           # Show the top 20 largest packages"
         echo
-        echo "Note: --top scans every installed package (dpkg -s) and can take a"
-        echo "while on a large system."
+        echo "Note: --top ranks every installed package by on-disk size."
         echo
         return 1
     fi
@@ -1505,15 +1498,9 @@ jwdeb_size() {
         echo "Package                   Size      Description"
         echo "--------------------------------------------------------"
         
-        dpkg -l | grep "^ii" | awk '{print $2}' | while read -r package; do
-            local size="" description=""
-            size=$(dpkg -s "$package" 2>/dev/null | grep "^Installed-Size:" | awk '{print $2}')
-            description=$(dpkg -s "$package" 2>/dev/null | grep "^Description:" | cut -d' ' -f2- | head -1)
-            
-            if [ -n "$size" ] && [ "$size" -gt 0 ]; then
-                printf "%08d|%-25s %s %s\n" "$size" "$package" "$size" "$description"
-            fi
-        done | sort -rn | head -"$TOP_COUNT" | while IFS='|' read -r _ package_info; do
+        dpkg-query -W -f='${db:Status-Abbrev}\t${Installed-Size}\t${binary:Package}\t${binary:Summary}\n' 2>/dev/null \
+          | awk -F'\t' '$1 ~ /^ii/ && $2+0 > 0 { printf "%08d|%-25s %s %s\n", $2, $3, $2, $4 }' \
+          | sort -rn | head -"$TOP_COUNT" | while IFS='|' read -r _ package_info; do
             echo "$package_info" | awk '{
                 size = $2
                 if (size > 1024*1024) {

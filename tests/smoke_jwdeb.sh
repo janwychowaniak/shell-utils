@@ -30,11 +30,9 @@
 #   Part C — bash-vs-zsh stdout parity for deterministic read-only functions.
 # NOT covered by automated parity (verified by hand instead):
 #   * jwdeb_diag           — embeds `date`, so its output is non-deterministic.
-#   * jwdeb_size --top, jwdeb_installed --manual/--size — correct but scan every
-#     installed package with `dpkg -s` (minutes on a real system); too slow to
-#     run twice per shell here. Their bare-local-reprint fix is covered in
-#     parity by the lighter jwdeb_installed --date path.
 #   * jwdeb_update and the real (confirmed) install/remove/... mutations.
+# (jwdeb_size --top and jwdeb_installed --manual/--size used to be excluded as
+#  too slow — they now run in one dpkg-query pass, so they are covered below.)
 #
 # Run:  bash tests/smoke_jwdeb.sh   (or ./tests/smoke_jwdeb.sh)
 # Exit: 0 = clean, 1 = runtime-error signature / parity diff found, 2 = setup.
@@ -103,7 +101,10 @@ B=(
   "jwdeb_which /bin/sh"
   "jwdeb_which dpkg"
   "jwdeb_size $PKG"
+  "jwdeb_size --top 25"
   "jwdeb_installed $PKG"
+  "jwdeb_installed --size"
+  "jwdeb_installed --manual"
   "jwdeb_installed --date"
   "jwdeb_history 10"
   "jwdeb_history --installs"
@@ -146,7 +147,10 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwdeb_files $PKG"
     "jwdeb_which /bin/sh"
     "jwdeb_size $PKG"
+    "jwdeb_size --top 25"
     "jwdeb_installed $PKG"
+    "jwdeb_installed --size"
+    "jwdeb_installed --manual"
     "jwdeb_installed --date"
     "jwdeb_history 15"
     "jwdeb_history --installs"

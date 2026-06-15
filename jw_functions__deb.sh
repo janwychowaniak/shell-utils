@@ -110,9 +110,9 @@ jwdeb_search() {
         apt-cache search "$SEARCH_TERM"
         echo
         echo "---[ Package Details ]------------------------------"
-        apt-cache search "$SEARCH_TERM" | head -3 | while read -r pkg _; do
+        apt-cache search "$SEARCH_TERM" | while read -r pkg _; do
             echo "Package: $pkg"
-            apt-cache show "$pkg" 2>/dev/null | grep -E "^(Version|Description|Size|Depends):" | head -4
+            apt-cache show "$pkg" 2>/dev/null | grep -E "^(Version|Description|Size|Depends):"
             echo
         done
     else
@@ -131,7 +131,7 @@ jwdeb_info() {
         echo "  jwdeb_info python3-pip"
         echo
         echo "Available packages (recently updated):"
-        apt list --upgradable 2>/dev/null | head -5 | tail -n +2 | cut -d'/' -f1 | sed 's/^/- /'
+        apt list --upgradable 2>/dev/null | tail -n +2 | cut -d'/' -f1 | sed 's/^/- /'
         echo
         return 1
     fi
@@ -164,7 +164,7 @@ jwdeb_info() {
     # Show available package info
     echo "---[ Available Package Details ]-------------------"
     if apt-cache show "$PACKAGE" >/dev/null 2>&1; then
-        apt-cache show "$PACKAGE" 2>/dev/null | head -20 | grep -E "^(Package|Version|Architecture|Maintainer|Description|Size|Depends|Recommends|Suggests):"
+        apt-cache show "$PACKAGE" 2>/dev/null | grep -E "^(Package|Version|Architecture|Maintainer|Description|Size|Depends|Recommends|Suggests):"
     else
         echo "❌ Package not found in repositories"
     fi
@@ -174,7 +174,7 @@ jwdeb_info() {
     if dpkg -l "$PACKAGE" 2>/dev/null | grep -q "^ii"; then
         echo "---[ Reverse Dependencies ]------------------------"
         local reverse_deps
-        reverse_deps=$(apt-cache rdepends "$PACKAGE" 2>/dev/null | grep -v "Reverse Depends:" | head -10)
+        reverse_deps=$(apt-cache rdepends "$PACKAGE" 2>/dev/null | grep -v "Reverse Depends:")
         if [ -n "$reverse_deps" ]; then
             printf '%s\n' "$reverse_deps" | sed 's/^/  /'
         else
@@ -193,7 +193,7 @@ jwdeb_depends() {
         echo "  jwdeb_depends python3 --tree"
         echo
         echo "Available installed packages:"
-        dpkg -l | grep "^ii" | awk '{print $2}' | head -10 | sed 's/^/- /'
+        dpkg -l | grep "^ii" | awk '{print $2}' | sed 's/^/- /'
         echo
         return 1
     fi
@@ -238,7 +238,7 @@ jwdeb_files() {
         echo "  jwdeb_files python3-pip"
         echo
         echo "Recently installed packages:"
-        grep " install " /var/log/dpkg.log 2>/dev/null | tail -5 | awk '{print $4}' | sed 's/^/- /' || echo "- (log not accessible)"
+        grep " install " /var/log/dpkg.log 2>/dev/null | awk '{print $4}' | sed 's/^/- /' || echo "- (log not accessible)"
         echo
         return 1
     fi
@@ -327,7 +327,7 @@ jwdeb_which() {
         local dir_path
         dir_path=$(dirname "$FILE_PATH")
         echo "---[ Other Files in $dir_path ]-------------------"
-        dpkg -L "$owner_package" 2>/dev/null | grep "^$dir_path/" | head -5 | sed 's/^/  /'
+        dpkg -L "$owner_package" 2>/dev/null | grep "^$dir_path/" | sed 's/^/  /'
     else
         echo "❌ No package owns this file"
         echo
@@ -335,7 +335,7 @@ jwdeb_which() {
         # Try apt-file if available
         if command -v apt-file >/dev/null 2>&1; then
             echo "---[ Searching with apt-file ]---------------------"
-            apt-file search "$FILE_PATH" 2>/dev/null | head -10 | sed 's/^/  /' || echo "  (no results)"
+            apt-file search "$FILE_PATH" 2>/dev/null | sed 's/^/  /' || echo "  (no results)"
         else
             echo "💡 Install apt-file for more comprehensive searching:"
             echo "   sudo apt install apt-file && sudo apt-file update"
@@ -426,7 +426,7 @@ jwdeb_install() {
     
     # Show what will be installed
     echo "---[ Installation Plan ]---------------------------"
-    apt-get install -s "$@" 2>/dev/null | grep -E "^(Inst|Conf)" | head -10
+    apt-get install -s "$@" 2>/dev/null | grep -E "^(Inst|Conf)"
     echo
     
     echo -n "Proceed with installation? [y/N] "
@@ -464,7 +464,7 @@ jwdeb_remove() {
         echo "  jwdeb_remove python3-pip python3-venv"
         echo
         echo "Recently installed packages:"
-        grep " install " /var/log/dpkg.log 2>/dev/null | tail -10 | awk '{print $4}' | sed 's/^/- /' || echo "- (log not accessible)"
+        grep " install " /var/log/dpkg.log 2>/dev/null | awk '{print $4}' | sed 's/^/- /' || echo "- (log not accessible)"
         echo
         return 1
     fi
@@ -500,14 +500,14 @@ jwdeb_remove() {
     
     # Show what will be removed
     echo "---[ Removal Plan ]--------------------------------"
-    apt-get remove -s "${installed_packages[@]}" 2>/dev/null | grep -E "^Remv" | head -10
+    apt-get remove -s "${installed_packages[@]}" 2>/dev/null | grep -E "^Remv"
     echo
 
     # Show reverse dependencies
     echo "---[ Packages That Depend On These ]---------------"
     local rdeps=""
     for package in "${installed_packages[@]}"; do
-        rdeps=$(apt-cache rdepends "$package" 2>/dev/null | grep -v "Reverse Depends:" | head -3)
+        rdeps=$(apt-cache rdepends "$package" 2>/dev/null | grep -v "Reverse Depends:")
         if [ -n "$rdeps" ]; then
             echo "$package:"
             printf '%s\n' "$rdeps" | sed 's/^/  /'
@@ -556,7 +556,7 @@ jwdeb_purge() {
         echo "⚠️  WARNING: This completely removes packages AND their configuration files!"
         echo
         echo "Packages with remaining config files:"
-        dpkg -l | grep "^rc" | awk '{print "- " $2}' | head -10
+        dpkg -l | grep "^rc" | awk '{print "- " $2}'
         echo
         return 1
     fi
@@ -610,7 +610,7 @@ jwdeb_purge() {
     echo "---[ Configuration Files To Be Removed ]-----------"
     local config_files=""
     for package in "${can_purge[@]}"; do
-        config_files=$(dpkg -L "$package" 2>/dev/null | grep "^/etc/" | head -3)
+        config_files=$(dpkg -L "$package" 2>/dev/null | grep "^/etc/")
         if [ -n "$config_files" ]; then
             echo "$package:"
             printf '%s\n' "$config_files" | sed 's/^/  /'
@@ -908,7 +908,7 @@ jwdeb_update() {
     if [ "$new_upgradable_count" -gt 0 ]; then
         echo
         echo "---[ Available Updates (first 10) ]----------------"
-        apt list --upgradable 2>/dev/null | head -11 | tail -n +2 | while read -r line; do
+        apt list --upgradable 2>/dev/null | tail -n +2 | while read -r line; do
             package=$(echo "$line" | cut -d'/' -f1)
             version_info=$(echo "$line" | grep -o '\[.*\]' || echo "")
             echo "  📦 $package $version_info"
@@ -948,7 +948,7 @@ jwdeb_upgrade() {
     
     # Show first 15 packages to be upgraded
     echo "Packages to be upgraded (first 15):"
-    apt list --upgradable 2>/dev/null | head -16 | tail -n +2 | while read -r line; do
+    apt list --upgradable 2>/dev/null | tail -n +2 | while read -r line; do
         package=$(echo "$line" | cut -d'/' -f1)
         version_info=$(echo "$line" | grep -o '\[.*\]' || echo "")
         echo "  📦 $package $version_info"
@@ -1041,7 +1041,7 @@ jwdeb_dist-upgrade() {
     
     if [ "$remove_count" -gt 0 ]; then
         echo "---[ Packages To Be Removed ]----------------------"
-        echo "$simulation" | grep "^Remv" | head -10 | awk '{print "  🗑️  " $2}'
+        echo "$simulation" | grep "^Remv" | awk '{print "  🗑️  " $2}'
         if [ "$remove_count" -gt 10 ]; then
             echo "  ... and $((remove_count - 10)) more packages"
         fi
@@ -1050,7 +1050,7 @@ jwdeb_dist-upgrade() {
     
     if [ "$install_count" -gt 0 ]; then
         echo "---[ New Packages To Be Installed ]----------------"
-        echo "$simulation" | grep "^Inst" | grep -v "\[upgrade" | head -10 | awk '{print "  📦 " $2}'
+        echo "$simulation" | grep "^Inst" | grep -v "\[upgrade" | awk '{print "  📦 " $2}'
         if [ "$((install_count - upgrade_count))" -gt 10 ]; then
             echo "  ... and $((install_count - upgrade_count - 10)) more packages"
         fi
@@ -1122,7 +1122,7 @@ jwdeb_autoremove() {
     
     echo "---[ Packages To Be Removed ]----------------------"
     echo "Found $package_count unused packages:"
-    echo "$autoremove_list" | head -15 | sed 's/^/  🗑️  /'
+    printf '%s\n' "$autoremove_list" | sed 's/^/  🗑️  /'
     
     if [ "$package_count" -gt 15 ]; then
         echo "  ... and $((package_count - 15)) more packages"
@@ -1208,7 +1208,7 @@ jwdeb_autoclean() {
         echo "Obsolete package files to remove: $files_to_remove"
         
         echo "Files to be removed (first 10):"
-        echo "$autoclean_simulation" | grep "^Del" | head -10 | awk '{print "  🗑️  " $2}' | sed 's/_[^_]*\.deb//'
+        echo "$autoclean_simulation" | grep "^Del" | awk '{print "  🗑️  " $2}' | sed 's/_[^_]*\.deb//'
         
         if [ "$files_to_remove" -gt 10 ]; then
             echo "  ... and $((files_to_remove - 10)) more files"
@@ -1284,7 +1284,7 @@ jwdeb_clean() {
         
         echo
         echo "Recent packages in cache (last 10):"
-        find "$cache_dir" -name "*.deb" -printf "%T@ %f\n" 2>/dev/null | sort -n | tail -10 | cut -d' ' -f2- | sed 's/^/  📦 /' | sed 's/_[^_]*\.deb//'
+        find "$cache_dir" -name "*.deb" -printf "%T@ %f\n" 2>/dev/null | sort -n | cut -d' ' -f2- | sed 's/^/  📦 /' | sed 's/_[^_]*\.deb//'
     else
         echo "Cache directory not found"
         return 1
@@ -1783,7 +1783,7 @@ jwdeb_broken() {
         echo "✅ All packages in consistent state"
     else
         echo "⚠️  Packages in inconsistent state:"
-        printf '%s\n' "$inconsistent_packages" | sed 's/^/  /' | head -10
+        printf '%s\n' "$inconsistent_packages" | sed 's/^/  /'
         echo
     fi
     
@@ -1977,14 +1977,14 @@ jwdeb_diag() {
     
     echo "---[ Recent Activity ]------------------------------"
     if [ -r /var/log/dpkg.log ]; then
-        echo "Recent package operations (last 5):"
-        tail -5 /var/log/dpkg.log | while read -r line; do
+        echo "Package operations (oldest first):"
+        while read -r line; do
             local date_time="" operation="" package=""
             date_time=$(echo "$line" | awk '{print $1, $2}')
             operation=$(echo "$line" | awk '{print $3}')
             package=$(echo "$line" | awk '{print $4}')
             printf "  %-20s %-10s %s\n" "$date_time" "$operation" "$package"
-        done
+        done < /var/log/dpkg.log
     else
         echo "  (log not accessible)"
     fi

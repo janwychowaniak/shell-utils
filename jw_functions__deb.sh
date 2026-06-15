@@ -61,18 +61,6 @@ __jwdeb_kv__() {
     printf "%-${3:-24}s%s\n" "$1" "$2"
 }
 
-# Print the first $1 lines of stdin, then disclose how many were withheld
-# ("... and N more") — a disclosed preview, never a silent cap
-# (CONVENTIONS.md → Default Values).
-__jwdeb_preview__() {
-    local cap=$1 buf total
-    buf=$(cat)
-    [ -z "$buf" ] && return 0
-    printf '%s\n' "$buf" | head -n "$cap"
-    total=$(printf '%s\n' "$buf" | grep -c .)
-    [ "$total" -gt "$cap" ] && echo "  ... and $((total - cap)) more"
-}
-
 
 # ---------------------------------------------------------------------------------
 # package search and information
@@ -112,14 +100,14 @@ jwdeb_search() {
         if [ -n "$opt_names" ]; then
             dpkg -l | grep -i "$SEARCH_TERM" | awk '{printf "%-30s %s\n", $2, $3}'
         else
-            apt list --installed 2>/dev/null | grep -i "$SEARCH_TERM" | __jwdeb_preview__ 20
+            apt list --installed 2>/dev/null | grep -i "$SEARCH_TERM"
         fi
     elif [ -n "$opt_names" ]; then
         echo "---[ Package Names ]--------------------------------"
-        apt-cache pkgnames | grep -i "$SEARCH_TERM" | __jwdeb_preview__ 20
+        apt-cache pkgnames | grep -i "$SEARCH_TERM"
     elif [ -n "$opt_full" ]; then
         echo "---[ Detailed Search Results ]----------------------"
-        apt-cache search "$SEARCH_TERM" | __jwdeb_preview__ 10
+        apt-cache search "$SEARCH_TERM"
         echo
         echo "---[ Package Details ]------------------------------"
         apt-cache search "$SEARCH_TERM" | head -3 | while read -r pkg _; do
@@ -129,7 +117,7 @@ jwdeb_search() {
         done
     else
         echo "---[ Search Results ]-------------------------------"
-        apt-cache search "$SEARCH_TERM" | __jwdeb_preview__ 15
+        apt-cache search "$SEARCH_TERM"
     fi
     echo
 }
@@ -224,7 +212,7 @@ jwdeb_depends() {
     if [ -n "$TREE_MODE" ]; then
         echo "---[ Dependency Tree ]------------------------------"
         if command -v apt-rdepends >/dev/null 2>&1; then
-            apt-rdepends "$PACKAGE" 2>/dev/null | head -30
+            apt-rdepends "$PACKAGE" 2>/dev/null
         else
             echo "⚠️  apt-rdepends not available. Install with: sudo apt install apt-rdepends"
             echo "Showing basic dependencies instead:"
@@ -232,11 +220,11 @@ jwdeb_depends() {
         fi
     else
         echo "---[ Direct Dependencies ]--------------------------"
-        apt-cache depends "$PACKAGE" 2>/dev/null | grep -E "^\s*(Depends|Recommends|Suggests):" | head -20
+        apt-cache depends "$PACKAGE" 2>/dev/null | grep -E "^\s*(Depends|Recommends|Suggests):"
         echo
         
         echo "---[ Reverse Dependencies ]------------------------"
-        apt-cache rdepends "$PACKAGE" 2>/dev/null | head -15
+        apt-cache rdepends "$PACKAGE" 2>/dev/null
     fi
     echo
 }
@@ -269,19 +257,19 @@ jwdeb_files() {
     fi
     
     echo "---[ Configuration Files ]-------------------------"
-    dpkg -L "$PACKAGE" 2>/dev/null | grep -E "^/etc/" | head -10 | sed 's/^/  /' || echo "  (no configuration files)"
+    dpkg -L "$PACKAGE" 2>/dev/null | grep -E "^/etc/" | sed 's/^/  /' || echo "  (no configuration files)"
     echo
     
     echo "---[ Executables ]----------------------------------"
-    dpkg -L "$PACKAGE" 2>/dev/null | grep -E "^/(usr/)?s?bin/" | head -10 | sed 's/^/  /' || echo "  (no executables)"
+    dpkg -L "$PACKAGE" 2>/dev/null | grep -E "^/(usr/)?s?bin/" | sed 's/^/  /' || echo "  (no executables)"
     echo
     
     echo "---[ Documentation ]-------------------------------"
-    dpkg -L "$PACKAGE" 2>/dev/null | grep -E "^/usr/share/(doc|man)/" | head -5 | sed 's/^/  /' || echo "  (no documentation)"
+    dpkg -L "$PACKAGE" 2>/dev/null | grep -E "^/usr/share/(doc|man)/" | sed 's/^/  /' || echo "  (no documentation)"
     echo
     
-    echo "---[ All Files (first 20) ]------------------------"
-    dpkg -L "$PACKAGE" 2>/dev/null | head -20 | sed 's/^/  /'
+    echo "---[ All Files ]-----------------------------------"
+    dpkg -L "$PACKAGE" 2>/dev/null | sed 's/^/  /'
     
     local total_files
     total_files=$(dpkg -L "$PACKAGE" 2>/dev/null | wc -l)
@@ -1412,7 +1400,7 @@ jwdeb_installed() {
                     description=$(dpkg -s "$package" 2>/dev/null | grep "^Description:" | cut -d' ' -f2- | head -1)
                     printf "  %-25s %-15s %s\n" "$package" "$version" "$description"
                 fi
-            done | __jwdeb_preview__ 30
+            done
         else
             echo "No manually installed packages found matching filter."
         fi
@@ -1442,19 +1430,19 @@ jwdeb_installed() {
                 fi
                 printf "%s|%-25s %-9s %s\n" "$size" "$package" "$size" "$description"
             fi
-        done | sort -rn | cut -d'|' -f2- | __jwdeb_preview__ 30
+        done | sort -rn | cut -d'|' -f2-
         
     elif [ "$SORT_MODE" = "date" ]; then
         echo "---[ Packages Sorted by Installation Date ]--------"
         if command -v grep >/dev/null 2>&1 && [ -r /var/log/dpkg.log ]; then
-            echo "Recent installations:"
+            echo "Installations (oldest first):"
             echo
             
             local recent_installs
             if [ -n "$FILTER" ]; then
-                recent_installs=$(grep " install " /var/log/dpkg.log 2>/dev/null | grep -i "$FILTER" | tail -20)
+                recent_installs=$(grep " install " /var/log/dpkg.log 2>/dev/null | grep -i "$FILTER")
             else
-                recent_installs=$(grep " install " /var/log/dpkg.log 2>/dev/null | tail -20)
+                recent_installs=$(grep " install " /var/log/dpkg.log 2>/dev/null)
             fi
             
             echo "$recent_installs" | while read -r line; do
@@ -1484,15 +1472,11 @@ jwdeb_installed() {
         
         echo "Package                   Version           Description"
         echo "--------------------------------------------------------"
-        echo "$package_list" | head -30 | awk '{
+        echo "$package_list" | awk '{
             printf "%-25s %-17s", $2, $3
             for(i=4; i<=NF; i++) printf "%s ", $i
             printf "\n"
         }'
-        
-        if [ "$count" -gt 30 ]; then
-            echo "... and $((count - 30)) more packages"
-        fi
     fi
     echo
 }
@@ -1643,11 +1627,7 @@ jwdeb_orphans() {
             local count
             count=$(echo "$autoremove_list" | wc -l)
             echo "Found $count packages that can be autoremoved:"
-            echo "$autoremove_list" | head -20 | sed 's/^/  🗑️  /'
-            
-            if [ "$count" -gt 20 ]; then
-                echo "  ... and $((count - 20)) more packages"
-            fi
+            printf '%s\n' "$autoremove_list" | sed 's/^/  🗑️  /'
             echo
             echo "💡 These packages were installed as dependencies and are no longer needed"
             echo "   Run 'jwdeb_autoremove' to remove them"
@@ -1669,11 +1649,7 @@ jwdeb_orphans() {
         local lib_count
         lib_count=$(echo "$lib_orphans" | wc -l)
         echo "Found $lib_count orphaned library packages:"
-        echo "$lib_orphans" | head -15 | sed 's/^/  📚 /'
-        
-        if [ "$lib_count" -gt 15 ]; then
-            echo "  ... and $((lib_count - 15)) more packages"
-        fi
+        printf '%s\n' "$lib_orphans" | sed 's/^/  📚 /'
     else
         echo "✅ No orphaned library packages found"
     fi
@@ -1687,11 +1663,7 @@ jwdeb_orphans() {
         local all_count
         all_count=$(echo "$all_orphans" | wc -l)
         echo "Found $all_count total orphaned packages:"
-        echo "$all_orphans" | head -15 | sed 's/^/  🗑️  /'
-        
-        if [ "$all_count" -gt 15 ]; then
-            echo "  ... and $((all_count - 15)) more packages"
-        fi
+        printf '%s\n' "$all_orphans" | sed 's/^/  🗑️  /'
     else
         echo "✅ No orphaned packages found"
     fi

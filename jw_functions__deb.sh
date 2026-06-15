@@ -1977,14 +1977,14 @@ jwdeb_diag() {
     
     echo "---[ Recent Activity ]------------------------------"
     if [ -r /var/log/dpkg.log ]; then
-        echo "Package operations (oldest first):"
-        while read -r line; do
+        echo "Recent package operations (last 20):"
+        tail -20 /var/log/dpkg.log | while read -r line; do
             local date_time="" operation="" package=""
             date_time=$(echo "$line" | awk '{print $1, $2}')
             operation=$(echo "$line" | awk '{print $3}')
             package=$(echo "$line" | awk '{print $4}')
             printf "  %-20s %-10s %s\n" "$date_time" "$operation" "$package"
-        done < /var/log/dpkg.log
+        done
     else
         echo "  (log not accessible)"
     fi

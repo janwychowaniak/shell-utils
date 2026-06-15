@@ -1470,11 +1470,11 @@ jwdeb_installed() {
         echo "Found $count installed packages:"
         echo
         
-        echo "Package                   Version           Description"
-        echo "--------------------------------------------------------"
+        printf "%-29s %-22s %-8s %s\n" "Package" "Version" "Arch" "Description"
+        echo "---------------------------------------------------------------------------"
         echo "$package_list" | awk '{
-            printf "%-25s %-17s", $2, $3
-            for(i=4; i<=NF; i++) printf "%s ", $i
+            printf "%-29s %-22s %-8s ", $2, $3, $4
+            for(i=5; i<=NF; i++) printf "%s ", $i
             printf "\n"
         }'
     fi

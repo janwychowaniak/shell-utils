@@ -11,8 +11,9 @@
 #
 # SAFETY — these functions wrap the REAL docker daemon on this machine. The test
 # is built to never start, stop, remove, prune, build, pull, push or otherwise
-# mutate anything. A container/image/network/volume count is snapshotted before
-# and after the run and the test FAILS if any of them changed.
+# mutate anything. A container (total + running), image, network and volume
+# count is snapshotted before and after the run and the test FAILS if any of
+# them changed — the running count catches a stray stop/start the total misses.
 #   * Prompting functions (prune, cleanup, volume-prune, network-prune, and the
 #     no-args "stop all? / remove all?" paths) are fed </dev/null, so the
 #     confirmation read() hits EOF and the function cancels before any docker
@@ -32,6 +33,8 @@
 # NOT covered by automated parity (verified by hand instead):
 #   * jwdocker_monitor-stats/-health, jwdocker_containers/ps* — embed live
 #     CPU%/"Up N minutes", so output is non-deterministic between two runs.
+#   * jwdocker_container-inspect — docker returns .Mounts in non-deterministic
+#     order between calls, so its byte output isn't stable (Part B still runs it).
 #   * registry/filesystem mutators (run/pull/build/push/search/save/load/
 #     export/import/backup) beyond their usage path, and real (confirmed) prunes.
 #   * jwdocker_findcontainerbyip and jwdocker_ps/psup (aliases, not functions).
@@ -66,9 +69,10 @@ IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<
 NOPE=zzz-jwdocker-smoke-nonexistent
 
 # Snapshot real state so we can prove the test mutated nothing.
-snapshot() { printf '%s|%s|%s|%s' \
-  "$(docker ps -aq 2>/dev/null | wc -l)" "$(docker images -q 2>/dev/null | wc -l)" \
-  "$(docker network ls -q 2>/dev/null | wc -l)" "$(docker volume ls -q 2>/dev/null | wc -l)"; }
+snapshot() { printf '%s|%s|%s|%s|%s' \
+  "$(docker ps -aq 2>/dev/null | wc -l)" "$(docker ps -q 2>/dev/null | wc -l)" \
+  "$(docker images -q 2>/dev/null | wc -l)" "$(docker network ls -q 2>/dev/null | wc -l)" \
+  "$(docker volume ls -q 2>/dev/null | wc -l)"; }
 STATE_BEFORE=$(snapshot)
 
 # Shell runtime-error signatures (NOT docker's own "Error: No such ..." messages)
@@ -132,7 +136,7 @@ done
 echo "=== Part C: bash-vs-zsh stdout parity (read-only functions) ==="
 if [ "${#SHELLS[@]}" -ge 2 ]; then
   RO=("jwdocker_toc")
-  [ -n "$CON" ] && RO+=("jwdocker_container-inspect $CON" "jwdocker_port $CON")
+  [ -n "$CON" ] && RO+=("jwdocker_port $CON")
   [ -n "$NET" ] && RO+=("jwdocker_network-inspect $NET")
   [ -n "$VOL" ] && RO+=("jwdocker_volume-inspect $VOL")
   [ -n "$IMG" ] && RO+=("jwdocker_image-history $IMG")
@@ -153,7 +157,7 @@ fi
 
 # Safety net — prove the test changed no real docker state.
 STATE_AFTER=$(snapshot)
-echo "=== State check (containers|images|networks|volumes) ==="
+echo "=== State check (all|running|images|networks|volumes) ==="
 if [ "$STATE_BEFORE" = "$STATE_AFTER" ]; then
   echo "  ✅ unchanged: $STATE_AFTER"
 else

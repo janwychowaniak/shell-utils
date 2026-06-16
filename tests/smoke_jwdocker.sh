@@ -37,6 +37,9 @@
 #     order between calls, so its byte output isn't stable (Part B still runs it).
 #   * registry/filesystem mutators (run/pull/build/push/search/save/load/
 #     export/import/backup) beyond their usage path, and real (confirmed) prunes.
+#   * jwdocker_test/-debug exec-based subcommands (deps/network/process/http) and
+#     jwdocker_bench against a real container — they exec into / stress the
+#     container and reach external hosts; only their inspect/usage paths run here.
 #   * jwdocker_findcontainerbyip and jwdocker_ps/psup (aliases, not functions).
 #
 # Run:  bash tests/smoke_jwdocker.sh   (or ./tests/smoke_jwdocker.sh)
@@ -117,6 +120,11 @@ B+=("jwdocker_container-remove $NOPE" "jwdocker_container-start $NOPE" \
     "jwdocker_container-stop $NOPE"   "jwdocker_container-restart $NOPE" \
     "jwdocker_image-rm $NOPE"         "jwdocker_volume-remove $NOPE" \
     "jwdocker_network-remove $NOPE")
+# development helpers: inspect-only subcommands with a real container; the bench
+# and exec-based paths are only ever hit with a non-existent container (the
+# "not found / not running" guard returns before any docker exec).
+[ -n "$CON" ] && B+=("jwdocker_test $CON health" "jwdocker_debug $CON startup")
+B+=("jwdocker_test $NOPE health" "jwdocker_debug $NOPE" "jwdocker_bench $NOPE")
 echo "=== Part B: ${#B[@]} real-arg invocations (read-only + non-existent-target paths) ==="
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -136,7 +144,7 @@ done
 echo "=== Part C: bash-vs-zsh stdout parity (read-only functions) ==="
 if [ "${#SHELLS[@]}" -ge 2 ]; then
   RO=("jwdocker_toc")
-  [ -n "$CON" ] && RO+=("jwdocker_port $CON")
+  [ -n "$CON" ] && RO+=("jwdocker_port $CON" "jwdocker_test $CON health")
   [ -n "$NET" ] && RO+=("jwdocker_network-inspect $NET")
   [ -n "$VOL" ] && RO+=("jwdocker_volume-inspect $VOL")
   [ -n "$IMG" ] && RO+=("jwdocker_image-history $IMG")

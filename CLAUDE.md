@@ -18,6 +18,20 @@ shellcheck jw_functions__<area>.sh
 
 All function files should include `# shellcheck shell=bash` at the top.
 
+## Secret scanning
+
+Secrets are scanned with [gitleaks](https://github.com/gitleaks/gitleaks) (apt 8.16).
+A versioned pre-commit hook (`.githooks/pre-commit`) runs `gitleaks protect --staged`
+and blocks commits that introduce secrets. Activate it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Config is `.gitleaks.toml` (extends the default ruleset; add false positives to
+`[allowlist]`). Ad-hoc scans: `gitleaks detect -v` (history),
+`gitleaks detect --no-git -v` (files).
+
 ## Architecture
 
 **Files are organized by domain** following the pattern `jw_functions__<area>.sh`:

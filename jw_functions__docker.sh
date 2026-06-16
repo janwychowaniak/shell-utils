@@ -2177,8 +2177,8 @@ jwdocker_debug() {
         echo "Focus areas:"
         echo "  startup     - Debug container startup issues"
         echo "  network     - Debug network connectivity issues"
-        echo "  filesystem  - Debug filesystem and volume issues"
-        echo "  process     - Debug process and application issues"
+        echo "  fs          - Debug filesystem and volume issues"
+        echo "  ps          - Debug process and application issues"
         echo "  all         - Run all debug checks"
         echo
         echo "Examples:"
@@ -2218,14 +2218,14 @@ jwdocker_debug() {
     esac
 
     case $FOCUS in
-        filesystem|all)
-            __jwdocker_debug_filesystem__ "$CONTAINER"
+        fs|all)
+            __jwdocker_debug_fs__ "$CONTAINER"
             ;;
     esac
 
     case $FOCUS in
-        process|all)
-            __jwdocker_debug_process__ "$CONTAINER"
+        ps|all)
+            __jwdocker_debug_ps__ "$CONTAINER"
             ;;
     esac
 }
@@ -2308,7 +2308,7 @@ __jwdocker_debug_network__() {
     echo
 }
 
-__jwdocker_debug_filesystem__() {
+__jwdocker_debug_fs__() {
     local CONTAINER=$1
     
     echo "---[ Filesystem Debug ]----------------------------"
@@ -2342,7 +2342,7 @@ __jwdocker_debug_filesystem__() {
     echo
 }
 
-__jwdocker_debug_process__() {
+__jwdocker_debug_ps__() {
     local CONTAINER=$1
     
     echo "---[ Process Debug ]-------------------------------"

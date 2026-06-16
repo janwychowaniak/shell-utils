@@ -37,7 +37,7 @@
 #     order between calls, so its byte output isn't stable (Part B still runs it).
 #   * registry/filesystem mutators (run/pull/build/push/search/save/load/
 #     export/import/backup) beyond their usage path, and real (confirmed) prunes.
-#   * jwdocker_test/-debug exec-based subcommands (deps/network/process/http) —
+#   * jwdocker_test/-debug exec-based subcommands (deps/http, network/fs/ps) —
 #     they exec into the container and reach external hosts; only the
 #     inspect/usage paths run here.
 #   * jwdocker_findcontainerbyip and jwdocker_ps/psup (aliases, not functions).

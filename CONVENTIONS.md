@@ -102,7 +102,7 @@ echo "  jwdocker_image-build myapp:v1.0 ./Dockerfile ."
 ### Default Values
 - Reasonable defaults for optional parameters
 - Timeout values and common paths pre-configured
-- **Output limits — disclosed previews only, never silent caps.** A truncation is acceptable only in a *summary/overview* context AND only when it announces itself: cap with `head -N` and always print `... and N more`. NEVER silently cap a **dedicated viewer** (`jwgit_log`, `jwgit_reflog`, …) — show the full result and let git's pager handle volume, exposing `-N` for the user to limit by hand. A silent, undocumented cap (no `... and N more`, no way to change it from the help) is a bug, not a default (see the dropped 20-entry default in `jwgit_log`/`jwgit_reflog`).
+- **Output limits — show everything; capping is opt-in.** Default to NO truncation anywhere — listing/viewer functions *and* summary/confirmation previews (e.g. install/remove showing every affected package) print the full result; the user narrows with their own `head`. NEVER cap a **dedicated viewer** (`jwgit_log`, `jwgit_reflog`, `jwdeb_installed`, …). A `head -N`/`tail -N` cap is added only when explicitly requested for a specific function (e.g. `jwdeb_diag`'s bounded "Recent Activity"). Not caps (keep these): `head -1`/`tail -1` single-field extraction and `tail -n +2` header strips. A silent, undocumented cap is a bug, not a default.
 - Fallback behaviors when tools are unavailable
 
 ### Enhanced Output

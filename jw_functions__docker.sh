@@ -81,6 +81,11 @@ jwdocker_toc() {
     echo " - 🟢 jwdocker_logs"
     echo " - 🟢 jwdocker_port"
     echo
+    echo " -----------------------------  development helpers"
+    echo " - 🟢 jwdocker_test"
+    echo " - 🟢 jwdocker_debug"
+    echo " - ⚪ jwdocker_bench"
+    echo
 }
 
 
@@ -1696,3 +1701,823 @@ jwdocker_port() {
         echo
     fi
 }
+
+
+# ---------------------------------------------------------------------------------
+# development helpers (test / debug / benchmark)
+# ---------------------------------------------------------------------------------
+
+jwdocker_test() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdocker_test <container> <test_type> [options]"
+        echo "Test types:"
+        echo "  health      - Check container health, status, and restart count"
+        echo "  logs        - Analyze logs for errors and warnings"
+        echo "  resources   - Check resource usage and constraints"
+        echo "  config      - Validate configuration (env vars, volumes, ports)"
+        echo "  deps        - Test dependencies and external connectivity"
+        echo "  http        - Test HTTP endpoints (for web services)"
+        echo "  perf        - Basic performance metrics"
+        echo "  all         - Run all applicable tests"
+        echo
+        echo "Examples:"
+        echo "  jwdocker_test myapp health"
+        echo "  jwdocker_test myapp logs"
+        echo "  jwdocker_test myapp http 8080"
+        echo "  jwdocker_test myapp all"
+        echo
+        echo "Available containers:"
+        docker ps -a --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local TEST_TYPE=$2
+    local OPTION=$3
+
+    # Check if container exists
+    if ! docker ps -a --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        echo "Error: Container '$CONTAINER' not found."
+        return 1
+    fi
+
+    echo "🧪 Testing container: $CONTAINER"
+    echo "=================================================="
+    echo
+
+    case $TEST_TYPE in
+        health)
+            __jwdocker_test_health__ "$CONTAINER"
+            ;;
+        logs)
+            __jwdocker_test_logs__ "$CONTAINER" "$OPTION"
+            ;;
+        resources)
+            __jwdocker_test_resources__ "$CONTAINER"
+            ;;
+        config)
+            __jwdocker_test_config__ "$CONTAINER"
+            ;;
+        deps)
+            __jwdocker_test_deps__ "$CONTAINER"
+            ;;
+        http)
+            __jwdocker_test_http__ "$CONTAINER" "$OPTION"
+            ;;
+        perf)
+            __jwdocker_test_perf__ "$CONTAINER"
+            ;;
+        all)
+            __jwdocker_test_health__ "$CONTAINER"
+            __jwdocker_test_logs__ "$CONTAINER"
+            __jwdocker_test_resources__ "$CONTAINER"
+            __jwdocker_test_config__ "$CONTAINER"
+            __jwdocker_test_deps__ "$CONTAINER"
+            __jwdocker_test_perf__ "$CONTAINER"
+            ;;
+        *)
+            echo "Error: Unknown test type '$TEST_TYPE'"
+            echo "Valid types: health, logs, resources, config, deps, http, perf, all"
+            return 1
+            ;;
+    esac
+}
+
+__jwdocker_test_health__() {
+    local CONTAINER=$1
+    echo "---[ Health Check ]--------------------------------"
+    
+    # Container status
+    local container_status
+    container_status=$(docker inspect --format='{{.State.Status}}' "$CONTAINER")
+    echo -n "Status: "
+    if [ "$container_status" = "running" ]; then
+        echo "✅ $container_status"
+    else
+        echo "❌ $container_status"
+    fi
+    
+    # Exit code
+    local exit_code
+    exit_code=$(docker inspect --format='{{.State.ExitCode}}' "$CONTAINER")
+    echo -n "Exit Code: "
+    if [ "$exit_code" = "0" ]; then
+        echo "✅ $exit_code"
+    else
+        echo "❌ $exit_code"
+    fi
+    
+    # Restart count
+    local restart_count
+    restart_count=$(docker inspect --format='{{.RestartCount}}' "$CONTAINER")
+    echo -n "Restart Count: "
+    if [ "$restart_count" = "0" ]; then
+        echo "✅ $restart_count"
+    else
+        echo "⚠️  $restart_count (container has been restarted)"
+    fi
+    
+    # Health status (if healthcheck is configured)
+    local health_status
+    health_status=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null)
+    if [ -n "$health_status" ] && [ "$health_status" != "<no value>" ]; then
+        echo -n "Health Status: "
+        case $health_status in
+            healthy)
+                echo "✅ $health_status"
+                ;;
+            unhealthy)
+                echo "❌ $health_status"
+                ;;
+            starting)
+                echo "⚠️  $health_status"
+                ;;
+            *)
+                echo "❓ $health_status"
+                ;;
+        esac
+    fi
+    
+    # Uptime
+    local started_at
+    started_at=$(docker inspect --format='{{.State.StartedAt}}' "$CONTAINER")
+    if [ "$started_at" != "0001-01-01T00:00:00Z" ]; then
+        echo "Started: $started_at"
+    fi
+    
+    echo
+}
+
+__jwdocker_test_logs__() {
+    local CONTAINER=$1
+    local LINES=${2:-100}
+    
+    echo "---[ Log Analysis ]--------------------------------"
+    echo "Analyzing last $LINES log lines..."
+    
+    # Get logs
+    local logs
+    logs=$(docker logs --tail "$LINES" "$CONTAINER" 2>&1)
+    
+    if [ -z "$logs" ]; then
+        echo "⚠️  No logs found"
+        echo
+        return
+    fi
+    
+    # Count different log levels
+    local errors
+    local warnings
+    local total_lines
+    
+    errors=$(echo "$logs" | grep -ci "error\|exception\|fatal\|panic" || true)
+    warnings=$(echo "$logs" | grep -ci "warn\|warning" || true)
+    total_lines=$(echo "$logs" | wc -l)
+    
+    echo "Total log lines: $total_lines"
+    echo -n "Errors: "
+    if [ "$errors" -gt 0 ]; then
+        echo "❌ $errors found"
+    else
+        echo "✅ $errors"
+    fi
+    
+    echo -n "Warnings: "
+    if [ "$warnings" -gt 0 ]; then
+        echo "⚠️  $warnings found"
+    else
+        echo "✅ $warnings"
+    fi
+    
+    # Show recent errors if any
+    if [ "$errors" -gt 0 ]; then
+        echo
+        echo "Recent errors:"
+        echo "$logs" | grep -i "error\|exception\|fatal\|panic" | sed 's/^/  /'
+    fi
+    
+    echo
+}
+
+__jwdocker_test_resources__() {
+    local CONTAINER=$1
+    
+    echo "---[ Resource Usage ]------------------------------"
+    
+    # Get resource stats
+    local stats
+    stats=$(docker stats --no-stream --format "{{.CPUPerc}},{{.MemUsage}},{{.MemPerc}},{{.NetIO}},{{.BlockIO}}" "$CONTAINER" 2>/dev/null)
+    
+    if [ -z "$stats" ]; then
+        echo "❌ Unable to get resource stats (container may not be running)"
+        echo
+        return
+    fi
+    
+    IFS=',' read -r cpu_perc mem_usage mem_perc net_io block_io <<< "$stats"
+    
+    echo "CPU Usage: $cpu_perc"
+    echo "Memory Usage: $mem_usage ($mem_perc)"
+    echo "Network I/O: $net_io"
+    echo "Block I/O: $block_io"
+    
+    # Check for resource constraints
+    local cpu_num
+    cpu_num=$(echo "$cpu_perc" | sed 's/%//' | cut -d. -f1)
+    if [ "$cpu_num" -gt 80 ] 2>/dev/null; then
+        echo "⚠️  High CPU usage detected"
+    fi
+    
+    local mem_num
+    mem_num=$(echo "$mem_perc" | sed 's/%//' | cut -d. -f1)
+    if [ "$mem_num" -gt 80 ] 2>/dev/null; then
+        echo "⚠️  High memory usage detected"
+    fi
+    
+    echo
+}
+
+__jwdocker_test_config__() {
+    local CONTAINER=$1
+    
+    echo "---[ Configuration Validation ]--------------------"
+    
+    # Check environment variables
+    local env_count
+    env_count=$(docker inspect --format='{{range .Config.Env}}{{.}}{{"\n"}}{{end}}' "$CONTAINER" | wc -l)
+    echo "Environment variables: $env_count configured"
+    
+    # Check volumes
+    local volume_count
+    volume_count=$(docker inspect --format='{{range .Mounts}}{{.}}{{"\n"}}{{end}}' "$CONTAINER" | wc -l)
+    echo -n "Volumes: "
+    if [ "$volume_count" -gt 0 ]; then
+        echo "✅ $volume_count mounted"
+        # Check if volumes are accessible
+        docker inspect --format='{{range .Mounts}}{{printf "%s -> %s (%s)\n" .Source .Destination .Type}}{{end}}' "$CONTAINER" | while read -r mount_info; do
+            echo "  $mount_info"
+        done
+    else
+        echo "⚠️  No volumes mounted"
+    fi
+    
+    # Check ports
+    local port_count
+    port_count=$(docker inspect --format='{{range $key, $value := .NetworkSettings.Ports}}{{$key}}{{"\n"}}{{end}}' "$CONTAINER" | wc -l)
+    echo -n "Exposed ports: "
+    if [ "$port_count" -gt 0 ]; then
+        echo "✅ $port_count configured"
+        docker inspect --format='{{range $key, $value := .NetworkSettings.Ports}}{{printf "%s -> %s\n" $key $value}}{{end}}' "$CONTAINER" | sed 's/^/  /'
+    else
+        echo "⚠️  No ports exposed"
+    fi
+    
+    echo
+}
+
+__jwdocker_test_deps__() {
+    local CONTAINER=$1
+    
+    echo "---[ Dependency Testing ]--------------------------"
+    
+    # Check if container is running
+    if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        echo "❌ Container is not running - cannot test dependencies"
+        echo
+        return
+    fi
+    
+    # Test basic network connectivity
+    echo -n "Internet connectivity: "
+    if docker exec "$CONTAINER" ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
+        echo "✅ Available"
+    else
+        echo "❌ Failed"
+    fi
+    
+    # Test DNS resolution
+    echo -n "DNS resolution: "
+    if docker exec "$CONTAINER" nslookup google.com >/dev/null 2>&1; then
+        echo "✅ Working"
+    else
+        echo "❌ Failed"
+    fi
+    
+    # Check for common dependency tools
+    echo "Available tools:"
+    for tool in curl wget nc telnet ping nslookup; do
+        if docker exec "$CONTAINER" sh -c "command -v $tool >/dev/null 2>&1"; then
+            echo "  ✅ $tool"
+        else
+            echo "  ❌ $tool"
+        fi
+    done
+    
+    echo
+}
+
+__jwdocker_test_http__() {
+    local CONTAINER=$1
+    local PORT=${2:-80}
+    
+    echo "---[ HTTP Testing ]--------------------------------"
+    
+    # Check if container is running
+    if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        echo "❌ Container is not running - cannot test HTTP"
+        echo
+        return
+    fi
+    
+    # Get container IP
+    local container_ip
+    container_ip=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$CONTAINER" | head -1)
+    
+    if [ -z "$container_ip" ]; then
+        echo "❌ Could not determine container IP"
+        echo
+        return
+    fi
+    
+    echo "Testing HTTP on $container_ip:$PORT"
+    
+    # Test if port is listening
+    echo -n "Port $PORT listening: "
+    if docker exec "$CONTAINER" sh -c "command -v nc >/dev/null 2>&1"; then
+        if docker exec "$CONTAINER" nc -z localhost "$PORT" 2>/dev/null; then
+            echo "✅ Yes"
+        else
+            echo "❌ No"
+            echo
+            return
+        fi
+    else
+        echo "⚠️  Cannot test (nc not available)"
+    fi
+    
+    # Test HTTP response if curl is available
+    if docker exec "$CONTAINER" sh -c "command -v curl >/dev/null 2>&1"; then
+        echo -n "HTTP response: "
+        local http_code
+        http_code=$(docker exec "$CONTAINER" curl -s -o /dev/null -w "%{http_code}" "http://localhost:$PORT" 2>/dev/null || echo "000")
+        
+        case $http_code in
+            200|201|202|204)
+                echo "✅ $http_code (Success)"
+                ;;
+            3*)
+                echo "⚠️  $http_code (Redirect)"
+                ;;
+            4*)
+                echo "❌ $http_code (Client Error)"
+                ;;
+            5*)
+                echo "❌ $http_code (Server Error)"
+                ;;
+            000)
+                echo "❌ No response"
+                ;;
+            *)
+                echo "❓ $http_code"
+                ;;
+        esac
+    else
+        echo "⚠️  Cannot test HTTP response (curl not available)"
+    fi
+    
+    echo
+}
+
+__jwdocker_test_perf__() {
+    local CONTAINER=$1
+    
+    echo "---[ Performance Metrics ]-------------------------"
+    
+    # Check if container is running
+    if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        echo "❌ Container is not running - cannot get performance metrics"
+        echo
+        return
+    fi
+    
+    # Get detailed stats
+    local stats
+    stats=$(docker stats --no-stream --format "{{.CPUPerc}},{{.MemUsage}},{{.MemPerc}},{{.NetIO}},{{.BlockIO}},{{.PIDs}}" "$CONTAINER" 2>/dev/null)
+    
+    if [ -z "$stats" ]; then
+        echo "❌ Unable to get performance stats"
+        echo
+        return
+    fi
+    
+    IFS=',' read -r cpu_perc mem_usage mem_perc net_io block_io pids <<< "$stats"
+    
+    echo "Current Performance:"
+    echo "  CPU: $cpu_perc"
+    echo "  Memory: $mem_usage ($mem_perc)"
+    echo "  Network I/O: $net_io"
+    echo "  Block I/O: $block_io"
+    echo "  PIDs: $pids"
+    
+    # Performance assessment
+    echo
+    echo "Performance Assessment:"
+    
+    local cpu_num
+    cpu_num=$(echo "$cpu_perc" | sed 's/%//' | cut -d. -f1 2>/dev/null || echo "0")
+    if [ "$cpu_num" -lt 50 ] 2>/dev/null; then
+        echo "  CPU: ✅ Normal ($cpu_perc)"
+    elif [ "$cpu_num" -lt 80 ] 2>/dev/null; then
+        echo "  CPU: ⚠️  Moderate ($cpu_perc)"
+    else
+        echo "  CPU: ❌ High ($cpu_perc)"
+    fi
+    
+    local mem_num
+    mem_num=$(echo "$mem_perc" | sed 's/%//' | cut -d. -f1 2>/dev/null || echo "0")
+    if [ "$mem_num" -lt 70 ] 2>/dev/null; then
+        echo "  Memory: ✅ Normal ($mem_perc)"
+    elif [ "$mem_num" -lt 90 ] 2>/dev/null; then
+        echo "  Memory: ⚠️  High ($mem_perc)"
+    else
+        echo "  Memory: ❌ Critical ($mem_perc)"
+    fi
+    
+    echo
+}
+
+
+jwdocker_debug() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdocker_debug <container> [focus_area]"
+        echo "Focus areas:"
+        echo "  startup     - Debug container startup issues"
+        echo "  network     - Debug network connectivity issues"
+        echo "  filesystem  - Debug filesystem and volume issues"
+        echo "  process     - Debug process and application issues"
+        echo "  all         - Run all debug checks"
+        echo
+        echo "Examples:"
+        echo "  jwdocker_debug myapp"
+        echo "  jwdocker_debug myapp startup"
+        echo "  jwdocker_debug myapp network"
+        echo
+        echo "Available containers:"
+        docker ps -a --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local FOCUS=${2:-all}
+
+    # Check if container exists
+    if ! docker ps -a --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        echo "Error: Container '$CONTAINER' not found."
+        return 1
+    fi
+
+    echo "🐛 Debugging container: $CONTAINER"
+    echo "=================================================="
+    echo
+
+    case $FOCUS in
+        startup|all)
+            __jwdocker_debug_startup__ "$CONTAINER"
+            ;;
+    esac
+
+    case $FOCUS in
+        network|all)
+            __jwdocker_debug_network__ "$CONTAINER"
+            ;;
+    esac
+
+    case $FOCUS in
+        filesystem|all)
+            __jwdocker_debug_filesystem__ "$CONTAINER"
+            ;;
+    esac
+
+    case $FOCUS in
+        process|all)
+            __jwdocker_debug_process__ "$CONTAINER"
+            ;;
+    esac
+}
+
+__jwdocker_debug_startup__() {
+    local CONTAINER=$1
+    
+    echo "---[ Startup Debug ]-------------------------------"
+    
+    # Container state
+    local container_status
+    container_status=$(docker inspect --format='{{.State.Status}}' "$CONTAINER")
+    echo "Current Status: $container_status"
+    
+    # Exit code and error
+    local exit_code
+    local error
+    exit_code=$(docker inspect --format='{{.State.ExitCode}}' "$CONTAINER")
+    error=$(docker inspect --format='{{.State.Error}}' "$CONTAINER")
+    
+    if [ "$exit_code" != "0" ]; then
+        echo "❌ Exit Code: $exit_code"
+        if [ -n "$error" ] && [ "$error" != "<no value>" ]; then
+            echo "❌ Error: $error"
+        fi
+    fi
+    
+    # Recent logs for startup issues
+    echo
+    echo "Recent startup logs:"
+    docker logs --tail 20 "$CONTAINER" 2>&1 | sed 's/^/  /'
+    
+    # Check if image exists
+    local image
+    image=$(docker inspect --format='{{.Config.Image}}' "$CONTAINER")
+    echo
+    echo "Image: $image"
+    if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${image}$"; then
+        echo "✅ Image exists locally"
+    else
+        echo "❌ Image not found locally"
+    fi
+    
+    echo
+}
+
+__jwdocker_debug_network__() {
+    local CONTAINER=$1
+    
+    echo "---[ Network Debug ]-------------------------------"
+    
+    # Network settings
+    echo "Networks:"
+    docker inspect --format='{{range $key, $value := .NetworkSettings.Networks}}{{printf "  %s: %s\n" $key .IPAddress}}{{end}}' "$CONTAINER"
+    
+    # Port mappings
+    echo
+    echo "Port mappings:"
+    docker inspect --format='{{range $key, $value := .NetworkSettings.Ports}}{{printf "  %s -> %s\n" $key $value}}{{end}}' "$CONTAINER"
+    
+    # Test basic connectivity if running
+    if docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        echo
+        echo "Connectivity tests:"
+        echo -n "  Internet: "
+        if docker exec "$CONTAINER" ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
+            echo "✅"
+        else
+            echo "❌"
+        fi
+        
+        echo -n "  DNS: "
+        if docker exec "$CONTAINER" nslookup google.com >/dev/null 2>&1; then
+            echo "✅"
+        else
+            echo "❌"
+        fi
+    fi
+    
+    echo
+}
+
+__jwdocker_debug_filesystem__() {
+    local CONTAINER=$1
+    
+    echo "---[ Filesystem Debug ]----------------------------"
+    
+    # Volume mounts
+    echo "Volume mounts:"
+    docker inspect --format='{{range .Mounts}}{{printf "  %s -> %s (%s, %s)\n" .Source .Destination .Type .Mode}}{{end}}' "$CONTAINER"
+    
+    # Check if running to test filesystem
+    if docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        echo
+        echo "Filesystem tests:"
+        
+        # Check working directory
+        local workdir
+        workdir=$(docker inspect --format='{{.Config.WorkingDir}}' "$CONTAINER")
+        if [ -n "$workdir" ] && [ "$workdir" != "/" ]; then
+            echo -n "  Working directory ($workdir): "
+            if docker exec "$CONTAINER" test -d "$workdir"; then
+                echo "✅ Exists"
+            else
+                echo "❌ Missing"
+            fi
+        fi
+        
+        # Check disk space
+        echo "  Disk usage:"
+        docker exec "$CONTAINER" df -h 2>/dev/null | sed 's/^/    /' || echo "    ❌ Cannot check disk usage"
+    fi
+    
+    echo
+}
+
+__jwdocker_debug_process__() {
+    local CONTAINER=$1
+    
+    echo "---[ Process Debug ]-------------------------------"
+    
+    # Check if running
+    if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        echo "❌ Container is not running - cannot debug processes"
+        echo
+        return
+    fi
+    
+    # Process list
+    echo "Running processes:"
+    docker exec "$CONTAINER" ps aux 2>/dev/null | sed 's/^/  /' || echo "  ❌ Cannot list processes"
+    
+    # Check main process
+    echo
+    local pid1_cmd
+    pid1_cmd=$(docker exec "$CONTAINER" ps -p 1 -o comm= 2>/dev/null || echo "unknown")
+    echo "Main process (PID 1): $pid1_cmd"
+    
+    # Resource usage
+    echo
+    echo "Resource usage:"
+    docker exec "$CONTAINER" top -bn1 | head -5 | sed 's/^/  /' 2>/dev/null || echo "  ❌ Cannot get resource usage"
+    
+    echo
+}
+
+
+jwdocker_bench() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: jwdocker_bench <container> [test_type]"
+        echo "Test types:"
+        echo "  cpu         - CPU performance test"
+        echo "  memory      - Memory performance test"
+        echo "  disk        - Disk I/O performance test"
+        echo "  network     - Network performance test"
+        echo "  all         - Run all benchmarks"
+        echo
+        echo "Examples:"
+        echo "  jwdocker_bench myapp cpu"
+        echo "  jwdocker_bench myapp all"
+        echo
+        echo "Available running containers:"
+        docker ps --format "- {{.Names}}"
+        echo
+        return 1
+    fi
+
+    local CONTAINER=$1
+    local TEST_TYPE=${2:-all}
+
+    # Check if container is running
+    if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
+        echo "Error: Container '$CONTAINER' is not running."
+        return 1
+    fi
+
+    echo "⚡ Benchmarking container: $CONTAINER"
+    echo "=================================================="
+    echo
+
+    case $TEST_TYPE in
+        cpu|all)
+            __jwdocker_bench_cpu__ "$CONTAINER"
+            ;;
+    esac
+
+    case $TEST_TYPE in
+        memory|all)
+            __jwdocker_bench_memory__ "$CONTAINER"
+            ;;
+    esac
+
+    case $TEST_TYPE in
+        disk|all)
+            __jwdocker_bench_disk__ "$CONTAINER"
+            ;;
+    esac
+
+    case $TEST_TYPE in
+        network|all)
+            __jwdocker_bench_network__ "$CONTAINER"
+            ;;
+    esac
+}
+
+__jwdocker_bench_cpu__() {
+    local CONTAINER=$1
+    
+    echo "---[ CPU Benchmark ]-------------------------------"
+    
+    # Simple CPU test using dd and time
+    echo "Running CPU stress test (10 seconds)..."
+    local start_time
+    local end_time
+    local duration
+    
+    start_time=$(date +%s)
+    docker exec "$CONTAINER" sh -c 'timeout 10 yes > /dev/null 2>&1 || true' >/dev/null 2>&1
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+    
+    echo "CPU test completed in ${duration}s"
+    
+    # Get CPU stats during and after test
+    echo "CPU usage after test:"
+    docker stats --no-stream --format "  CPU: {{.CPUPerc}}" "$CONTAINER"
+    
+    echo
+}
+
+__jwdocker_bench_memory__() {
+    local CONTAINER=$1
+    
+    echo "---[ Memory Benchmark ]----------------------------"
+    
+    # Memory allocation test
+    echo "Testing memory allocation..."
+    
+    # Get current memory usage
+    local mem_before
+    mem_before=$(docker stats --no-stream --format "{{.MemUsage}}" "$CONTAINER")
+    echo "Memory before test: $mem_before"
+    
+    # Simple memory test
+    docker exec "$CONTAINER" sh -c 'dd if=/dev/zero of=/tmp/memtest bs=1M count=100 2>/dev/null && rm -f /tmp/memtest' >/dev/null 2>&1 || echo "Memory test completed"
+    
+    # Get memory usage after
+    local mem_after
+    mem_after=$(docker stats --no-stream --format "{{.MemUsage}}" "$CONTAINER")
+    echo "Memory after test: $mem_after"
+    
+    echo
+}
+
+__jwdocker_bench_disk__() {
+    local CONTAINER=$1
+    
+    echo "---[ Disk I/O Benchmark ]--------------------------"
+    
+    # Write test
+    echo "Testing disk write performance..."
+    local write_result
+    write_result=$(docker exec "$CONTAINER" sh -c 'dd if=/dev/zero of=/tmp/disktest bs=1M count=100 2>&1 | grep -o "[0-9.]* MB/s" | tail -1' || echo "N/A")
+    echo "Write speed: $write_result"
+    
+    # Read test
+    echo "Testing disk read performance..."
+    local read_result
+    read_result=$(docker exec "$CONTAINER" sh -c 'dd if=/tmp/disktest of=/dev/null bs=1M 2>&1 | grep -o "[0-9.]* MB/s" | tail -1' || echo "N/A")
+    echo "Read speed: $read_result"
+    
+    # Cleanup
+    docker exec "$CONTAINER" rm -f /tmp/disktest 2>/dev/null || true
+    
+    echo
+}
+
+__jwdocker_bench_network__() {
+    local CONTAINER=$1
+    
+    echo "---[ Network Benchmark ]---------------------------"
+    
+    # Test network connectivity and basic performance
+    echo "Testing network connectivity..."
+    
+    # Ping test
+    echo -n "Ping to 8.8.8.8: "
+    local ping_result
+    ping_result=$(docker exec "$CONTAINER" ping -c 5 8.8.8.8 2>/dev/null | grep 'avg' | cut -d'/' -f5 || echo "failed")
+    if [ "$ping_result" != "failed" ]; then
+        echo "${ping_result}ms average"
+    else
+        echo "❌ Failed"
+    fi
+    
+    # DNS resolution test
+    echo -n "DNS resolution: "
+    local dns_start
+    local dns_end
+    dns_start=$(date +%s%N)
+    if docker exec "$CONTAINER" nslookup google.com >/dev/null 2>&1; then
+        dns_end=$(date +%s%N)
+        local dns_time
+        dns_time=$(( (dns_end - dns_start) / 1000000 ))
+        echo "✅ ${dns_time}ms"
+    else
+        echo "❌ Failed"
+    fi
+    
+    # Download test if curl/wget available
+    if docker exec "$CONTAINER" sh -c "command -v curl >/dev/null 2>&1"; then
+        echo "Testing download speed..."
+        docker exec "$CONTAINER" curl -s -w "Download speed: %{speed_download} bytes/sec\n" -o /dev/null http://httpbin.org/bytes/1048576 2>/dev/null || echo "Download test failed"
+    fi
+    
+    echo
+}
+

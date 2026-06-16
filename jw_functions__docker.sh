@@ -1117,7 +1117,9 @@ jwdocker_load() {
         echo "  jwdocker_load /tmp/myimage.tar"
         echo
         echo "Available tar files in current directory:"
-        ls -1 ./*.tar 2>/dev/null || echo "  (no .tar files found)"
+        local tars=""
+        tars=$(find . -maxdepth 1 -name '*.tar' 2>/dev/null | sort)
+        if [ -n "$tars" ]; then printf '%s\n' "$tars"; else echo "  (no .tar files found)"; fi
         echo
         return 1
     fi
@@ -1186,7 +1188,9 @@ jwdocker_import() {
         echo "  jwdocker_import container.tar myimage:latest     # Imports with specific name"
         echo
         echo "Available tar files in current directory:"
-        ls -1 ./*.tar 2>/dev/null || echo "  (no .tar files found)"
+        local tars=""
+        tars=$(find . -maxdepth 1 -name '*.tar' 2>/dev/null | sort)
+        if [ -n "$tars" ]; then printf '%s\n' "$tars"; else echo "  (no .tar files found)"; fi
         echo
         return 1
     fi

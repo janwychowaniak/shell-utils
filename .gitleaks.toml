@@ -1,0 +1,19 @@
+# gitleaks configuration for shell-utils
+# Tooling: apt gitleaks 8.16 (commands: `detect`, `detect --no-git`, `protect --staged`).
+# NOTE: v8.16 uses the singular [allowlist]; [[allowlists]] is v8.25+ only.
+
+title = "shell-utils gitleaks config"
+
+# Extend the ruleset baked into the gitleaks binary rather than redefining it.
+[extend]
+useDefault = true
+
+# Repo-specific false positives. Add regexes/paths/commits here when a scan
+# flags something that is NOT a real secret (e.g. a placeholder in --help text).
+[allowlist]
+description = "shell-utils false positives"
+paths = [
+  '''\.gitleaks\.toml''',          # don't scan our own config (it carries rule regexes)
+]
+# regexes = [ '''YOUR_[A-Z_]*_(KEY|TOKEN)''' ]   # e.g. placeholders shown in usage text
+# commits = [ ]                                   # whitelist a specific finding by commit SHA

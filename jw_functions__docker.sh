@@ -1713,11 +1713,11 @@ jwdocker_test() {
         echo "Test types:"
         echo "  health      - Check container health, status, and restart count"
         echo "  logs        - Analyze logs for errors and warnings"
-        echo "  resources   - Check resource usage and constraints"
+        echo "  limits      - Show configured resource limits (memory, CPU, PIDs)"
         echo "  config      - Validate configuration (env vars, volumes, ports)"
         echo "  deps        - Test dependencies and external connectivity"
         echo "  http        - Test HTTP endpoints (for web services)"
-        echo "  perf        - Basic performance metrics"
+        echo "  stats       - Live resource usage (CPU, memory, I/O, PIDs)"
         echo "  all         - Run all applicable tests"
         echo
         echo "Examples:"
@@ -1753,8 +1753,8 @@ jwdocker_test() {
         logs)
             __jwdocker_test_logs__ "$CONTAINER" "$OPTION"
             ;;
-        resources)
-            __jwdocker_test_resources__ "$CONTAINER"
+        limits)
+            __jwdocker_test_limits__ "$CONTAINER"
             ;;
         config)
             __jwdocker_test_config__ "$CONTAINER"
@@ -1765,20 +1765,20 @@ jwdocker_test() {
         http)
             __jwdocker_test_http__ "$CONTAINER" "$OPTION"
             ;;
-        perf)
-            __jwdocker_test_perf__ "$CONTAINER"
+        stats)
+            __jwdocker_test_stats__ "$CONTAINER"
             ;;
         all)
             __jwdocker_test_health__ "$CONTAINER"
             __jwdocker_test_logs__ "$CONTAINER"
-            __jwdocker_test_resources__ "$CONTAINER"
+            __jwdocker_test_limits__ "$CONTAINER"
             __jwdocker_test_config__ "$CONTAINER"
             __jwdocker_test_deps__ "$CONTAINER"
-            __jwdocker_test_perf__ "$CONTAINER"
+            __jwdocker_test_stats__ "$CONTAINER"
             ;;
         *)
             echo "Error: Unknown test type '$TEST_TYPE'"
-            echo "Valid types: health, logs, resources, config, deps, http, perf, all"
+            echo "Valid types: health, logs, config, deps, http, limits, stats, all"
             return 1
             ;;
     esac
@@ -1900,41 +1900,52 @@ __jwdocker_test_logs__() {
     echo
 }
 
-__jwdocker_test_resources__() {
+# Format a byte count as MiB/GiB; a non-positive / unset value prints $2.
+__jwdocker_human_bytes__() {
+    local b=$1 zero=${2:-unlimited}
+    if [ -z "$b" ] || [ "$b" = "<no value>" ] || [ "$b" -le 0 ] 2>/dev/null; then
+        echo "$zero"
+    elif [ "$b" -ge 1073741824 ]; then
+        awk -v b="$b" 'BEGIN{printf "%g GiB", b/1073741824}'
+    else
+        echo "$((b / 1048576)) MiB"
+    fi
+}
+
+__jwdocker_test_limits__() {
     local CONTAINER=$1
-    
-    echo "---[ Resource Usage ]------------------------------"
-    
-    # Get resource stats
-    local stats
-    stats=$(docker stats --no-stream --format "{{.CPUPerc}},{{.MemUsage}},{{.MemPerc}},{{.NetIO}},{{.BlockIO}}" "$CONTAINER" 2>/dev/null)
-    
-    if [ -z "$stats" ]; then
-        echo "❌ Unable to get resource stats (container may not be running)"
-        echo
-        return
+
+    echo "---[ Resource Limits ]-----------------------------"
+
+    # Configured limits/reservations (what the container is ALLOWED), from the
+    # host config — distinct from jwdocker_test ... stats (live usage).
+    local raw mem memres memswap nanocpus cpushares cpuset pidslimit
+    raw=$(docker inspect --format='{{.HostConfig.Memory}}|{{.HostConfig.MemoryReservation}}|{{.HostConfig.MemorySwap}}|{{.HostConfig.NanoCpus}}|{{.HostConfig.CpuShares}}|{{.HostConfig.CpusetCpus}}|{{.HostConfig.PidsLimit}}' "$CONTAINER" 2>/dev/null)
+    IFS='|' read -r mem memres memswap nanocpus cpushares cpuset pidslimit <<< "$raw"
+
+    printf "  %-20s %s\n" "Memory limit:"       "$(__jwdocker_human_bytes__ "$mem" unlimited)"
+    printf "  %-20s %s\n" "Memory reservation:" "$(__jwdocker_human_bytes__ "$memres" none)"
+    printf "  %-20s %s\n" "Memory + swap:"      "$(__jwdocker_human_bytes__ "$memswap" unlimited)"
+
+    local cpu="unlimited"
+    if [ -n "$nanocpus" ] && [ "$nanocpus" -gt 0 ] 2>/dev/null; then
+        cpu="$(awk -v n="$nanocpus" 'BEGIN{printf "%g", n/1000000000}') CPUs"
     fi
-    
-    IFS=',' read -r cpu_perc mem_usage mem_perc net_io block_io <<< "$stats"
-    
-    echo "CPU Usage: $cpu_perc"
-    echo "Memory Usage: $mem_usage ($mem_perc)"
-    echo "Network I/O: $net_io"
-    echo "Block I/O: $block_io"
-    
-    # Check for resource constraints
-    local cpu_num
-    cpu_num=$(echo "$cpu_perc" | sed 's/%//' | cut -d. -f1)
-    if [ "$cpu_num" -gt 80 ] 2>/dev/null; then
-        echo "⚠️  High CPU usage detected"
+    printf "  %-20s %s\n" "CPU limit:" "$cpu"
+
+    local shares="1024 (default)"
+    if [ -n "$cpushares" ] && [ "$cpushares" -gt 0 ] 2>/dev/null; then
+        shares="$cpushares"
     fi
-    
-    local mem_num
-    mem_num=$(echo "$mem_perc" | sed 's/%//' | cut -d. -f1)
-    if [ "$mem_num" -gt 80 ] 2>/dev/null; then
-        echo "⚠️  High memory usage detected"
+    printf "  %-20s %s\n" "CPU shares:" "$shares"
+    printf "  %-20s %s\n" "CPU set:" "${cpuset:-all}"
+
+    local pids="unlimited"
+    if [ -n "$pidslimit" ] && [ "$pidslimit" != "<no value>" ] && [ "$pidslimit" -gt 0 ] 2>/dev/null; then
+        pids="$pidslimit"
     fi
-    
+    printf "  %-20s %s\n" "PIDs limit:" "$pids"
+
     echo
 }
 
@@ -2102,10 +2113,10 @@ __jwdocker_test_http__() {
     echo
 }
 
-__jwdocker_test_perf__() {
+__jwdocker_test_stats__() {
     local CONTAINER=$1
-    
-    echo "---[ Performance Metrics ]-------------------------"
+
+    echo "---[ Live Stats ]----------------------------------"
     
     # Check if container is running
     if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then

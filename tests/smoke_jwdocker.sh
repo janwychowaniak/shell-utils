@@ -123,7 +123,8 @@ B+=("jwdocker_container-remove $NOPE" "jwdocker_container-start $NOPE" \
 # development helpers: inspect-only subcommands with a real container; the bench
 # and exec-based paths are only ever hit with a non-existent container (the
 # "not found / not running" guard returns before any docker exec).
-[ -n "$CON" ] && B+=("jwdocker_test $CON health" "jwdocker_debug $CON startup")
+[ -n "$CON" ] && B+=("jwdocker_test $CON health" "jwdocker_test $CON config" \
+                     "jwdocker_debug $CON startup")
 B+=("jwdocker_test $NOPE health" "jwdocker_debug $NOPE" "jwdocker_bench $NOPE")
 echo "=== Part B: ${#B[@]} real-arg invocations (read-only + non-existent-target paths) ==="
 for sh in "${SHELLS[@]}"; do

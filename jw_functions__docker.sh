@@ -1940,39 +1940,41 @@ __jwdocker_test_resources__() {
 
 __jwdocker_test_config__() {
     local CONTAINER=$1
-    
+
     echo "---[ Configuration Validation ]--------------------"
-    
-    # Check environment variables
-    local env_count
-    env_count=$(docker inspect --format='{{range .Config.Env}}{{.}}{{"\n"}}{{end}}' "$CONTAINER" | wc -l)
-    echo "Environment variables: $env_count configured"
-    
-    # Check volumes
-    local volume_count
-    volume_count=$(docker inspect --format='{{range .Mounts}}{{.}}{{"\n"}}{{end}}' "$CONTAINER" | wc -l)
+
+    # NB: `docker inspect --format` appends its own trailing newline after the
+    # template's, so `... | wc -l` over-counts by one. Capture each list once,
+    # drop the trailing blank with `grep .`, and count what is actually shown.
+
+    # Environment variables — list them, don't just count
+    local envs
+    envs=$(docker inspect --format='{{range .Config.Env}}{{printf "%s\n" .}}{{end}}' "$CONTAINER" | grep .)
+    echo "Environment variables: $(printf '%s\n' "$envs" | grep -c .) configured"
+    [ -n "$envs" ] && printf '%s\n' "$envs" | sed 's/^/  /'
+
+    # Volumes
+    local volumes
+    volumes=$(docker inspect --format='{{range .Mounts}}{{printf "%s -> %s (%s)\n" .Source .Destination .Type}}{{end}}' "$CONTAINER" | grep .)
     echo -n "Volumes: "
-    if [ "$volume_count" -gt 0 ]; then
-        echo "✅ $volume_count mounted"
-        # Check if volumes are accessible
-        docker inspect --format='{{range .Mounts}}{{printf "%s -> %s (%s)\n" .Source .Destination .Type}}{{end}}' "$CONTAINER" | while read -r mount_info; do
-            echo "  $mount_info"
-        done
+    if [ -n "$volumes" ]; then
+        echo "✅ $(printf '%s\n' "$volumes" | grep -c .) mounted"
+        printf '%s\n' "$volumes" | sed 's/^/  /'
     else
         echo "⚠️  No volumes mounted"
     fi
-    
-    # Check ports
-    local port_count
-    port_count=$(docker inspect --format='{{range $key, $value := .NetworkSettings.Ports}}{{$key}}{{"\n"}}{{end}}' "$CONTAINER" | wc -l)
+
+    # Ports
+    local ports
+    ports=$(docker inspect --format='{{range $key, $value := .NetworkSettings.Ports}}{{printf "%s -> %s\n" $key $value}}{{end}}' "$CONTAINER" | grep .)
     echo -n "Exposed ports: "
-    if [ "$port_count" -gt 0 ]; then
-        echo "✅ $port_count configured"
-        docker inspect --format='{{range $key, $value := .NetworkSettings.Ports}}{{printf "%s -> %s\n" $key $value}}{{end}}' "$CONTAINER" | sed 's/^/  /'
+    if [ -n "$ports" ]; then
+        echo "✅ $(printf '%s\n' "$ports" | grep -c .) configured"
+        printf '%s\n' "$ports" | sed 's/^/  /'
     else
         echo "⚠️  No ports exposed"
     fi
-    
+
     echo
 }
 

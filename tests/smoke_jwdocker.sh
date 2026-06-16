@@ -124,6 +124,7 @@ B+=("jwdocker_container-remove $NOPE" "jwdocker_container-start $NOPE" \
 # and exec-based paths are only ever hit with a non-existent container (the
 # "not found / not running" guard returns before any docker exec).
 [ -n "$CON" ] && B+=("jwdocker_test $CON health" "jwdocker_test $CON config" \
+                     "jwdocker_test $CON limits" "jwdocker_test $CON stats" \
                      "jwdocker_debug $CON startup")
 B+=("jwdocker_test $NOPE health" "jwdocker_debug $NOPE" "jwdocker_bench $NOPE")
 echo "=== Part B: ${#B[@]} real-arg invocations (read-only + non-existent-target paths) ==="
@@ -145,7 +146,7 @@ done
 echo "=== Part C: bash-vs-zsh stdout parity (read-only functions) ==="
 if [ "${#SHELLS[@]}" -ge 2 ]; then
   RO=("jwdocker_toc")
-  [ -n "$CON" ] && RO+=("jwdocker_port $CON" "jwdocker_test $CON health")
+  [ -n "$CON" ] && RO+=("jwdocker_port $CON" "jwdocker_test $CON health" "jwdocker_test $CON limits")
   [ -n "$NET" ] && RO+=("jwdocker_network-inspect $NET")
   [ -n "$VOL" ] && RO+=("jwdocker_volume-inspect $VOL")
   [ -n "$IMG" ] && RO+=("jwdocker_image-history $IMG")

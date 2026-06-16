@@ -2054,16 +2054,27 @@ __jwdocker_test_http__() {
             echo
             return
         fi
+    elif docker exec "$CONTAINER" sh -c "command -v curl >/dev/null 2>&1"; then
+        # No nc — fall back to curl (connect-only probe; a service that accepts
+        # the connection and speaks HTTP counts as listening).
+        if docker exec "$CONTAINER" curl -s -o /dev/null --connect-timeout 5 "http://localhost:$PORT" 2>/dev/null; then
+            echo "✅ Yes (via curl)"
+        else
+            echo "❌ No (or not speaking HTTP)"
+        fi
     else
-        echo "⚠️  Cannot test (nc not available)"
+        echo "⚠️  Cannot test (no nc or curl available)"
     fi
     
     # Test HTTP response if curl is available
     if docker exec "$CONTAINER" sh -c "command -v curl >/dev/null 2>&1"; then
         echo -n "HTTP response: "
         local http_code
-        http_code=$(docker exec "$CONTAINER" curl -s -o /dev/null -w "%{http_code}" "http://localhost:$PORT" 2>/dev/null || echo "000")
-        
+        # curl's -w already prints "000" when no response arrives; an `|| echo`
+        # fallback would DOUBLE it ("000000"), so default only when truly empty.
+        http_code=$(docker exec "$CONTAINER" curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "http://localhost:$PORT" 2>/dev/null)
+        [ -z "$http_code" ] && http_code="000"
+
         case $http_code in
             200|201|202|204)
                 echo "✅ $http_code (Success)"

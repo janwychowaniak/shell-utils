@@ -84,7 +84,6 @@ jwdocker_toc() {
     echo " -----------------------------  development helpers"
     echo " - 🟢 jwdocker_test"
     echo " - 🟢 jwdocker_debug"
-    echo " - ⚪ jwdocker_bench"
     echo
 }
 
@@ -1704,7 +1703,7 @@ jwdocker_port() {
 
 
 # ---------------------------------------------------------------------------------
-# development helpers (test / debug / benchmark)
+# development helpers (test / debug)
 # ---------------------------------------------------------------------------------
 
 jwdocker_test() {
@@ -2257,7 +2256,7 @@ __jwdocker_debug_startup__() {
     # Recent logs for startup issues
     echo
     echo "Recent startup logs:"
-    docker logs --tail 20 "$CONTAINER" 2>&1 | sed 's/^/  /'
+    docker logs --tail 30 "$CONTAINER" 2>&1 | sed 's/^/  /'
     
     # Check if image exists
     local image
@@ -2372,176 +2371,3 @@ __jwdocker_debug_process__() {
     
     echo
 }
-
-
-jwdocker_bench() {
-    if [ $# -eq 0 ]; then
-        echo "Usage: jwdocker_bench <container> [test_type]"
-        echo "Test types:"
-        echo "  cpu         - CPU performance test"
-        echo "  memory      - Memory performance test"
-        echo "  disk        - Disk I/O performance test"
-        echo "  network     - Network performance test"
-        echo "  all         - Run all benchmarks"
-        echo
-        echo "Examples:"
-        echo "  jwdocker_bench myapp cpu"
-        echo "  jwdocker_bench myapp all"
-        echo
-        echo "Available running containers:"
-        docker ps --format "- {{.Names}}"
-        echo
-        return 1
-    fi
-
-    local CONTAINER=$1
-    local TEST_TYPE=${2:-all}
-
-    # Check if container is running
-    if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
-        echo "Error: Container '$CONTAINER' is not running."
-        return 1
-    fi
-
-    echo "⚡ Benchmarking container: $CONTAINER"
-    echo "=================================================="
-    echo
-
-    case $TEST_TYPE in
-        cpu|all)
-            __jwdocker_bench_cpu__ "$CONTAINER"
-            ;;
-    esac
-
-    case $TEST_TYPE in
-        memory|all)
-            __jwdocker_bench_memory__ "$CONTAINER"
-            ;;
-    esac
-
-    case $TEST_TYPE in
-        disk|all)
-            __jwdocker_bench_disk__ "$CONTAINER"
-            ;;
-    esac
-
-    case $TEST_TYPE in
-        network|all)
-            __jwdocker_bench_network__ "$CONTAINER"
-            ;;
-    esac
-}
-
-__jwdocker_bench_cpu__() {
-    local CONTAINER=$1
-    
-    echo "---[ CPU Benchmark ]-------------------------------"
-    
-    # Simple CPU test using dd and time
-    echo "Running CPU stress test (10 seconds)..."
-    local start_time
-    local end_time
-    local duration
-    
-    start_time=$(date +%s)
-    docker exec "$CONTAINER" sh -c 'timeout 10 yes > /dev/null 2>&1 || true' >/dev/null 2>&1
-    end_time=$(date +%s)
-    duration=$((end_time - start_time))
-    
-    echo "CPU test completed in ${duration}s"
-    
-    # Get CPU stats during and after test
-    echo "CPU usage after test:"
-    docker stats --no-stream --format "  CPU: {{.CPUPerc}}" "$CONTAINER"
-    
-    echo
-}
-
-__jwdocker_bench_memory__() {
-    local CONTAINER=$1
-    
-    echo "---[ Memory Benchmark ]----------------------------"
-    
-    # Memory allocation test
-    echo "Testing memory allocation..."
-    
-    # Get current memory usage
-    local mem_before
-    mem_before=$(docker stats --no-stream --format "{{.MemUsage}}" "$CONTAINER")
-    echo "Memory before test: $mem_before"
-    
-    # Simple memory test
-    docker exec "$CONTAINER" sh -c 'dd if=/dev/zero of=/tmp/memtest bs=1M count=100 2>/dev/null && rm -f /tmp/memtest' >/dev/null 2>&1 || echo "Memory test completed"
-    
-    # Get memory usage after
-    local mem_after
-    mem_after=$(docker stats --no-stream --format "{{.MemUsage}}" "$CONTAINER")
-    echo "Memory after test: $mem_after"
-    
-    echo
-}
-
-__jwdocker_bench_disk__() {
-    local CONTAINER=$1
-    
-    echo "---[ Disk I/O Benchmark ]--------------------------"
-    
-    # Write test
-    echo "Testing disk write performance..."
-    local write_result
-    write_result=$(docker exec "$CONTAINER" sh -c 'dd if=/dev/zero of=/tmp/disktest bs=1M count=100 2>&1 | grep -o "[0-9.]* MB/s" | tail -1' || echo "N/A")
-    echo "Write speed: $write_result"
-    
-    # Read test
-    echo "Testing disk read performance..."
-    local read_result
-    read_result=$(docker exec "$CONTAINER" sh -c 'dd if=/tmp/disktest of=/dev/null bs=1M 2>&1 | grep -o "[0-9.]* MB/s" | tail -1' || echo "N/A")
-    echo "Read speed: $read_result"
-    
-    # Cleanup
-    docker exec "$CONTAINER" rm -f /tmp/disktest 2>/dev/null || true
-    
-    echo
-}
-
-__jwdocker_bench_network__() {
-    local CONTAINER=$1
-    
-    echo "---[ Network Benchmark ]---------------------------"
-    
-    # Test network connectivity and basic performance
-    echo "Testing network connectivity..."
-    
-    # Ping test
-    echo -n "Ping to 8.8.8.8: "
-    local ping_result
-    ping_result=$(docker exec "$CONTAINER" ping -c 5 8.8.8.8 2>/dev/null | grep 'avg' | cut -d'/' -f5 || echo "failed")
-    if [ "$ping_result" != "failed" ]; then
-        echo "${ping_result}ms average"
-    else
-        echo "❌ Failed"
-    fi
-    
-    # DNS resolution test
-    echo -n "DNS resolution: "
-    local dns_start
-    local dns_end
-    dns_start=$(date +%s%N)
-    if docker exec "$CONTAINER" nslookup google.com >/dev/null 2>&1; then
-        dns_end=$(date +%s%N)
-        local dns_time
-        dns_time=$(( (dns_end - dns_start) / 1000000 ))
-        echo "✅ ${dns_time}ms"
-    else
-        echo "❌ Failed"
-    fi
-    
-    # Download test if curl/wget available
-    if docker exec "$CONTAINER" sh -c "command -v curl >/dev/null 2>&1"; then
-        echo "Testing download speed..."
-        docker exec "$CONTAINER" curl -s -w "Download speed: %{speed_download} bytes/sec\n" -o /dev/null http://httpbin.org/bytes/1048576 2>/dev/null || echo "Download test failed"
-    fi
-    
-    echo
-}
-

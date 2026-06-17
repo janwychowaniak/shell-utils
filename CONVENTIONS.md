@@ -190,3 +190,24 @@ Debian Example:
 - Standardized progress reporting
 - Uniform summary formats
 - Common troubleshooting patterns
+
+# Bringing a New Area to Production Quality
+
+Each `jw_functions__<area>.sh` is taken through the same pipeline (git → deb →
+docker have followed it). Not every step always applies — assess the file first.
+
+1. **Baseline commit** the file's current state.
+2. **Naming** — `jw<area>_<action>` with the separator; fix any misnomers.
+3. **TOC** — author a `<area>_toc()` *function* (not a comment) with the
+   blast-radius markers + legend (see *Blast-radius Markers in the TOC*).
+4. **Audit** for the bash/zsh runtime traps (see *Cross-shell Portability*).
+   Parallel sub-readers over disjoint function groups are fine, but
+   **self-verify every high-severity claim before acting** — sub-agents
+   false-positive (a git "inverted merge logic" finding was wrong on inspection).
+5. **Remediate group by group**, one commit per group, shellcheck-clean and
+   *run* (not just `-n`) in **both bash and zsh** after each.
+6. **Fill domain gaps** with the functions the area obviously lacks.
+7. **Smoke test** `tests/smoke_<area>.sh` (model on the siblings): no-args of
+   every function + bash↔zsh stdout parity of the deterministic read-only ones.
+   Never mutate real system/daemon state. **Make the fixture rich enough to drive
+   loops past one iteration** — a single-element fixture once hid 3 zsh bugs.

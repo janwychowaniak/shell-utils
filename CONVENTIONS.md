@@ -211,3 +211,27 @@ docker have followed it). Not every step always applies — assess the file firs
    every function + bash↔zsh stdout parity of the deterministic read-only ones.
    Never mutate real system/daemon state. **Make the fixture rich enough to drive
    loops past one iteration** — a single-element fixture once hid 3 zsh bugs.
+
+## From scratch (greenfield)
+
+The pipeline above is *remediation-shaped*: it assumes an existing raw file whose
+function set is given and whose work is correctness + standardization. A net-new
+area (e.g. the ideas in `_further_areas.md`) inverts it — the **design is the
+work**, and the conventions are written in from line one. The quality bar and
+everything tool-agnostic (naming, TOC + markers, Cross-shell Portability,
+no-caps, smoke + bash↔zsh parity, commit-per-group, verify-by-running) is
+identical; only the process changes:
+
+- **First, check for raw material.** A scratch draft (like the docker dev-helpers)
+  is remediation-of-a-draft — use the pipeline as-is. Only a truly-empty area is
+  greenfield.
+- **Design before code, with sign-off.** Decide the function set, what each does,
+  its blast-radius and UX, and confirm it — `_further_areas.md`-style lists are
+  wishlists, not specs. This replaces steps 1/4 (nothing to baseline or audit yet).
+- **Demand-driven and incremental.** Build the 2–3 functions you will actually
+  use, validate the shape, then grow — not a completeness sweep of the wishlist.
+- **No behavioral reference.** There is no "old version" to diff against, so
+  "correct" means "matches the design intent"; verification leans entirely on the
+  smoke test + the agreed spec.
+- **Prevention, not correction.** The bash/zsh trap list is an authoring guide
+  here, not an audit pass — write it right the first time.

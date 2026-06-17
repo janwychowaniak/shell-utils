@@ -19,6 +19,9 @@ jwpy_toc() {
     echo " -----------------------------  virtual environment lifecycle"
     echo " - 🔵 jwpy_venv-create"
     echo " - ⚪ jwpy_venv-activate"
+    echo " - ⚪ jwpy_venv-deactivate"
+    echo " - 🔴 jwpy_venv-remove"
+    echo " - 🟢 jwpy_venv-list"
     echo " - 🟢 jwpy_venv-info"
     echo
     echo " -----------------------------  package management (pip)"
@@ -213,6 +216,135 @@ jwpy_venv-activate() {
     source "$vdir/bin/activate"
     echo "✅ Activated: ${VIRTUAL_ENV:-$vdir}"
     __jwpy_kv__ "Python:" "$(command -v python) ($(python --version 2>&1))"
+}
+
+
+jwpy_venv-deactivate() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_venv-deactivate"
+            echo "Deactivates the active virtualenv in the current shell."
+            echo
+            return 0
+            ;;
+    esac
+
+    if [ -z "${VIRTUAL_ENV:-}" ]; then
+        echo "ℹ️  No active virtual environment."
+        return 1
+    fi
+
+    local prev="$VIRTUAL_ENV"
+    if command -v deactivate >/dev/null 2>&1; then
+        deactivate
+    else
+        # VIRTUAL_ENV inherited without the activate function (e.g. into a fresh
+        # shell): undo by hand. Strip "$prev/bin" from PATH with pure parameter
+        # expansion — no external tools (this path may run with a degraded PATH)
+        # and no `for x in $PATH` (zsh would not word-split the scalar).
+        local newpath="" rest="$PATH" seg
+        while [ -n "$rest" ]; do
+            seg=${rest%%:*}
+            if [ "$rest" = "$seg" ]; then rest=""; else rest=${rest#*:}; fi
+            if [ "$seg" = "$prev/bin" ] || [ -z "$seg" ]; then continue; fi
+            if [ -z "$newpath" ]; then newpath="$seg"; else newpath="$newpath:$seg"; fi
+        done
+        export PATH="$newpath"
+        unset VIRTUAL_ENV
+        hash -r 2>/dev/null
+    fi
+    echo "✅ Deactivated: $prev"
+}
+
+
+jwpy_venv-remove() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_venv-remove <name|path>"
+        echo "Examples:"
+        echo "  jwpy_venv-remove .venv"
+        echo "  jwpy_venv-remove ../old-project/venv"
+        echo
+        echo "Refuses anything that isn't a virtualenv, and won't remove the"
+        echo "currently-active one (deactivate first)."
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    local target="$1"
+    if [ ! -d "$target" ]; then
+        echo "❌ '$target' is not a directory."
+        return 1
+    fi
+    if [ ! -f "$target/pyvenv.cfg" ] && [ ! -f "$target/bin/activate" ]; then
+        echo "❌ '$target' doesn't look like a virtualenv (no pyvenv.cfg / bin/activate)."
+        echo "   Refusing to delete it."
+        return 1
+    fi
+
+    # never delete the active venv out from under the shell
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        local rp_t rp_v
+        rp_t=$(cd "$target" 2>/dev/null && pwd)
+        rp_v=$(cd "$VIRTUAL_ENV" 2>/dev/null && pwd)
+        if [ -n "$rp_t" ] && [ "$rp_t" = "$rp_v" ]; then
+            echo "⚠️  '$target' is the ACTIVE virtualenv — run jwpy_venv-deactivate first."
+            return 1
+        fi
+    fi
+
+    echo "🔴 This will permanently delete this virtualenv:"
+    __jwpy_kv__ "Location:" "$target"
+    [ -x "$target/bin/python" ] && __jwpy_kv__ "Python:" "$("$target/bin/python" --version 2>&1)"
+    echo -n "Are you sure? [y/N] "
+    local reply
+    read -r reply
+    case "$reply" in
+        y|Y) ;;
+        *)   echo "Operation cancelled."; return 1 ;;
+    esac
+
+    if rm -rf "$target"; then
+        echo "✅ Removed '$target'"
+    else
+        echo "❌ Failed to remove '$target'"
+        return 1
+    fi
+}
+
+
+jwpy_venv-list() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_venv-list"
+            echo "Lists virtualenvs found under the current directory (depth ≤ 2)."
+            echo
+            return 0
+            ;;
+    esac
+
+    echo "🐍 Virtual environments under $(pwd)"
+    local cfg vdir name ver rp marker n=0
+    while IFS= read -r cfg; do
+        vdir=${cfg%/pyvenv.cfg}
+        vdir=${vdir#./}
+        name=$vdir
+        ver="?"
+        [ -x "$vdir/bin/python" ] && ver=$("$vdir/bin/python" --version 2>&1)
+        marker="  "
+        rp=$(cd "$vdir" 2>/dev/null && pwd)
+        [ -n "$rp" ] && [ "$rp" = "${VIRTUAL_ENV:-}" ] && marker=" *"
+        printf "  %s %-22s %s\n" "$marker" "$name" "$ver"
+        n=$((n + 1))
+    done < <(find . -maxdepth 2 -name pyvenv.cfg -type f 2>/dev/null | sort)
+
+    if [ "$n" -eq 0 ]; then
+        echo "  (none found)"
+        echo "💡 Create one:  jwpy_venv-create .venv"
+    else
+        echo
+        echo "  ( * = active )"
+    fi
 }
 
 

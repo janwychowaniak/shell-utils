@@ -21,6 +21,14 @@ jwpy_toc() {
     echo " - ⚪ jwpy_venv-activate"
     echo " - 🟢 jwpy_venv-info"
     echo
+    echo " -----------------------------  package management (pip)"
+    echo " - ⚪ jwpy_install"
+    echo " - ⚪ jwpy_upgrade"
+    echo " - 🔴 jwpy_uninstall"
+    echo " - 🟢 jwpy_list"
+    echo " - 🟢 jwpy_outdated"
+    echo " - 🟢 jwpy_show"
+    echo
 }
 
 
@@ -52,6 +60,48 @@ __jwpy_venv_find__() {
         fi
     done
     return 1
+}
+
+# Run pip via the chosen backend: `uv pip` (fast; auto-resolves the active venv,
+# a cwd .venv, or — with none — the system Python) when uv is installed, else
+# `python -m pip` against whatever interpreter is on PATH.
+__jwpy_pip__() {
+    if command -v uv >/dev/null 2>&1; then
+        uv pip "$@"
+    else
+        python -m pip "$@"
+    fi
+}
+
+# Describe which environment pip ops will affect (for display + the guard).
+# Returns 0 when a venv will be used, 1 when it resolves to the system Python.
+__jwpy_target__() {
+    local vdir
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        printf '%s\n' "$VIRTUAL_ENV (active venv)"
+        return 0
+    fi
+    if command -v uv >/dev/null 2>&1 && vdir=$(__jwpy_venv_find__); then
+        printf '%s\n' "$vdir (uv auto-discovers — not activated)"
+        return 0
+    fi
+    printf '%s\n' "SYSTEM Python"
+    return 1
+}
+
+# Confirm before a mutating pip op that would modify the system Python.
+__jwpy_guard_venv__() {
+    if __jwpy_target__ >/dev/null; then
+        return 0
+    fi
+    echo "⚠️  No virtual environment active — this would modify the SYSTEM Python."
+    echo -n "Proceed against system Python? [y/N] "
+    local reply
+    read -r reply
+    case "$reply" in
+        y|Y) return 0 ;;
+        *)   echo "Operation cancelled.  💡 jwpy_venv-activate first."; return 1 ;;
+    esac
 }
 
 
@@ -209,4 +259,158 @@ jwpy_venv-info() {
         echo "⚠️  interpreter not found under $vdir/bin"
     fi
     echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# package management (pip)
+# ---------------------------------------------------------------------------------
+
+jwpy_install() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_install <package> [package...] [pip-options]"
+        echo "Examples:"
+        echo "  jwpy_install requests"
+        echo "  jwpy_install 'django>=5' pytest"
+        echo "  jwpy_install -r requirements.txt"
+        echo
+        echo "Targets the active venv (uv also auto-discovers ./.venv); warns"
+        echo "before touching the system Python."
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_kv__ "Target:" "$(__jwpy_target__)"
+    __jwpy_guard_venv__ || return 1
+
+    echo "📦 Installing: $*"
+    if __jwpy_pip__ install "$@"; then
+        echo "✅ Done.  💡 jwpy_list to see what's installed."
+    else
+        echo "❌ install failed"
+        return 1
+    fi
+}
+
+
+jwpy_upgrade() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_upgrade <package>... | --all"
+        echo "Examples:"
+        echo "  jwpy_upgrade pip"
+        echo "  jwpy_upgrade requests urllib3"
+        echo "  jwpy_upgrade --all          # upgrade every outdated package"
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_kv__ "Target:" "$(__jwpy_target__)"
+    __jwpy_guard_venv__ || return 1
+
+    if [ "$1" = "--all" ]; then
+        local json line
+        local pkgs=()
+        # `--outdated` is incompatible with `--format=freeze`; json works on both
+        # uv and pip. An empty result here means the listing FAILED (e.g. no index)
+        # — surface it instead of silently reporting "up to date".
+        json=$(__jwpy_pip__ list --outdated --format=json 2>/dev/null)
+        if [ -z "$json" ]; then
+            echo "⚠️  Could not list outdated packages (is the package index reachable?)."
+            return 1
+        fi
+        # Extract name fields; tolerate uv ("name":"x") and pip ("name": "x") spacing.
+        while IFS= read -r line; do
+            [ -n "$line" ] && pkgs+=("$line")
+        done < <(printf '%s\n' "$json" | grep -oE '"name": ?"[^"]*"' | cut -d'"' -f4)
+        if [ "${#pkgs[@]}" -eq 0 ]; then
+            echo "✅ Everything is up to date."
+            return 0
+        fi
+        echo "⬆️  Upgrading ${#pkgs[@]} package(s): ${pkgs[*]}"
+        __jwpy_pip__ install --upgrade "${pkgs[@]}"
+    else
+        echo "⬆️  Upgrading: $*"
+        __jwpy_pip__ install --upgrade "$@"
+    fi
+}
+
+
+jwpy_uninstall() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_uninstall <package> [package...]"
+        echo "Examples:"
+        echo "  jwpy_uninstall requests"
+        echo "  jwpy_uninstall pytest coverage"
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_kv__ "Target:" "$(__jwpy_target__)"
+    __jwpy_guard_venv__ || return 1
+
+    echo "🔴 This will uninstall: $*"
+    echo -n "Are you sure? [y/N] "
+    local reply
+    read -r reply
+    case "$reply" in
+        y|Y) ;;
+        *)   echo "Operation cancelled."; return 1 ;;
+    esac
+
+    # uv pip uninstall does not prompt; python -m pip needs -y to match.
+    if command -v uv >/dev/null 2>&1; then
+        uv pip uninstall "$@"
+    else
+        python -m pip uninstall -y "$@"
+    fi
+}
+
+
+jwpy_list() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_list [pip-list-options]"
+            echo "Examples:"
+            echo "  jwpy_list"
+            echo "  jwpy_list --format=freeze"
+            echo "  jwpy_list --editable"
+            echo
+            return 0
+            ;;
+    esac
+
+    echo "📦 Installed packages — $(__jwpy_target__)"
+    __jwpy_pip__ list "$@"
+}
+
+
+jwpy_outdated() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_outdated [pip-list-options]"
+            echo "Lists packages with newer releases available (queries the index)."
+            echo
+            return 0
+            ;;
+    esac
+
+    echo "📦 Outdated packages — $(__jwpy_target__)"
+    __jwpy_pip__ list --outdated "$@"
+}
+
+
+jwpy_show() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_show <package> [package...]"
+        echo "Examples:"
+        echo "  jwpy_show requests"
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_pip__ show "$@"
 }

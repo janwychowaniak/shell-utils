@@ -15,6 +15,11 @@
 # entirely under a mktemp dir that is removed on exit. VIRTUAL_ENV is unset so the
 # run is hermetic regardless of the caller's shell.
 #
+# Deliberately NOT executed (network and/or state, like git's smoke skips push /
+# destructive paths): the actual install/uninstall/upgrade of packages — only
+# their usage and --help paths are smoked. jwpy_outdated queries the package
+# index, so it is dropped from the blind no-args sweep (its --help is in Part C).
+#
 # Run:  bash tests/smoke_jwpy.sh   (or ./tests/smoke_jwpy.sh)
 # Exit: 0 = clean, 1 = runtime-error signature found, 2 = setup problem.
 
@@ -67,8 +72,8 @@ run() {
   printf '%s' "$out" | grep -nE "$SIG" | head -2
 }
 
-# Part A — every function, no-args path
-mapfile -t FNS < <(grep -oE '^jwpy_[a-z-]+' "$LIB" | sort -u)
+# Part A — every function, no-args path (jwpy_outdated excluded: it hits the network)
+mapfile -t FNS < <(grep -oE '^jwpy_[a-z-]+' "$LIB" | sort -u | grep -vx 'jwpy_outdated')
 echo "=== Part A: no-args path of ${#FNS[@]} functions ==="
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -94,6 +99,13 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwpy_venv-create --help'
     'jwpy_venv-info'
     'jwpy_venv-info .venv'
+    'jwpy_list'
+    'jwpy_list --format=freeze'
+    'jwpy_install --help'
+    'jwpy_upgrade --help'
+    'jwpy_uninstall --help'
+    'jwpy_outdated --help'
+    'jwpy_show --help'
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -121,6 +133,12 @@ B=(
   'jwpy_venv-create --help'
   'jwpy_venv-create newenv'
   'jwpy_venv-create .venv'
+  'jwpy_list'
+  'jwpy_list --format=freeze'
+  'jwpy_show no-such-pkg-zzz'
+  'jwpy_install --help'
+  'jwpy_upgrade --help'
+  'jwpy_uninstall --help'
 )
 echo "=== Part B: ${#B[@]} real-arg invocations (safe functions) ==="
 for sh in "${SHELLS[@]}"; do

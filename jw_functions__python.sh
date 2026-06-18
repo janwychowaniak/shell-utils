@@ -836,13 +836,31 @@ jwpy_pythons() {
     case "${1:-}" in
         -h|--help)
             echo "Usage: jwpy_pythons"
-            echo "Lists Python interpreters found on PATH (in search order), with versions."
+            echo "Surveys ALL Python interpreters on PATH (system-wide), in search order,"
+            echo "with versions — e.g. to choose one for 'jwpy_venv-create --python X.Y'."
+            echo "Marks the active venv, and notes the project's .venv if you're in one."
+            echo "(For the single interpreter THIS env resolves to, see jwpy_version.)"
             echo
             return 0
             ;;
     esac
 
-    echo "🐍 Python interpreters on PATH"
+    # env-context line: which interpreter the area resolves HERE (only when in a venv).
+    # A non-activated project .venv is NOT on PATH, so it wouldn't appear below — call
+    # it out so this survey isn't mistaken for "what the area will use".
+    local kind root pyver
+    IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
+    if [ -n "$root" ] && [ -x "$root/bin/python" ]; then
+        pyver=$("$root/bin/python" --version 2>&1 | awk '{print $2}')
+        if [ "$kind" = active ]; then
+            echo "🎯 Resolved here: $root/bin/python ($pyver) — active venv"
+        else
+            echo "🎯 Resolved here: $root/bin/python ($pyver) — project .venv, not activated"
+        fi
+        echo
+    fi
+
+    echo "🐍 Python interpreters on PATH (system-wide)"
     # `path` is a reserved (special) variable in zsh — never use it as a local.
     local rest="$PATH" dir="" bin="" ver="" seen=":" mark="" active="" n=0
     [ -n "${VIRTUAL_ENV:-}" ] && active="$VIRTUAL_ENV/bin"

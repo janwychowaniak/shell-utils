@@ -151,6 +151,17 @@ __jwpy_has_path__() {
     return 1
 }
 
+# True if the resolved tool path is pipx-managed (its real path lives in a pipx venv)
+# — i.e. a global standalone app, not a project tool that belongs in your venv.
+__jwpy_is_pipx__() {
+    local real
+    real=$(readlink -f "$1" 2>/dev/null) || real="$1"
+    case "$real" in
+        */pipx/venvs/*) return 0 ;;
+        *)              return 1 ;;
+    esac
+}
+
 # Resolve a code-quality tool by ENVIRONMENT (via __jwpy_envroot__), never crossing
 # the boundary: a tool from the active/discovered venv, or — only when there is no
 # venv at all — a global one. Echoes "<source>\t<path>" (source "active venv" /
@@ -785,15 +796,16 @@ jwpy_which() {
             echo "Usage: jwpy_which [tool...]"
             echo "Resolves tools the way the area does (active venv > project .venv >"
             echo "global), annotating the source. Default: python pip ruff pytest mypy uv."
+            echo "pipx-managed tools (code2flow, etc.) are shown as 'global (pipx)'."
             echo "Examples:"
             echo "  jwpy_which"
-            echo "  jwpy_which black"
+            echo "  jwpy_which code2flow"
             echo
             return 0
             ;;
     esac
 
-    local kind root tool gloc srclabel
+    local kind root tool gloc glabel srclabel w=8 t2
     local tools=()
     IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
     if [ "$#" -gt 0 ]; then
@@ -808,25 +820,36 @@ jwpy_which() {
         *)      echo "🔎 Environment: system (no venv)"; srclabel="system" ;;
     esac
 
+    # column width = longest tool name + ':' + a 1-space gutter (handles long names)
+    for t2 in "${tools[@]}"; do [ "${#t2}" -gt "$w" ] && w=${#t2}; done
+    w=$((w + 2))
+
     for tool in "${tools[@]}"; do
         gloc=$(command -v "$tool" 2>/dev/null)
+        glabel="global"
+        [ -n "$gloc" ] && __jwpy_is_pipx__ "$gloc" && glabel="global (pipx)"
+
         # uv / pipx manage venvs from outside — always reported globally.
         case "$tool" in
             uv|pipx)
-                __jwpy_kv__ "$tool:" "${gloc:-(not found)}  ·  global" 9
+                __jwpy_kv__ "$tool:" "${gloc:-(not found)}  ·  $glabel" "$w"
                 continue
                 ;;
         esac
+
         if [ "$kind" = active ] || [ "$kind" = venv ]; then
             if [ -x "$root/bin/$tool" ]; then
-                __jwpy_kv__ "$tool:" "$root/bin/$tool  ·  $srclabel" 9
+                __jwpy_kv__ "$tool:" "$root/bin/$tool  ·  $srclabel" "$w"
+            elif [ "$glabel" = "global (pipx)" ]; then
+                # a pipx tool is a global app by design — not "missing from the venv"
+                __jwpy_kv__ "$tool:" "$gloc  ·  $glabel" "$w"
             elif [ -n "$gloc" ]; then
-                __jwpy_kv__ "$tool:" "(not in venv)  ·  global: $gloc" 9
+                __jwpy_kv__ "$tool:" "(not in venv)  ·  global: $gloc" "$w"
             else
-                __jwpy_kv__ "$tool:" "(not in venv)" 9
+                __jwpy_kv__ "$tool:" "(not in venv)" "$w"
             fi
         else
-            __jwpy_kv__ "$tool:" "${gloc:-(not found)}  ·  global" 9
+            __jwpy_kv__ "$tool:" "${gloc:-(not found)}  ·  $glabel" "$w"
         fi
     done
 }

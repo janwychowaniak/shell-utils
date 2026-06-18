@@ -110,6 +110,11 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwpy_uninstall --help'
     'jwpy_outdated --help'
     'jwpy_show --help'
+    'jwpy_freeze'
+    'jwpy_freeze --help'
+    'jwpy_reqs-save --help'
+    'jwpy_reqs-install --help'
+    'jwpy_reqs-install missing-reqs.txt'
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -150,6 +155,9 @@ B=(
   'jwpy_install --help'
   'jwpy_upgrade --help'
   'jwpy_uninstall --help'
+  'jwpy_freeze'
+  'jwpy_reqs-save --help'
+  'jwpy_reqs-install missing-reqs.txt'
 )
 echo "=== Part B: ${#B[@]} real-arg invocations (safe functions) ==="
 for sh in "${SHELLS[@]}"; do

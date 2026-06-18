@@ -118,6 +118,36 @@ __jwpy_has_path__() {
     return 1
 }
 
+# Resolve a code-quality tool, preferring the active or auto-discovered venv over
+# global/PATH installs (consistent with how the pip group auto-finds .venv). Echoes
+# the resolved executable path (return 0). If a venv is present but holds none of the
+# candidates, or there's no venv and none on PATH, prints a hint to stderr and
+# returns 1 — callers abort rather than silently run a global tool in the wrong env.
+__jwpy_tool__() {
+    local vbin="" vd t
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        vbin="$VIRTUAL_ENV/bin"
+    elif vd=$(__jwpy_venv_find__); then
+        vbin="$vd/bin"
+    fi
+
+    if [ -n "$vbin" ]; then
+        for t in "$@"; do
+            [ -x "$vbin/$t" ] && { printf '%s\n' "$vbin/$t"; return 0; }
+        done
+        echo "❌ none of [$*] is installed in this venv ($vbin)." >&2
+        echo "💡 Install one here:  jwpy_install $1" >&2
+        return 1
+    fi
+
+    for t in "$@"; do
+        command -v "$t" >/dev/null 2>&1 && { command -v "$t"; return 0; }
+    done
+    echo "❌ no tool found ([$*]) and no virtualenv detected." >&2
+    echo "💡 Create one (jwpy_venv-create) then 'jwpy_install $1', or install it globally." >&2
+    return 1
+}
+
 # Confirm before a mutating pip op that would modify the system Python.
 __jwpy_guard_venv__() {
     if __jwpy_target__ >/dev/null; then
@@ -793,13 +823,36 @@ jwpy_test() {
             ;;
     esac
 
-    if command -v pytest >/dev/null 2>&1; then
+    local vbin="" vd pyt="" py=""
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        vbin="$VIRTUAL_ENV/bin"
+    elif vd=$(__jwpy_venv_find__); then
+        vbin="$vd/bin"
+    fi
+
+    # pytest from the venv if present; only from PATH when there is no venv at all
+    # (never the system pytest while a venv is active — it would run in the wrong env).
+    if [ -n "$vbin" ] && [ -x "$vbin/pytest" ]; then
+        pyt="$vbin/pytest"
+    elif [ -z "$vbin" ] && command -v pytest >/dev/null 2>&1; then
+        pyt=$(command -v pytest)
+    fi
+
+    if [ -n "$pyt" ]; then
         echo "🧪 pytest"
-        pytest "$@"
-    elif command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
-        local py
+        "$pyt" "$@"
+        return
+    fi
+
+    # no pytest -> unittest via the venv's python (or the system python if no venv)
+    if [ -n "$vbin" ] && [ -x "$vbin/python" ]; then
+        py="$vbin/python"
+    else
         py=$(command -v python3 || command -v python)
-        echo "🧪 python -m unittest (pytest not found)"
+    fi
+
+    if [ -n "$py" ]; then
+        echo "🧪 ${py} -m unittest (pytest not found${vbin:+ in venv})"
         if [ "$#" -eq 0 ]; then
             "$py" -m unittest discover
         else
@@ -807,7 +860,6 @@ jwpy_test() {
         fi
     else
         echo "❌ No test runner found (pytest, or a python for unittest)."
-        echo "💡 Install pytest:  jwpy_install pytest"
         return 1
     fi
 }
@@ -828,20 +880,12 @@ jwpy_lint() {
 
     __jwpy_has_path__ "$@" || set -- "$@" "."
 
-    if command -v ruff >/dev/null 2>&1; then
-        echo "🔎 ruff check"
-        ruff check "$@"
-    elif command -v flake8 >/dev/null 2>&1; then
-        echo "🔎 flake8"
-        flake8 "$@"
-    elif command -v pylint >/dev/null 2>&1; then
-        echo "🔎 pylint"
-        pylint "$@"
-    else
-        echo "❌ No linter found (ruff / flake8 / pylint)."
-        echo "💡 Install one:  jwpy_install ruff"
-        return 1
-    fi
+    local tool
+    tool=$(__jwpy_tool__ ruff flake8 pylint) || return 1
+    case ${tool##*/} in
+        ruff) echo "🔎 ruff check"; "$tool" check "$@" ;;
+        *)    echo "🔎 ${tool##*/}"; "$tool" "$@" ;;
+    esac
 }
 
 
@@ -867,21 +911,22 @@ jwpy_typecheck() {
         set -- "$@" "."
     fi
 
-    if command -v mypy >/dev/null 2>&1; then
-        echo "🔬 mypy"
-        if [ "$defaulted" -eq 1 ]; then
-            mypy --exclude '(^|/)(\.venv|venv|env|__pycache__|build|dist)(/|$)' "$@"
-        else
-            mypy "$@"
-        fi
-    elif command -v pyright >/dev/null 2>&1; then
-        echo "🔬 pyright"
-        pyright "$@"
-    else
-        echo "❌ No type checker found (mypy / pyright)."
-        echo "💡 Install one:  jwpy_install mypy"
-        return 1
-    fi
+    local tool
+    tool=$(__jwpy_tool__ mypy pyright) || return 1
+    case ${tool##*/} in
+        mypy)
+            echo "🔬 mypy"
+            if [ "$defaulted" -eq 1 ]; then
+                "$tool" --exclude '(^|/)(\.venv|venv|env|__pycache__|build|dist)(/|$)' "$@"
+            else
+                "$tool" "$@"
+            fi
+            ;;
+        *)
+            echo "🔬 ${tool##*/}"
+            "$tool" "$@"
+            ;;
+    esac
 }
 
 
@@ -901,15 +946,10 @@ jwpy_format() {
 
     __jwpy_has_path__ "$@" || set -- "$@" "."
 
-    if command -v ruff >/dev/null 2>&1; then
-        echo "🎨 ruff format"
-        ruff format "$@"
-    elif command -v black >/dev/null 2>&1; then
-        echo "🎨 black"
-        black "$@"
-    else
-        echo "❌ No formatter found (ruff / black)."
-        echo "💡 Install one:  jwpy_install ruff"
-        return 1
-    fi
+    local tool
+    tool=$(__jwpy_tool__ ruff black) || return 1
+    case ${tool##*/} in
+        ruff) echo "🎨 ruff format"; "$tool" format "$@" ;;
+        *)    echo "🎨 ${tool##*/}"; "$tool" "$@" ;;
+    esac
 }

@@ -37,6 +37,11 @@ jwpy_toc() {
     echo " - 🔵 jwpy_reqs-save"
     echo " - ⚪ jwpy_reqs-install"
     echo
+    echo " -----------------------------  interpreter & version info"
+    echo " - 🟢 jwpy_version"
+    echo " - 🟢 jwpy_which"
+    echo " - 🟢 jwpy_pythons"
+    echo
 }
 
 
@@ -646,5 +651,110 @@ jwpy_reqs-install() {
     else
         echo "❌ install failed"
         return 1
+    fi
+}
+
+
+# ---------------------------------------------------------------------------------
+# interpreter & version info
+# ---------------------------------------------------------------------------------
+
+jwpy_version() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_version"
+            echo "Shows versions of the active Python toolchain (python, pip, uv)."
+            echo
+            return 0
+            ;;
+    esac
+
+    local py="" pipver=""
+    py=$(command -v python || command -v python3)
+
+    echo "🐍 Python toolchain"
+    if [ -n "$py" ]; then
+        __jwpy_kv__ "Python:" "$("$py" --version 2>&1)"
+        __jwpy_kv__ "Path:" "$py"
+        pipver=$("$py" -m pip --version 2>/dev/null | awk '{print $2}')
+        __jwpy_kv__ "Pip:" "${pipver:-n/a}"
+    else
+        __jwpy_kv__ "Python:" "not found"
+    fi
+    if command -v uv >/dev/null 2>&1; then
+        __jwpy_kv__ "uv:" "$(uv --version 2>&1 | awk '{print $2}')"
+    else
+        __jwpy_kv__ "uv:" "not installed"
+    fi
+    __jwpy_kv__ "Virtualenv:" "${VIRTUAL_ENV:-none}"
+    echo
+}
+
+
+jwpy_which() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_which [tool...]"
+            echo "Shows the resolved path of Python tools (default: python, pip, uv)."
+            echo "Examples:"
+            echo "  jwpy_which"
+            echo "  jwpy_which python pytest"
+            echo
+            return 0
+            ;;
+    esac
+
+    local tool="" loc=""
+    local tools=()
+    if [ "$#" -gt 0 ]; then
+        tools=("$@")
+    else
+        tools=(python python3 pip pip3 uv)
+    fi
+
+    for tool in "${tools[@]}"; do
+        loc=$(command -v "$tool" 2>/dev/null)
+        __jwpy_kv__ "$tool:" "${loc:-(not found)}" 10
+    done
+}
+
+
+jwpy_pythons() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_pythons"
+            echo "Lists Python interpreters found on PATH (in search order), with versions."
+            echo
+            return 0
+            ;;
+    esac
+
+    echo "🐍 Python interpreters on PATH"
+    # `path` is a reserved (special) variable in zsh — never use it as a local.
+    local rest="$PATH" dir="" bin="" ver="" seen=":" mark="" active="" n=0
+    [ -n "${VIRTUAL_ENV:-}" ] && active="$VIRTUAL_ENV/bin"
+
+    # split PATH by hand (no `for x in $PATH` — zsh would not word-split the scalar)
+    while [ -n "$rest" ]; do
+        dir=${rest%%:*}
+        if [ "$rest" = "$dir" ]; then rest=""; else rest=${rest#*:}; fi
+        [ -d "$dir" ] || continue
+        # find, not a glob: an unmatched glob aborts zsh with "no matches found"
+        while IFS= read -r bin; do
+            [ -x "$bin" ] || continue
+            case "$seen" in *":$bin:"*) continue ;; esac
+            seen="$seen$bin:"
+            ver=$("$bin" --version 2>&1)
+            mark="  "
+            [ -n "$active" ] && [ "$dir" = "$active" ] && mark=" *"
+            printf "  %s %-22s %s\n" "$mark" "$bin" "$ver"
+            n=$((n + 1))
+        done < <(find "$dir" -maxdepth 1 \( -name 'python' -o -name 'python3' -o -name 'python3.[0-9]' -o -name 'python3.[0-9][0-9]' \) 2>/dev/null | sort)
+    done
+
+    if [ "$n" -eq 0 ]; then
+        echo "  (none found)"
+    else
+        [ -n "$active" ] && { echo; echo "  ( * = active venv )"; }
     fi
 }

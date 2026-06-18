@@ -814,54 +814,23 @@ jwpy_test() {
     case "${1:-}" in
         -h|--help)
             echo "Usage: jwpy_test [pytest-args]"
-            echo "Runs the test suite with pytest (falls back to python -m unittest)."
+            echo "Runs the test suite with pytest (resolved venv-first)."
             echo "Examples:"
             echo "  jwpy_test"
             echo "  jwpy_test tests/ -k auth -v"
+            echo
+            echo "No unittest fallback on purpose: unittest can't collect pytest-style"
+            echo "tests (bare test_* fns, fixtures, raises/mark), so substituting it would"
+            echo "silently run nothing. If pytest isn't in the venv, install it there."
             echo
             return 0
             ;;
     esac
 
-    local vbin="" vd pyt="" py=""
-    if [ -n "${VIRTUAL_ENV:-}" ]; then
-        vbin="$VIRTUAL_ENV/bin"
-    elif vd=$(__jwpy_venv_find__); then
-        vbin="$vd/bin"
-    fi
-
-    # pytest from the venv if present; only from PATH when there is no venv at all
-    # (never the system pytest while a venv is active — it would run in the wrong env).
-    if [ -n "$vbin" ] && [ -x "$vbin/pytest" ]; then
-        pyt="$vbin/pytest"
-    elif [ -z "$vbin" ] && command -v pytest >/dev/null 2>&1; then
-        pyt=$(command -v pytest)
-    fi
-
-    if [ -n "$pyt" ]; then
-        echo "🧪 pytest"
-        "$pyt" "$@"
-        return
-    fi
-
-    # no pytest -> unittest via the venv's python (or the system python if no venv)
-    if [ -n "$vbin" ] && [ -x "$vbin/python" ]; then
-        py="$vbin/python"
-    else
-        py=$(command -v python3 || command -v python)
-    fi
-
-    if [ -n "$py" ]; then
-        echo "🧪 ${py} -m unittest (pytest not found${vbin:+ in venv})"
-        if [ "$#" -eq 0 ]; then
-            "$py" -m unittest discover
-        else
-            "$py" -m unittest "$@"
-        fi
-    else
-        echo "❌ No test runner found (pytest, or a python for unittest)."
-        return 1
-    fi
+    local tool
+    tool=$(__jwpy_tool__ pytest) || return 1
+    echo "🧪 pytest"
+    "$tool" "$@"
 }
 
 

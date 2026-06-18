@@ -179,8 +179,9 @@ B=(
   'jwpy_lint --help'
   'jwpy_typecheck --help'
   'jwpy_format --help'
-  # venv-first resolution: the fixture .venv has no linters/formatters/checkers, so
-  # these resolve the venv and abort (no tool run) — exercises __jwpy_tool__ safely.
+  # venv-first resolution: the fixture .venv has no pytest/linters/formatters/checkers,
+  # so these resolve the venv and abort (no tool run) — exercises __jwpy_tool__ safely.
+  'jwpy_test'
   'jwpy_lint'
   'jwpy_typecheck'
   'jwpy_format'

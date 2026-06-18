@@ -135,16 +135,16 @@ __jwpy_tool__() {
         for t in "$@"; do
             [ -x "$vbin/$t" ] && { printf '%s\n' "$vbin/$t"; return 0; }
         done
-        echo "❌ none of [$*] is installed in this venv ($vbin)." >&2
-        echo "💡 Install one here:  jwpy_install $1" >&2
+        echo "❌ $1 is not installed in this venv ($vbin)." >&2
+        echo "💡 Install it:  jwpy_install $1" >&2
         return 1
     fi
 
     for t in "$@"; do
         command -v "$t" >/dev/null 2>&1 && { command -v "$t"; return 0; }
     done
-    echo "❌ no tool found ([$*]) and no virtualenv detected." >&2
-    echo "💡 Create one (jwpy_venv-create) then 'jwpy_install $1', or install it globally." >&2
+    echo "❌ $1 not found, and no virtualenv detected." >&2
+    echo "💡 Create a venv (jwpy_venv-create) then 'jwpy_install $1', or install it globally." >&2
     return 1
 }
 
@@ -837,8 +837,8 @@ jwpy_test() {
 jwpy_lint() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwpy_lint [path...] [linter-options]"
-            echo "Lints with ruff (or flake8, or pylint). Default path: current directory."
+            echo "Usage: jwpy_lint [path...] [ruff-options]"
+            echo "Lints with ruff (ruff check). Default path: current directory."
             echo "Examples:"
             echo "  jwpy_lint"
             echo "  jwpy_lint src/"
@@ -850,19 +850,17 @@ jwpy_lint() {
     __jwpy_has_path__ "$@" || set -- "$@" "."
 
     local tool
-    tool=$(__jwpy_tool__ ruff flake8 pylint) || return 1
-    case ${tool##*/} in
-        ruff) echo "🔎 ruff check"; "$tool" check "$@" ;;
-        *)    echo "🔎 ${tool##*/}"; "$tool" "$@" ;;
-    esac
+    tool=$(__jwpy_tool__ ruff) || return 1
+    echo "🔎 ruff check"
+    "$tool" check "$@"
 }
 
 
 jwpy_typecheck() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwpy_typecheck [path...] [checker-options]"
-            echo "Static type-check with mypy (or pyright). Default path: current directory."
+            echo "Usage: jwpy_typecheck [path...] [mypy-options]"
+            echo "Type-checks with mypy. Default path: current directory."
             echo "Examples:"
             echo "  jwpy_typecheck"
             echo "  jwpy_typecheck src/"
@@ -881,21 +879,13 @@ jwpy_typecheck() {
     fi
 
     local tool
-    tool=$(__jwpy_tool__ mypy pyright) || return 1
-    case ${tool##*/} in
-        mypy)
-            echo "🔬 mypy"
-            if [ "$defaulted" -eq 1 ]; then
-                "$tool" --exclude '(^|/)(\.venv|venv|env|__pycache__|build|dist)(/|$)' "$@"
-            else
-                "$tool" "$@"
-            fi
-            ;;
-        *)
-            echo "🔬 ${tool##*/}"
-            "$tool" "$@"
-            ;;
-    esac
+    tool=$(__jwpy_tool__ mypy) || return 1
+    echo "🔬 mypy"
+    if [ "$defaulted" -eq 1 ]; then
+        "$tool" --exclude '(^|/)(\.venv|venv|env|__pycache__|build|dist)(/|$)' "$@"
+    else
+        "$tool" "$@"
+    fi
 }
 
 
@@ -903,7 +893,7 @@ jwpy_format() {
     case "${1:-}" in
         -h|--help)
             echo "Usage: jwpy_format [--check] [path...]"
-            echo "Formats code with ruff (or black). Default path: current directory."
+            echo "Formats code with ruff (ruff format). Default path: current directory."
             echo "Examples:"
             echo "  jwpy_format"
             echo "  jwpy_format src/"
@@ -916,9 +906,7 @@ jwpy_format() {
     __jwpy_has_path__ "$@" || set -- "$@" "."
 
     local tool
-    tool=$(__jwpy_tool__ ruff black) || return 1
-    case ${tool##*/} in
-        ruff) echo "🎨 ruff format"; "$tool" format "$@" ;;
-        *)    echo "🎨 ${tool##*/}"; "$tool" "$@" ;;
-    esac
+    tool=$(__jwpy_tool__ ruff) || return 1
+    echo "🎨 ruff format"
+    "$tool" format "$@"
 }

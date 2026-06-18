@@ -179,6 +179,11 @@ B=(
   'jwpy_lint --help'
   'jwpy_typecheck --help'
   'jwpy_format --help'
+  # venv-first resolution: the fixture .venv has no linters/formatters/checkers, so
+  # these resolve the venv and abort (no tool run) — exercises __jwpy_tool__ safely.
+  'jwpy_lint'
+  'jwpy_typecheck'
+  'jwpy_format'
 )
 echo "=== Part B: ${#B[@]} real-arg invocations (safe functions) ==="
 for sh in "${SHELLS[@]}"; do

@@ -45,6 +45,7 @@ jwpy_toc() {
     echo " -----------------------------  code quality"
     echo " - 🟢 jwpy_test"
     echo " - 🟢 jwpy_lint"
+    echo " - 🟢 jwpy_typecheck"
     echo " - ⚪ jwpy_format"
     echo
 }
@@ -839,6 +840,46 @@ jwpy_lint() {
     else
         echo "❌ No linter found (ruff / flake8 / pylint)."
         echo "💡 Install one:  jwpy_install ruff"
+        return 1
+    fi
+}
+
+
+jwpy_typecheck() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_typecheck [path...] [checker-options]"
+            echo "Static type-check with mypy (or pyright). Default path: current directory."
+            echo "Examples:"
+            echo "  jwpy_typecheck"
+            echo "  jwpy_typecheck src/"
+            echo
+            return 0
+            ;;
+    esac
+
+    # Default to "." only when no path was given; remember that so we can apply a
+    # sensible venv/cache exclude to mypy (which, unlike ruff, would otherwise
+    # descend into .venv). Explicit paths are trusted as-is.
+    local defaulted=0
+    if ! __jwpy_has_path__ "$@"; then
+        defaulted=1
+        set -- "$@" "."
+    fi
+
+    if command -v mypy >/dev/null 2>&1; then
+        echo "🔬 mypy"
+        if [ "$defaulted" -eq 1 ]; then
+            mypy --exclude '(^|/)(\.venv|venv|env|__pycache__|build|dist)(/|$)' "$@"
+        else
+            mypy "$@"
+        fi
+    elif command -v pyright >/dev/null 2>&1; then
+        echo "🔬 pyright"
+        pyright "$@"
+    else
+        echo "❌ No type checker found (mypy / pyright)."
+        echo "💡 Install one:  jwpy_install mypy"
         return 1
     fi
 }

@@ -19,7 +19,7 @@
 # git's smoke skips push / destructive paths): the actual install/uninstall/upgrade
 # of packages, and test/lint/format (which run pytest/ruff/etc. against the cwd, and
 # format even rewrites files) — only their usage / --help paths are smoked.
-# jwpy_outdated, jwpy_test, jwpy_lint and jwpy_format all act on no-args, so they are
+# jwpy_outdated and jwpy_test/lint/typecheck/format all act on no-args, so they are
 # dropped from the blind no-args sweep; their --help paths are checked in Part C.
 #
 # Run:  bash tests/smoke_jwpy.sh   (or ./tests/smoke_jwpy.sh)
@@ -75,9 +75,10 @@ run() {
 }
 
 # Part A — every function, no-args path. Excluded: jwpy_outdated (network) and
-# jwpy_test/lint/format (run external tools against the cwd; format rewrites files).
+# jwpy_test/lint/typecheck/format (run external tools against the cwd; format
+# rewrites files).
 mapfile -t FNS < <(grep -oE '^jwpy_[a-z-]+' "$LIB" | sort -u \
-                   | grep -vxE 'jwpy_(outdated|test|lint|format)')
+                   | grep -vxE 'jwpy_(outdated|test|lint|typecheck|format)')
 echo "=== Part A: no-args path of ${#FNS[@]} functions ==="
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -125,6 +126,7 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwpy_pythons'
     'jwpy_test --help'
     'jwpy_lint --help'
+    'jwpy_typecheck --help'
     'jwpy_format --help'
   )
   n=0
@@ -175,6 +177,7 @@ B=(
   'jwpy_pythons'
   'jwpy_test --help'
   'jwpy_lint --help'
+  'jwpy_typecheck --help'
   'jwpy_format --help'
 )
 echo "=== Part B: ${#B[@]} real-arg invocations (safe functions) ==="

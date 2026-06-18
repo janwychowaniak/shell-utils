@@ -88,31 +88,57 @@ __jwpy_venv_find__() {
     return 1
 }
 
-# Run pip via the chosen backend: `uv pip` (fast; auto-resolves the active venv,
-# a cwd .venv, or — with none — the system Python) when uv is installed, else
-# `python -m pip` against whatever interpreter is on PATH.
+# THE environment resolver — single source of truth for "which environment", in the
+# uv precedence model. Echoes "<kind>\t<root>"; rc 0 = a venv, rc 1 = system.
+#   active venv -> "active\t$VIRTUAL_ENV"
+#   project     -> "venv\t<dir>"   (auto-discovered, walking up like uv)
+#   system      -> "system\t"      (no root)
+__jwpy_envroot__() {
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        printf 'active\t%s\n' "$VIRTUAL_ENV"
+        return 0
+    fi
+    local d
+    if d=$(__jwpy_venv_find__); then
+        printf 'venv\t%s\n' "$d"
+        return 0
+    fi
+    printf 'system\t\n'
+    return 1
+}
+
+# Run pip via the chosen backend. With uv: `uv pip` (uv resolves active > project
+# .venv > system itself). Without uv: run pip with the env's resolved python (so a
+# non-activated project .venv is honored too, and we never assume a bare `python`).
 __jwpy_pip__() {
     if command -v uv >/dev/null 2>&1; then
         uv pip "$@"
-    else
-        python -m pip "$@"
+        return
     fi
+    local kind root py
+    IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
+    if [ -n "$root" ] && [ -x "$root/bin/python" ]; then
+        py="$root/bin/python"
+    else
+        py=$(command -v python3 || command -v python)
+    fi
+    if [ -z "$py" ]; then
+        echo "❌ no python found to run pip." >&2
+        return 1
+    fi
+    "$py" -m pip "$@"
 }
 
-# Describe which environment pip ops will affect (for display + the guard).
-# Returns 0 when a venv will be used, 1 when it resolves to the system Python.
+# Describe which environment pip ops will affect (for display + the guard), via the
+# shared resolver. Returns 0 for a venv, 1 for the system Python.
 __jwpy_target__() {
-    local vdir
-    if [ -n "${VIRTUAL_ENV:-}" ]; then
-        printf '%s\n' "$VIRTUAL_ENV (active venv)"
-        return 0
-    fi
-    if command -v uv >/dev/null 2>&1 && vdir=$(__jwpy_venv_find__); then
-        printf '%s\n' "$vdir (uv auto-discovers — not activated)"
-        return 0
-    fi
-    printf '%s\n' "SYSTEM Python"
-    return 1
+    local kind root
+    IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
+    case "$kind" in
+        active) printf '%s\n' "$root (active venv)"; return 0 ;;
+        venv)   printf '%s\n' "$root (.venv, not activated)"; return 0 ;;
+        *)      printf '%s\n' "SYSTEM Python"; return 1 ;;
+    esac
 }
 
 # True if any argument looks like a path (not a -flag). Used to decide whether to
@@ -125,26 +151,24 @@ __jwpy_has_path__() {
     return 1
 }
 
-# Resolve a code-quality tool by ENVIRONMENT, never falling back across the boundary:
-# active venv -> auto-discovered project .venv (searched upward, like uv) -> global
-# PATH (only when there is no venv at all). Echoes "<source>\t<path>" (source is
-# "active venv" / "venv: DIR" / "global") and returns 0. If a venv is present but
-# lacks the tool -> hint + return 1 (never crosses to a global tool). No venv and
-# nothing on PATH -> bare error + return 1 (no install hint: venv-first won't nudge a
-# global install).
+# Resolve a code-quality tool by ENVIRONMENT (via __jwpy_envroot__), never crossing
+# the boundary: a tool from the active/discovered venv, or — only when there is no
+# venv at all — a global one. Echoes "<source>\t<path>" (source "active venv" /
+# "venv: DIR" / "global"), returns 0. Venv present but tool missing -> hint + return 1
+# (no global fallback). No venv and nothing on PATH -> bare error + return 1.
 __jwpy_tool__() {
-    local vbin="" vroot="" src="" t
-    if [ -n "${VIRTUAL_ENV:-}" ]; then
-        vbin="$VIRTUAL_ENV/bin"; vroot="$VIRTUAL_ENV"; src="active venv"
-    elif vroot=$(__jwpy_venv_find__); then
-        vbin="$vroot/bin"; src="venv: $vroot"
-    fi
+    local kind root vbin="" src="" t
+    IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
+    case "$kind" in
+        active) vbin="$root/bin"; src="active venv" ;;
+        venv)   vbin="$root/bin"; src="venv: $root" ;;
+    esac
 
     if [ -n "$vbin" ]; then
         for t in "$@"; do
             [ -x "$vbin/$t" ] && { printf '%s\t%s\n' "$src" "$vbin/$t"; return 0; }
         done
-        echo "❌ $1 is not installed in this venv ($vroot)." >&2
+        echo "❌ $1 is not installed in this venv ($root)." >&2
         echo "💡 Install it:  jwpy_install $1" >&2
         return 1
     fi
@@ -717,14 +741,20 @@ jwpy_version() {
     case "${1:-}" in
         -h|--help)
             echo "Usage: jwpy_version"
-            echo "Shows versions of the active Python toolchain (python, pip, uv)."
+            echo "Shows the Python toolchain for the resolved environment"
+            echo "(active venv > project .venv > system), plus pip and uv."
             echo
             return 0
             ;;
     esac
 
-    local py="" pipver=""
-    py=$(command -v python || command -v python3)
+    local kind root py="" pipver=""
+    IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
+    if [ -n "$root" ] && [ -x "$root/bin/python" ]; then
+        py="$root/bin/python"
+    else
+        py=$(command -v python3 || command -v python)
+    fi
 
     echo "🐍 Python toolchain"
     if [ -n "$py" ]; then
@@ -740,7 +770,11 @@ jwpy_version() {
     else
         __jwpy_kv__ "uv:" "not installed"
     fi
-    __jwpy_kv__ "Virtualenv:" "${VIRTUAL_ENV:-none}"
+    case "$kind" in
+        active) __jwpy_kv__ "Virtualenv:" "$root (active)" ;;
+        venv)   __jwpy_kv__ "Virtualenv:" "$root (not activated)" ;;
+        *)      __jwpy_kv__ "Virtualenv:" "none" ;;
+    esac
     echo
 }
 
@@ -749,26 +783,51 @@ jwpy_which() {
     case "${1:-}" in
         -h|--help)
             echo "Usage: jwpy_which [tool...]"
-            echo "Shows the resolved path of Python tools (default: python, pip, uv)."
+            echo "Resolves tools the way the area does (active venv > project .venv >"
+            echo "global), annotating the source. Default: python pip ruff pytest mypy uv."
             echo "Examples:"
             echo "  jwpy_which"
-            echo "  jwpy_which python pytest"
+            echo "  jwpy_which black"
             echo
             return 0
             ;;
     esac
 
-    local tool="" loc=""
+    local kind root tool gloc srclabel
     local tools=()
+    IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
     if [ "$#" -gt 0 ]; then
         tools=("$@")
     else
-        tools=(python python3 pip pip3 uv)
+        tools=(python pip ruff pytest mypy uv)
     fi
 
+    case "$kind" in
+        active) echo "🔎 Environment: $root (active venv)"; srclabel="active venv" ;;
+        venv)   echo "🔎 Environment: $root (.venv, not activated)"; srclabel="venv" ;;
+        *)      echo "🔎 Environment: system (no venv)"; srclabel="system" ;;
+    esac
+
     for tool in "${tools[@]}"; do
-        loc=$(command -v "$tool" 2>/dev/null)
-        __jwpy_kv__ "$tool:" "${loc:-(not found)}" 10
+        gloc=$(command -v "$tool" 2>/dev/null)
+        # uv / pipx manage venvs from outside — always reported globally.
+        case "$tool" in
+            uv|pipx)
+                __jwpy_kv__ "$tool:" "${gloc:-(not found)}  ·  global" 9
+                continue
+                ;;
+        esac
+        if [ "$kind" = active ] || [ "$kind" = venv ]; then
+            if [ -x "$root/bin/$tool" ]; then
+                __jwpy_kv__ "$tool:" "$root/bin/$tool  ·  $srclabel" 9
+            elif [ -n "$gloc" ]; then
+                __jwpy_kv__ "$tool:" "(not in venv)  ·  global: $gloc" 9
+            else
+                __jwpy_kv__ "$tool:" "(not in venv)" 9
+            fi
+        else
+            __jwpy_kv__ "$tool:" "${gloc:-(not found)}  ·  global" 9
+        fi
     done
 }
 

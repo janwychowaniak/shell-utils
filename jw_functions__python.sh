@@ -60,11 +60,12 @@ __jwpy_kv__() {
     printf "%-${3:-14}s%s\n" "$1" "$2"
 }
 
-# Resolve a venv directory. With $1: treat it as an explicit dir/name. Without:
-# auto-discover the conventional names in the cwd. Echoes the dir + returns 0 on
-# success; returns 1 if nothing usable was found.
+# Resolve a venv directory. With $1: treat it as an explicit dir/name (echoed as
+# given). Without: auto-discover the conventional names (.venv/venv/env) walking UP
+# from the cwd to the filesystem root, like uv — so it works from a project subdir.
+# Echoes the venv dir (absolute when discovered) + returns 0; returns 1 if none.
 __jwpy_venv_find__() {
-    local cand
+    local cand dir
     if [ -n "${1:-}" ]; then
         if [ -f "$1/bin/activate" ]; then
             printf '%s\n' "$1"
@@ -72,11 +73,17 @@ __jwpy_venv_find__() {
         fi
         return 1
     fi
-    for cand in .venv venv env; do
-        if [ -f "$cand/bin/activate" ]; then
-            printf '%s\n' "$cand"
-            return 0
-        fi
+    dir=$PWD
+    while : ; do
+        for cand in .venv venv env; do
+            if [ -f "$dir/$cand/bin/activate" ]; then
+                printf '%s\n' "$dir/$cand"
+                return 0
+            fi
+        done
+        [ "$dir" = "/" ] && break
+        dir=${dir%/*}
+        [ -z "$dir" ] && dir="/"
     done
     return 1
 }
@@ -118,33 +125,34 @@ __jwpy_has_path__() {
     return 1
 }
 
-# Resolve a code-quality tool, preferring the active or auto-discovered venv over
-# global/PATH installs (consistent with how the pip group auto-finds .venv). Echoes
-# the resolved executable path (return 0). If a venv is present but holds none of the
-# candidates, or there's no venv and none on PATH, prints a hint to stderr and
-# returns 1 — callers abort rather than silently run a global tool in the wrong env.
+# Resolve a code-quality tool by ENVIRONMENT, never falling back across the boundary:
+# active venv -> auto-discovered project .venv (searched upward, like uv) -> global
+# PATH (only when there is no venv at all). Echoes "<source>\t<path>" (source is
+# "active venv" / "venv: DIR" / "global") and returns 0. If a venv is present but
+# lacks the tool -> hint + return 1 (never crosses to a global tool). No venv and
+# nothing on PATH -> bare error + return 1 (no install hint: venv-first won't nudge a
+# global install).
 __jwpy_tool__() {
-    local vbin="" vd t
+    local vbin="" vroot="" src="" t
     if [ -n "${VIRTUAL_ENV:-}" ]; then
-        vbin="$VIRTUAL_ENV/bin"
-    elif vd=$(__jwpy_venv_find__); then
-        vbin="$vd/bin"
+        vbin="$VIRTUAL_ENV/bin"; vroot="$VIRTUAL_ENV"; src="active venv"
+    elif vroot=$(__jwpy_venv_find__); then
+        vbin="$vroot/bin"; src="venv: $vroot"
     fi
 
     if [ -n "$vbin" ]; then
         for t in "$@"; do
-            [ -x "$vbin/$t" ] && { printf '%s\n' "$vbin/$t"; return 0; }
+            [ -x "$vbin/$t" ] && { printf '%s\t%s\n' "$src" "$vbin/$t"; return 0; }
         done
-        echo "❌ $1 is not installed in this venv ($vbin)." >&2
+        echo "❌ $1 is not installed in this venv ($vroot)." >&2
         echo "💡 Install it:  jwpy_install $1" >&2
         return 1
     fi
 
     for t in "$@"; do
-        command -v "$t" >/dev/null 2>&1 && { command -v "$t"; return 0; }
+        command -v "$t" >/dev/null 2>&1 && { printf '%s\t%s\n' "global" "$(command -v "$t")"; return 0; }
     done
-    echo "❌ $1 not found, and no virtualenv detected." >&2
-    echo "💡 Create a venv (jwpy_venv-create) then 'jwpy_install $1', or install it globally." >&2
+    echo "❌ $1 not found (no virtualenv here)." >&2
     return 1
 }
 
@@ -827,9 +835,10 @@ jwpy_test() {
             ;;
     esac
 
-    local tool
-    tool=$(__jwpy_tool__ pytest) || return 1
-    echo "🧪 pytest"
+    local res src tool
+    res=$(__jwpy_tool__ pytest) || return 1
+    IFS=$'\t' read -r src tool <<<"$res"
+    echo "🧪 pytest  ·  $src"
     "$tool" "$@"
 }
 
@@ -849,9 +858,10 @@ jwpy_lint() {
 
     __jwpy_has_path__ "$@" || set -- "$@" "."
 
-    local tool
-    tool=$(__jwpy_tool__ ruff) || return 1
-    echo "🔎 ruff check"
+    local res src tool
+    res=$(__jwpy_tool__ ruff) || return 1
+    IFS=$'\t' read -r src tool <<<"$res"
+    echo "🔎 ruff check  ·  $src"
     "$tool" check "$@"
 }
 
@@ -878,9 +888,10 @@ jwpy_typecheck() {
         set -- "$@" "."
     fi
 
-    local tool
-    tool=$(__jwpy_tool__ mypy) || return 1
-    echo "🔬 mypy"
+    local res src tool
+    res=$(__jwpy_tool__ mypy) || return 1
+    IFS=$'\t' read -r src tool <<<"$res"
+    echo "🔬 mypy  ·  $src"
     if [ "$defaulted" -eq 1 ]; then
         "$tool" --exclude '(^|/)(\.venv|venv|env|__pycache__|build|dist)(/|$)' "$@"
     else
@@ -905,8 +916,9 @@ jwpy_format() {
 
     __jwpy_has_path__ "$@" || set -- "$@" "."
 
-    local tool
-    tool=$(__jwpy_tool__ ruff) || return 1
-    echo "🎨 ruff format"
+    local res src tool
+    res=$(__jwpy_tool__ ruff) || return 1
+    IFS=$'\t' read -r src tool <<<"$res"
+    echo "🎨 ruff format  ·  $src"
     "$tool" format "$@"
 }

@@ -42,6 +42,11 @@ jwpy_toc() {
     echo " - 🟢 jwpy_which"
     echo " - 🟢 jwpy_pythons"
     echo
+    echo " -----------------------------  code quality"
+    echo " - 🟢 jwpy_test"
+    echo " - 🟢 jwpy_lint"
+    echo " - ⚪ jwpy_format"
+    echo
 }
 
 
@@ -99,6 +104,16 @@ __jwpy_target__() {
         return 0
     fi
     printf '%s\n' "SYSTEM Python"
+    return 1
+}
+
+# True if any argument looks like a path (not a -flag). Used to decide whether to
+# append a default "." target for lint/format.
+__jwpy_has_path__() {
+    local a
+    for a in "$@"; do
+        case "$a" in -*) ;; *) return 0 ;; esac
+    done
     return 1
 }
 
@@ -756,5 +771,104 @@ jwpy_pythons() {
         echo "  (none found)"
     else
         [ -n "$active" ] && { echo; echo "  ( * = active venv )"; }
+    fi
+}
+
+
+# ---------------------------------------------------------------------------------
+# code quality
+# ---------------------------------------------------------------------------------
+
+jwpy_test() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_test [pytest-args]"
+            echo "Runs the test suite with pytest (falls back to python -m unittest)."
+            echo "Examples:"
+            echo "  jwpy_test"
+            echo "  jwpy_test tests/ -k auth -v"
+            echo
+            return 0
+            ;;
+    esac
+
+    if command -v pytest >/dev/null 2>&1; then
+        echo "🧪 pytest"
+        pytest "$@"
+    elif command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
+        local py
+        py=$(command -v python3 || command -v python)
+        echo "🧪 python -m unittest (pytest not found)"
+        if [ "$#" -eq 0 ]; then
+            "$py" -m unittest discover
+        else
+            "$py" -m unittest "$@"
+        fi
+    else
+        echo "❌ No test runner found (pytest, or a python for unittest)."
+        echo "💡 Install pytest:  jwpy_install pytest"
+        return 1
+    fi
+}
+
+
+jwpy_lint() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_lint [path...] [linter-options]"
+            echo "Lints with ruff (or flake8, or pylint). Default path: current directory."
+            echo "Examples:"
+            echo "  jwpy_lint"
+            echo "  jwpy_lint src/"
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_has_path__ "$@" || set -- "$@" "."
+
+    if command -v ruff >/dev/null 2>&1; then
+        echo "🔎 ruff check"
+        ruff check "$@"
+    elif command -v flake8 >/dev/null 2>&1; then
+        echo "🔎 flake8"
+        flake8 "$@"
+    elif command -v pylint >/dev/null 2>&1; then
+        echo "🔎 pylint"
+        pylint "$@"
+    else
+        echo "❌ No linter found (ruff / flake8 / pylint)."
+        echo "💡 Install one:  jwpy_install ruff"
+        return 1
+    fi
+}
+
+
+jwpy_format() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_format [--check] [path...]"
+            echo "Formats code with ruff (or black). Default path: current directory."
+            echo "Examples:"
+            echo "  jwpy_format"
+            echo "  jwpy_format src/"
+            echo "  jwpy_format --check        # report only, don't modify (read-only)"
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_has_path__ "$@" || set -- "$@" "."
+
+    if command -v ruff >/dev/null 2>&1; then
+        echo "🎨 ruff format"
+        ruff format "$@"
+    elif command -v black >/dev/null 2>&1; then
+        echo "🎨 black"
+        black "$@"
+    else
+        echo "❌ No formatter found (ruff / black)."
+        echo "💡 Install one:  jwpy_install ruff"
+        return 1
     fi
 }

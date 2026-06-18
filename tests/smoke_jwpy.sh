@@ -115,6 +115,10 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwpy_reqs-save --help'
     'jwpy_reqs-install --help'
     'jwpy_reqs-install missing-reqs.txt'
+    'jwpy_version'
+    'jwpy_which'
+    'jwpy_which python uv'
+    'jwpy_pythons'
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -158,6 +162,10 @@ B=(
   'jwpy_freeze'
   'jwpy_reqs-save --help'
   'jwpy_reqs-install missing-reqs.txt'
+  'jwpy_version'
+  'jwpy_which'
+  'jwpy_which python uv'
+  'jwpy_pythons'
 )
 echo "=== Part B: ${#B[@]} real-arg invocations (safe functions) ==="
 for sh in "${SHELLS[@]}"; do

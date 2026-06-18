@@ -250,7 +250,7 @@ jwpy_venv-deactivate() {
             if [ -z "$newpath" ]; then newpath="$seg"; else newpath="$newpath:$seg"; fi
         done
         export PATH="$newpath"
-        unset VIRTUAL_ENV
+        unset VIRTUAL_ENV VIRTUAL_ENV_PROMPT
         hash -r 2>/dev/null
     fi
     echo "✅ Deactivated: $prev"

@@ -32,6 +32,11 @@ jwpy_toc() {
     echo " - 🟢 jwpy_outdated"
     echo " - 🟢 jwpy_show"
     echo
+    echo " -----------------------------  dependency management"
+    echo " - 🟢 jwpy_freeze"
+    echo " - 🔵 jwpy_reqs-save"
+    echo " - ⚪ jwpy_reqs-install"
+    echo
 }
 
 
@@ -545,4 +550,101 @@ jwpy_show() {
     fi
 
     __jwpy_pip__ show "$@"
+}
+
+
+# ---------------------------------------------------------------------------------
+# dependency management
+# ---------------------------------------------------------------------------------
+
+jwpy_freeze() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_freeze [pip-freeze-options]"
+            echo "Prints installed packages in requirements (pinned) format."
+            echo "Examples:"
+            echo "  jwpy_freeze"
+            echo "  jwpy_freeze | grep -i django"
+            echo
+            echo "💡 Write it to a file with: jwpy_reqs-save [file]"
+            echo
+            return 0
+            ;;
+    esac
+
+    # No header/decoration: the output is meant to be piped or redirected as-is.
+    __jwpy_pip__ freeze "$@"
+}
+
+
+jwpy_reqs-save() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_reqs-save [file]"
+            echo "Freezes the current environment into a requirements file."
+            echo "Examples:"
+            echo "  jwpy_reqs-save                      # -> requirements.txt"
+            echo "  jwpy_reqs-save requirements-dev.txt"
+            echo
+            return 0
+            ;;
+    esac
+
+    local file="${1:-requirements.txt}"
+
+    if [ -e "$file" ]; then
+        echo "⚠️  '$file' already exists."
+        echo -n "Overwrite? [y/N] "
+        local reply
+        read -r reply
+        case "$reply" in
+            y|Y) ;;
+            *)   echo "Operation cancelled."; return 1 ;;
+        esac
+    fi
+
+    local content
+    content=$(__jwpy_pip__ freeze 2>/dev/null)
+    if [ -z "$content" ]; then
+        echo "⚠️  Nothing to freeze (no packages, or no environment resolved)."
+        return 1
+    fi
+
+    printf '%s\n' "$content" > "$file"
+    local n
+    n=$(printf '%s\n' "$content" | grep -c .)
+    echo "✅ Wrote $n package(s) from $(__jwpy_target__) to $file"
+}
+
+
+jwpy_reqs-install() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_reqs-install [file]"
+            echo "Installs packages from a requirements file."
+            echo "Examples:"
+            echo "  jwpy_reqs-install                      # <- requirements.txt"
+            echo "  jwpy_reqs-install requirements-dev.txt"
+            echo
+            return 0
+            ;;
+    esac
+
+    local file="${1:-requirements.txt}"
+    if [ ! -f "$file" ]; then
+        echo "❌ '$file' not found."
+        echo "💡 Create one with: jwpy_reqs-save"
+        return 1
+    fi
+
+    __jwpy_kv__ "Target:" "$(__jwpy_target__)"
+    __jwpy_guard_venv__ || return 1
+
+    echo "📦 Installing from: $file"
+    if __jwpy_pip__ install -r "$file"; then
+        echo "✅ Done.  💡 jwpy_list to see what's installed."
+    else
+        echo "❌ install failed"
+        return 1
+    fi
 }

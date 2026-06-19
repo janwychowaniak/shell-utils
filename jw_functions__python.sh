@@ -48,6 +48,12 @@ jwpy_toc() {
     echo " - 🟢 jwpy_typecheck"
     echo " - ⚪ jwpy_format"
     echo
+    echo " -----------------------------  pipx global tools"
+    echo " - 🔵 jwpy_tool-install"
+    echo " - ⚪ jwpy_tool-upgrade"
+    echo " - 🔴 jwpy_tool-uninstall"
+    echo " - 🟢 jwpy_tool-list"
+    echo
 }
 
 
@@ -204,6 +210,17 @@ __jwpy_guard_venv__() {
         y|Y) return 0 ;;
         *)   echo "Operation cancelled.  💡 jwpy_venv-activate first."; return 1 ;;
     esac
+}
+
+# Ensure pipx is available — the GLOBAL standalone-app lane. pipx installs each app
+# into its own isolated venv (independent of any project venv), so NONE of the
+# venv/precedence resolution above applies to the jwpy_tool-* wrappers. Returns 1
+# with an install hint if pipx is absent (graceful degradation).
+__jwpy_pipx__() {
+    command -v pipx >/dev/null 2>&1 && return 0
+    echo "❌ pipx is not installed (needed for global CLI-tool management)." >&2
+    echo "💡 Install it:  sudo apt install pipx   (or: python3 -m pip install --user pipx)" >&2
+    return 1
 }
 
 
@@ -1021,4 +1038,126 @@ jwpy_format() {
     IFS=$'\t' read -r src tool <<<"$res"
     echo "🎨 ruff format  ·  $src"
     "$tool" format "$@"
+}
+
+
+# ---------------------------------------------------------------------------------
+# pipx global tools
+# ---------------------------------------------------------------------------------
+# The GLOBAL lane: standalone CLI apps (code2flow, pydeps, hatch, …) installed once,
+# each in its own isolated venv via pipx — NOT tied to a project venv. These are thin
+# pipx wrappers for *managing* those apps; running one is just typing its name, so it
+# isn't a jwpy concern. (Project dev tools — ruff/pytest/mypy — are the OTHER lane,
+# resolved venv-first by jwpy_test/lint/typecheck/format.) All four degrade gracefully
+# when pipx is absent, via __jwpy_pipx__.
+
+jwpy_tool-install() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_tool-install <package> [package...] [pipx-options]"
+        echo "Examples:"
+        echo "  jwpy_tool-install pydeps"
+        echo "  jwpy_tool-install code2flow pyan3"
+        echo "  jwpy_tool-install pylint --python 3.12"
+        echo
+        echo "Globally installs CLI apps via pipx, each in its own isolated venv."
+        echo "💡 jwpy_tool-list to see what's installed."
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_pipx__ || return 1
+
+    echo "📦 Installing (pipx, global): $*"
+    if pipx install "$@"; then
+        echo "✅ Done.  💡 jwpy_tool-list to see installed tools."
+    else
+        echo "❌ install failed"
+        return 1
+    fi
+}
+
+
+jwpy_tool-upgrade() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_tool-upgrade <package>... | --all"
+        echo "Examples:"
+        echo "  jwpy_tool-upgrade pylint"
+        echo "  jwpy_tool-upgrade pydeps code2flow"
+        echo "  jwpy_tool-upgrade --all          # upgrade every pipx tool"
+        echo
+        echo "pipx upgrades one package per call, so multiple names are upgraded in"
+        echo "turn. For per-tool pipx flags (--pip-args, …), call pipx directly."
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_pipx__ || return 1
+
+    if [ "$1" = "--all" ]; then
+        echo "⬆️  Upgrading ALL pipx tools..."
+        pipx upgrade-all
+        return
+    fi
+
+    # pipx upgrade takes a single package; loop so multiple names work.
+    local p rc=0
+    for p in "$@"; do
+        echo "⬆️  Upgrading: $p"
+        pipx upgrade "$p" || rc=1
+    done
+    return "$rc"
+}
+
+
+jwpy_tool-uninstall() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_tool-uninstall <package> [package...]"
+        echo "Examples:"
+        echo "  jwpy_tool-uninstall pyan3"
+        echo "  jwpy_tool-uninstall code2flow pydeps"
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_pipx__ || return 1
+
+    echo "🔴 This will uninstall these pipx tools: $*"
+    echo -n "Are you sure? [y/N] "
+    local reply
+    read -r reply
+    case "$reply" in
+        y|Y) ;;
+        *)   echo "Operation cancelled."; return 1 ;;
+    esac
+
+    # pipx uninstall takes a single package; loop so multiple names work.
+    local p rc=0
+    for p in "$@"; do
+        echo "🗑️  Uninstalling: $p"
+        pipx uninstall "$p" || rc=1
+    done
+    return "$rc"
+}
+
+
+jwpy_tool-list() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_tool-list [--short|--json|--include-injected]"
+            echo "Lists global CLI apps installed with pipx (and the apps each exposes)."
+            echo "Examples:"
+            echo "  jwpy_tool-list"
+            echo "  jwpy_tool-list --short        # just package version"
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_pipx__ || return 1
+
+    echo "📦 pipx global tools"
+    pipx list "$@"
 }

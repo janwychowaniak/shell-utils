@@ -17,10 +17,13 @@
 #
 # Deliberately NOT executed (network, state, or running external tools — like
 # git's smoke skips push / destructive paths): the actual install/uninstall/upgrade
-# of packages, and test/lint/format (which run pytest/ruff/etc. against the cwd, and
-# format even rewrites files) — only their usage / --help paths are smoked.
-# jwpy_outdated and jwpy_test/lint/typecheck/format all act on no-args, so they are
-# dropped from the blind no-args sweep; their --help paths are checked in Part C.
+# of packages (pip *and* the pipx jwpy_tool-* group), and test/lint/format (which run
+# pytest/ruff/etc. against the cwd, and format even rewrites files) — only their usage
+# / --help paths are smoked. jwpy_outdated and jwpy_test/lint/typecheck/format all act
+# on no-args, so they are dropped from the blind no-args sweep; their --help paths are
+# checked in Part C. The jwpy_tool-* funcs are required-arg (no-args = usage) or
+# read-only (jwpy_tool-list = `pipx list`), so they stay IN the no-args sweep; only
+# real package installs/upgrades/uninstalls are kept out of Part B.
 #
 # Run:  bash tests/smoke_jwpy.sh   (or ./tests/smoke_jwpy.sh)
 # Exit: 0 = clean, 1 = runtime-error signature found, 2 = setup problem.
@@ -128,6 +131,13 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwpy_lint --help'
     'jwpy_typecheck --help'
     'jwpy_format --help'
+    # pipx group: only the deterministic --help forms here. jwpy_tool-list runs real
+    # `pipx list`, whose maintenance pass can differ between two back-to-back runs, so
+    # its bash↔zsh parity isn't guaranteed — it's exercised for runtime errors in B.
+    'jwpy_tool-install --help'
+    'jwpy_tool-upgrade --help'
+    'jwpy_tool-uninstall --help'
+    'jwpy_tool-list --help'
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -179,6 +189,14 @@ B=(
   'jwpy_lint --help'
   'jwpy_typecheck --help'
   'jwpy_format --help'
+  # pipx group: --help paths, plus the read-only listing in both forms (real
+  # install/upgrade/uninstall are network+state, so they are NOT invoked here).
+  'jwpy_tool-install --help'
+  'jwpy_tool-upgrade --help'
+  'jwpy_tool-uninstall --help'
+  'jwpy_tool-list --help'
+  'jwpy_tool-list'
+  'jwpy_tool-list --short'
   # venv-first resolution: the fixture .venv has no pytest/linters/formatters/checkers,
   # so these resolve the venv and abort (no tool run) — exercises __jwpy_tool__ safely.
   'jwpy_test'

@@ -49,10 +49,10 @@ jwpy_toc() {
     echo " - ⚪ jwpy_format"
     echo
     echo " -----------------------------  pipx global tools"
-    echo " - 🔵 jwpy_tool-install"
-    echo " - ⚪ jwpy_tool-upgrade"
-    echo " - 🔴 jwpy_tool-uninstall"
-    echo " - 🟢 jwpy_tool-list"
+    echo " - 🔵 jwpy_pipx-install"
+    echo " - ⚪ jwpy_pipx-upgrade"
+    echo " - 🔴 jwpy_pipx-uninstall"
+    echo " - 🟢 jwpy_pipx-list"
     echo
 }
 
@@ -214,7 +214,7 @@ __jwpy_guard_venv__() {
 
 # Ensure pipx is available — the GLOBAL standalone-app lane. pipx installs each app
 # into its own isolated venv (independent of any project venv), so NONE of the
-# venv/precedence resolution above applies to the jwpy_tool-* wrappers. Returns 1
+# venv/precedence resolution above applies to the jwpy_pipx-* wrappers. Returns 1
 # with an install hint if pipx is absent (graceful degradation).
 __jwpy_pipx__() {
     command -v pipx >/dev/null 2>&1 && return 0
@@ -1051,16 +1051,16 @@ jwpy_format() {
 # resolved venv-first by jwpy_test/lint/typecheck/format.) All four degrade gracefully
 # when pipx is absent, via __jwpy_pipx__.
 
-jwpy_tool-install() {
+jwpy_pipx-install() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo "Usage: jwpy_tool-install <package> [package...] [pipx-options]"
+        echo "Usage: jwpy_pipx-install <package> [package...] [pipx-options]"
         echo "Examples:"
-        echo "  jwpy_tool-install pydeps"
-        echo "  jwpy_tool-install code2flow pyan3"
-        echo "  jwpy_tool-install pylint --python 3.12"
+        echo "  jwpy_pipx-install pydeps"
+        echo "  jwpy_pipx-install code2flow pyan3"
+        echo "  jwpy_pipx-install pylint --python 3.12"
         echo
         echo "Globally installs CLI apps via pipx, each in its own isolated venv."
-        echo "💡 jwpy_tool-list to see what's installed."
+        echo "💡 jwpy_pipx-list to see what's installed."
         echo
         [ $# -eq 0 ] && return 1
         return 0
@@ -1070,7 +1070,7 @@ jwpy_tool-install() {
 
     echo "📦 Installing (pipx, global): $*"
     if pipx install "$@"; then
-        echo "✅ Done.  💡 jwpy_tool-list to see installed tools."
+        echo "✅ Done.  💡 jwpy_pipx-list to see installed tools."
     else
         echo "❌ install failed"
         return 1
@@ -1078,13 +1078,13 @@ jwpy_tool-install() {
 }
 
 
-jwpy_tool-upgrade() {
+jwpy_pipx-upgrade() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo "Usage: jwpy_tool-upgrade <package>... | --all"
+        echo "Usage: jwpy_pipx-upgrade <package>... | --all"
         echo "Examples:"
-        echo "  jwpy_tool-upgrade pylint"
-        echo "  jwpy_tool-upgrade pydeps code2flow"
-        echo "  jwpy_tool-upgrade --all          # upgrade every pipx tool"
+        echo "  jwpy_pipx-upgrade pylint"
+        echo "  jwpy_pipx-upgrade pydeps code2flow"
+        echo "  jwpy_pipx-upgrade --all          # upgrade every pipx tool"
         echo
         echo "pipx upgrades one package per call, so multiple names are upgraded in"
         echo "turn. For per-tool pipx flags (--pip-args, …), call pipx directly."
@@ -1111,12 +1111,12 @@ jwpy_tool-upgrade() {
 }
 
 
-jwpy_tool-uninstall() {
+jwpy_pipx-uninstall() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo "Usage: jwpy_tool-uninstall <package> [package...]"
+        echo "Usage: jwpy_pipx-uninstall <package> [package...]"
         echo "Examples:"
-        echo "  jwpy_tool-uninstall pyan3"
-        echo "  jwpy_tool-uninstall code2flow pydeps"
+        echo "  jwpy_pipx-uninstall pyan3"
+        echo "  jwpy_pipx-uninstall code2flow pydeps"
         echo
         [ $# -eq 0 ] && return 1
         return 0
@@ -1143,14 +1143,14 @@ jwpy_tool-uninstall() {
 }
 
 
-jwpy_tool-list() {
+jwpy_pipx-list() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwpy_tool-list [--short|--json|--include-injected]"
+            echo "Usage: jwpy_pipx-list [--short|--json|--include-injected]"
             echo "Lists global CLI apps installed with pipx (and the apps each exposes)."
             echo "Examples:"
-            echo "  jwpy_tool-list"
-            echo "  jwpy_tool-list --short        # just package version"
+            echo "  jwpy_pipx-list"
+            echo "  jwpy_pipx-list --short        # just package version"
             echo
             return 0
             ;;

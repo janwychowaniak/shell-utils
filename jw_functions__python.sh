@@ -223,6 +223,31 @@ __jwpy_pipx__() {
     return 1
 }
 
+# Re-align pipx's 3-line "venvs / apps / man" header into a padded column (label + ':'
+# then the path), preserving pipx's bold on the paths, and pass every other line
+# through verbatim. Reads pipx's (pty-captured) `list` output on stdin; strips the
+# pty's carriage returns and the cursor hide/show codes pipx brackets its output with.
+# Width 35 = longest label ("apps are exposed on your $PATH at") + ':' + a 1-col gutter.
+__jwpy_pipx_list_align__() {
+    awk '
+        BEGIN {
+            lbl[1] = "venvs are in"
+            lbl[2] = "apps are exposed on your $PATH at"
+            lbl[3] = "manual pages are exposed at"
+        }
+        { gsub(/\r/, ""); gsub(/\033\[\?25[lh]/, "") }   # drop CR + cursor hide/show
+        /^\033\[0m$/ { next }                            # drop the trailing lone reset
+        {
+            for (i = 1; i <= 3; i++)
+                if (index($0, lbl[i] " ") == 1) {
+                    printf "%-35s%s\n", lbl[i] ":", substr($0, length(lbl[i]) + 2)
+                    next
+                }
+            print
+        }
+    '
+}
+
 
 # ---------------------------------------------------------------------------------
 # virtual environment lifecycle
@@ -1159,5 +1184,18 @@ jwpy_pipx-list() {
     __jwpy_pipx__ || return 1
 
     echo "📦 pipx global tools"
-    pipx list "$@"
+
+    # The default long listing opens with a 3-line "venvs / apps / man" header whose
+    # paths read better column-aligned. pipx styles its output (bold) ONLY when its
+    # stdout is a tty (colors.py: PRINT_COLOR = sys.stdout.isatty(); no env override),
+    # so to realign while keeping that bold we run it under a pty (`script`) and
+    # reformat the header in awk. Plain passthrough otherwise: with flags (--short/
+    # --json carry no such header), into a non-tty (don't inject codes into a pipe or
+    # file), or when `script` is unavailable.
+    if [ "$#" -ne 0 ] || [ ! -t 1 ] || ! command -v script >/dev/null 2>&1; then
+        pipx list "$@"
+        return
+    fi
+
+    script -qec 'pipx list --skip-maintenance' /dev/null 2>/dev/null | __jwpy_pipx_list_align__
 }

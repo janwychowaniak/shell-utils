@@ -1,4 +1,5 @@
 # shell-utils
+
 This repository contains a collection of bash scripts that automate or otherwise help accelerate some typical day to day activities related, among other things, to:
 * navigating file system and working with files
 * working with media material
@@ -17,10 +18,13 @@ And then _.bashrc_ (or _.zshrc_ — the snippet is identical for both shells) mi
 ```bash
 [[ -f "$HOME/bin/shell-utils/jw_aliases.sh" ]]            && . "$HOME/bin/shell-utils/jw_aliases.sh"
 [[ -f "$HOME/bin/shell-utils/jw_colors.sh" ]]             && . "$HOME/bin/shell-utils/jw_colors.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__deb.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__deb.sh"
+#
 [[ -f "$HOME/bin/shell-utils/jw_functions__docker.sh" ]]  && . "$HOME/bin/shell-utils/jw_functions__docker.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__fs.sh" ]]      && . "$HOME/bin/shell-utils/jw_functions__fs.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__git.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__git.sh"
+[[ -f "$HOME/bin/shell-utils/jw_functions__deb.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__deb.sh"
+[[ -f "$HOME/bin/shell-utils/jw_functions__python.sh" ]]  && . "$HOME/bin/shell-utils/jw_functions__python.sh"
+#
+[[ -f "$HOME/bin/shell-utils/jw_functions__fs.sh" ]]      && . "$HOME/bin/shell-utils/jw_functions__fs.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__media.sh" ]]   && . "$HOME/bin/shell-utils/jw_functions__media.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__mediaff.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaff.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__mediaim.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaim.sh"

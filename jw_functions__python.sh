@@ -50,9 +50,13 @@ jwpy_toc() {
     echo
     echo " -----------------------------  pipx global tools"
     echo " - 🔵 jwpy_pipx-install"
-    echo " - ⚪ jwpy_pipx-upgrade"
     echo " - 🔴 jwpy_pipx-uninstall"
+    echo " - 🔵 jwpy_pipx-inject"
+    echo " - 🔴 jwpy_pipx-uninject"
+    echo " - ⚪ jwpy_pipx-upgrade"
+    echo " - ⚪ jwpy_pipx-run"
     echo " - 🟢 jwpy_pipx-list"
+    echo " - 🟢 jwpy_pipx-info"
     echo
 }
 
@@ -1198,4 +1202,163 @@ jwpy_pipx-list() {
     fi
 
     script -qec 'pipx list --skip-maintenance' /dev/null 2>/dev/null | __jwpy_pipx_list_align__
+}
+
+
+jwpy_pipx-inject() {
+    if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || [ $# -lt 2 ]; then
+        echo "Usage: jwpy_pipx-inject <app> <package> [package...] [pipx-options]"
+        echo "Examples:"
+        echo "  jwpy_pipx-inject pylint pylint-django"
+        echo "  jwpy_pipx-inject mkdocs mkdocs-material mkdocstrings"
+        echo
+        echo "Adds packages into an existing pipx app's isolated venv (e.g. plugins)."
+        echo "💡 jwpy_pipx-info <app> shows what's injected."
+        echo
+        # -h/--help returns 0; missing required args returns 1.
+        case "${1:-}" in -h|--help) return 0 ;; esac
+        return 1
+    fi
+
+    __jwpy_pipx__ || return 1
+
+    local app="$1"; shift
+    echo "💉 Injecting into '$app': $*"
+    if pipx inject "$app" "$@"; then
+        echo "✅ Done.  💡 jwpy_pipx-info $app"
+    else
+        echo "❌ inject failed"
+        return 1
+    fi
+}
+
+
+jwpy_pipx-uninject() {
+    if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || [ $# -lt 2 ]; then
+        echo "Usage: jwpy_pipx-uninject <app> <package> [package...]"
+        echo "Examples:"
+        echo "  jwpy_pipx-uninject pylint pylint-django"
+        echo
+        echo "Removes packages previously injected into an app's venv."
+        echo
+        case "${1:-}" in -h|--help) return 0 ;; esac
+        return 1
+    fi
+
+    __jwpy_pipx__ || return 1
+
+    local app="$1"; shift
+    echo "🔴 This will uninject from '$app': $*"
+    echo -n "Are you sure? [y/N] "
+    local reply
+    read -r reply
+    case "$reply" in
+        y|Y) ;;
+        *)   echo "Operation cancelled."; return 1 ;;
+    esac
+
+    if pipx uninject "$app" "$@"; then
+        echo "✅ Done."
+    else
+        echo "❌ uninject failed"
+        return 1
+    fi
+}
+
+
+jwpy_pipx-run() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_pipx-run <app> [args...]"
+        echo "Examples:"
+        echo "  jwpy_pipx-run cowsay -t moo"
+        echo "  jwpy_pipx-run --spec httpie http --help"
+        echo
+        echo "Runs an app ONCE in a temporary, cached venv without installing it"
+        echo "(pipx keeps the env ~14 days). For tools you use often, install it"
+        echo "with jwpy_pipx-install instead."
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_pipx__ || return 1
+
+    # Header to stderr so stdout stays clean for the app's own output (pipeable).
+    echo "🚀 pipx run (ephemeral): $*" >&2
+    pipx run "$@"
+}
+
+
+jwpy_pipx-info() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_pipx-info <package>"
+        echo "Examples:"
+        echo "  jwpy_pipx-info pylint"
+        echo
+        echo "Shows one pipx tool's version, interpreter, exposed apps and any"
+        echo "injected packages (read from 'pipx list --json')."
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_pipx__ || return 1
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "❌ python3 not found (needed to parse pipx data)." >&2
+        return 1
+    fi
+
+    local pkg="$1" out rc key val line
+    # pipx has no per-tool `show`, so read the structured listing. python3 prints
+    # "KEY<TAB>value" rows (rc 0), the available names one-per-line (rc 1 = not found),
+    # or nothing (rc 2 = unreadable JSON).
+    out=$(pipx list --json 2>/dev/null | python3 -c '
+import json, sys
+pkg = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(2)
+venvs = data.get("venvs", {})
+v = venvs.get(pkg)
+if v is None:
+    print("\n".join(sorted(venvs)))
+    sys.exit(1)
+md = v["metadata"]
+mp = md["main_package"]
+inj = md.get("injected_packages", {})
+print("VERSION\t" + str(mp.get("package_version", "?")))
+print("PYTHON\t" + str(md.get("python_version", "?")))
+apps = mp.get("apps") or []
+print("APPS\t" + (", ".join(apps) if apps else "(none)"))
+if inj:
+    parts = [n + " " + str(inj[n].get("package_version", "?")) for n in sorted(inj)]
+    print("INJECTED\t" + ", ".join(parts))
+' "$pkg")
+    rc=$?
+
+    if [ "$rc" -eq 2 ]; then
+        echo "❌ Could not read pipx data."
+        return 1
+    fi
+    if [ "$rc" -ne 0 ]; then
+        echo "❌ '$pkg' is not installed by pipx."
+        if [ -n "$out" ]; then
+            echo "💡 Installed pipx tools:"
+            while IFS= read -r line; do
+                [ -n "$line" ] && printf '   %s\n' "$line"
+            done <<< "$out"
+        fi
+        return 1
+    fi
+
+    echo "📦 pipx tool: $pkg"
+    while IFS=$'\t' read -r key val; do
+        case "$key" in
+            VERSION)  __jwpy_kv__ "Version:"  "$val" ;;
+            PYTHON)   __jwpy_kv__ "Python:"   "$val" ;;
+            APPS)     __jwpy_kv__ "Apps:"     "$val" ;;
+            INJECTED) __jwpy_kv__ "Injected:" "$val" ;;
+        esac
+    done <<< "$out"
 }

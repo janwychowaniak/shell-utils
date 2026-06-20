@@ -23,7 +23,9 @@
 # on no-args, so they are dropped from the blind no-args sweep; their --help paths are
 # checked in Part C. The jwpy_pipx-* funcs are required-arg (no-args = usage) or
 # read-only (jwpy_pipx-list = `pipx list`), so they stay IN the no-args sweep; only
-# real package installs/upgrades/uninstalls are kept out of Part B.
+# their real network/state/exec paths are kept out of Part B — installs/upgrades/
+# uninstalls/injects/uninjects/runs, plus `jwpy_pipx-info <tool>` (output varies by
+# what's installed on the host).
 #
 # Run:  bash tests/smoke_jwpy.sh   (or ./tests/smoke_jwpy.sh)
 # Exit: 0 = clean, 1 = runtime-error signature found, 2 = setup problem.
@@ -138,6 +140,10 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwpy_pipx-upgrade --help'
     'jwpy_pipx-uninstall --help'
     'jwpy_pipx-list --help'
+    'jwpy_pipx-inject --help'
+    'jwpy_pipx-uninject --help'
+    'jwpy_pipx-run --help'
+    'jwpy_pipx-info --help'
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -197,6 +203,10 @@ B=(
   'jwpy_pipx-list --help'
   'jwpy_pipx-list'
   'jwpy_pipx-list --short'
+  'jwpy_pipx-inject --help'
+  'jwpy_pipx-uninject --help'
+  'jwpy_pipx-run --help'
+  'jwpy_pipx-info --help'
   # venv-first resolution: the fixture .venv has no pytest/linters/formatters/checkers,
   # so these resolve the venv and abort (no tool run) — exercises __jwpy_tool__ safely.
   'jwpy_test'

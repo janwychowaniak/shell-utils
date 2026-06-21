@@ -54,9 +54,12 @@ jwpy_toc() {
     echo " - 🔵 jwpy_pipx-inject"
     echo " - 🔴 jwpy_pipx-uninject"
     echo " - ⚪ jwpy_pipx-upgrade"
+    echo " - ⚪ jwpy_pipx-reinstall"
     echo " - ⚪ jwpy_pipx-run"
     echo " - 🟢 jwpy_pipx-list"
     echo " - 🟢 jwpy_pipx-info"
+    echo " - 🟢 jwpy_pipx-env"
+    echo " - ⚪ jwpy_pipx-ensurepath"
     echo
 }
 
@@ -1361,4 +1364,84 @@ if inj:
             INJECTED) __jwpy_kv__ "Injected:" "$val" ;;
         esac
     done <<< "$out"
+}
+
+
+jwpy_pipx-reinstall() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwpy_pipx-reinstall <package>... | --all [--python X.Y] [--skip pkg...]"
+        echo "Examples:"
+        echo "  jwpy_pipx-reinstall pylint"
+        echo "  jwpy_pipx-reinstall pydeps code2flow"
+        echo "  jwpy_pipx-reinstall --all                 # rebuild every tool"
+        echo "  jwpy_pipx-reinstall --all --python 3.13   # ...on a new Python"
+        echo
+        echo "Rebuilds a tool's isolated venv (uninstall + install with the original"
+        echo "options) — use after a system Python upgrade. pipx reinstalls one package"
+        echo "per call, so multiple names are done in turn; for --python on a single"
+        echo "tool, call pipx directly."
+        echo
+        [ $# -eq 0 ] && return 1
+        return 0
+    fi
+
+    __jwpy_pipx__ || return 1
+
+    if [ "$1" = "--all" ]; then
+        shift
+        echo "🔄 Reinstalling ALL pipx tools..."
+        pipx reinstall-all "$@"
+        return
+    fi
+
+    # pipx reinstall takes a single package; loop so multiple names work.
+    local p rc=0
+    for p in "$@"; do
+        echo "🔄 Reinstalling: $p"
+        pipx reinstall "$p" || rc=1
+    done
+    return "$rc"
+}
+
+
+jwpy_pipx-env() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_pipx-env [--value VARIABLE]"
+            echo "Shows pipx's paths and config (PIPX_HOME, PIPX_BIN_DIR, PIPX_MAN_DIR, …)."
+            echo "Examples:"
+            echo "  jwpy_pipx-env"
+            echo "  jwpy_pipx-env --value PIPX_BIN_DIR     # just one value (scriptable)"
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_pipx__ || return 1
+
+    # Header only on the no-arg listing, so `--value VAR` stays a clean scalar.
+    [ "$#" -eq 0 ] && echo "📂 pipx environment"
+    pipx environment "$@"
+}
+
+
+jwpy_pipx-ensurepath() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_pipx-ensurepath [--force]"
+            echo "Ensures pipx's bin dir (~/.local/bin) is on your PATH, editing your"
+            echo "shell config (e.g. ~/.bashrc) if needed. --force re-adds even if it"
+            echo "already looks present."
+            echo "Examples:"
+            echo "  jwpy_pipx-ensurepath"
+            echo "  jwpy_pipx-ensurepath --force"
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_pipx__ || return 1
+
+    echo "🔧 Ensuring pipx's bin dir is on your PATH..."
+    pipx ensurepath "$@"
 }

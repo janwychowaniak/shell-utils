@@ -45,6 +45,13 @@ jwpy_toc() {
     echo " -----------------------------  project info"
     echo " - 🟢 jwpy_proj"
     echo
+    echo " -----------------------------  uv project"
+    echo " - 🟢 jwpy_uv-status"
+    echo " - ⚪ jwpy_uv-sync"
+    echo " - ⚪ jwpy_uv-lock"
+    echo " - 🟢 jwpy_uv-tree"
+    echo " - 🔵 jwpy_uv-export"
+    echo
     echo " -----------------------------  code quality"
     echo " - 🟢 jwpy_test"
     echo " - 🟢 jwpy_lint"
@@ -259,6 +266,36 @@ __jwpy_pipx_list_align__() {
             print
         }
     '
+}
+
+# uv availability guard (the uv-project lane). Graceful message if absent.
+__jwpy_uv__() {
+    command -v uv >/dev/null 2>&1 && return 0
+    echo "❌ uv is not installed (needed for the uv-project commands)." >&2
+    echo "💡 Install it:  pipx install uv   (or see https://docs.astral.sh/uv/)" >&2
+    return 1
+}
+
+# True if <dir> (default cwd) is a uv-managed project — a uv.lock, or [tool.uv] in its
+# pyproject.toml. THE shared "is this uv?" atom: jwpy_proj's manager detection and every
+# jwpy_uv-* guard build on it, so the rule lives in exactly one place.
+__jwpy_is_uvproject__() {
+    local d="${1:-.}"
+    [ -f "$d/uv.lock" ] && return 0
+    [ -f "$d/pyproject.toml" ] && grep -qE '^\[tool\.uv(\]|\.)' "$d/pyproject.toml" && return 0
+    return 1
+}
+
+# Guard for the uv-project lane: uv present AND cwd is a uv project. Friendly nudge
+# otherwise. Composes __jwpy_uv__ + __jwpy_is_uvproject__ (no reinventing).
+__jwpy_require_uvproject__() {
+    __jwpy_uv__ || return 1
+    if ! __jwpy_is_uvproject__; then
+        echo "❌ not a uv project here (no uv.lock or [tool.uv] in pyproject.toml)." >&2
+        echo "💡 jwpy_proj — see how this project is managed." >&2
+        return 1
+    fi
+    return 0
 }
 
 
@@ -1002,14 +1039,13 @@ jwpy_proj() {
 
     # --- manager signals: pure file presence + light grep on pyproject (no deps) ---
     local m_uv=0 m_poetry=0 m_pdm=0 m_pipenv=0 m_conda=0 m_hatch=0 m_reqs=0 m_setup=0 m_build=0
-    [ -f "$target/uv.lock" ] && m_uv=1
+    __jwpy_is_uvproject__ "$target" && m_uv=1     # shared atom (uv.lock or [tool.uv])
     [ -f "$target/poetry.lock" ] && m_poetry=1
     [ -f "$target/pdm.lock" ] && m_pdm=1
     [ -f "$target/Pipfile" ] && m_pipenv=1
     { [ -f "$target/environment.yml" ] || [ -f "$target/environment.yaml" ]; } && m_conda=1
     if [ -f "$target/setup.py" ] || [ -f "$target/setup.cfg" ]; then m_setup=1; fi
     if [ "$has_pp" = 1 ]; then
-        grep -qE '^\[tool\.uv(\]|\.)' "$pp"     && m_uv=1
         grep -qE '^\[tool\.poetry(\]|\.)' "$pp" && m_poetry=1
         grep -qE '^\[tool\.pdm(\]|\.)' "$pp"    && m_pdm=1
         grep -qE '^\[tool\.hatch\.envs' "$pp"   && m_hatch=1
@@ -1175,6 +1211,163 @@ emit("HASPROJECT", "1" if p else "0")
     echo
     __jwpy_kv__ "Environment:" "$env_disp"
     echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# uv project
+# ---------------------------------------------------------------------------------
+# The modern, declarative uv workflow: pyproject.toml + uv.lock are the source of truth,
+# .venv is derived (uv sync). Oversight-skewed (status / sync / lock / tree / export) —
+# bootstrap and add/remove are done directly (or by an agent) with uv. Every command
+# guards on a real uv project via __jwpy_require_uvproject__.
+
+jwpy_uv-status() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_uv-status"
+            echo "Read-only health of the uv project here: whether uv.lock is current with"
+            echo "pyproject.toml, and whether .venv is in sync with the lock (both local)."
+            echo "Examples:"
+            echo "  jwpy_uv-status"
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_require_uvproject__ || return 1
+
+    echo "🔒 uv project: $(basename "$PWD")"
+
+    local lock_disp env_disp
+    if uv lock --check >/dev/null 2>&1; then
+        lock_disp="up to date with pyproject  ✅"
+    else
+        lock_disp="⚠️  stale — run jwpy_uv-lock"
+    fi
+    __jwpy_kv__ "Lock:" "$lock_disp"
+
+    if uv sync --check >/dev/null 2>&1; then
+        env_disp=".venv in sync with lock  ✅"
+    else
+        env_disp="⚠️  drifted — run jwpy_uv-sync"
+    fi
+    __jwpy_kv__ "Environment:" "$env_disp"
+
+    # python: the interpreter this env resolves to (shared resolver) + the project pin
+    local ekind eroot pyv pin
+    IFS=$'\t' read -r ekind eroot <<<"$(__jwpy_envroot__)"
+    if [ -n "$eroot" ] && [ -x "$eroot/bin/python" ]; then
+        pyv=$("$eroot/bin/python" --version 2>&1 | awk '{print $2}')
+    else
+        pyv=$(command -v python3 >/dev/null 2>&1 && python3 --version 2>&1 | awk '{print $2}')
+    fi
+    pin=""
+    [ -f .python-version ] && pin=$(head -1 .python-version 2>/dev/null)
+    __jwpy_kv__ "Python:" "${pyv:-?}${pin:+  (pinned: .python-version → $pin)}"
+    echo
+}
+
+
+jwpy_uv-sync() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_uv-sync [uv-sync-options]"
+            echo "Makes .venv match the lockfile (uv sync). Options pass straight to uv."
+            echo "Examples:"
+            echo "  jwpy_uv-sync"
+            echo "  jwpy_uv-sync --frozen      # materialize the lock as-is, don't touch it"
+            echo "  jwpy_uv-sync --no-dev"
+            echo
+            echo "Plain sync may update uv.lock if pyproject.toml changed; --frozen never"
+            echo "touches the lock. jwpy_uv-status shows whether the lock is current."
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_require_uvproject__ || return 1
+
+    echo "🔄 uv sync${*:+ $*}"
+    uv sync "$@"
+}
+
+
+jwpy_uv-lock() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_uv-lock [uv-lock-options]"
+            echo "Resolves dependencies and writes uv.lock. Options pass straight to uv."
+            echo "Examples:"
+            echo "  jwpy_uv-lock"
+            echo "  jwpy_uv-lock --upgrade            # bump everything within constraints"
+            echo "  jwpy_uv-lock -P requests          # bump just one package"
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_require_uvproject__ || return 1
+
+    echo "🔒 uv lock${*:+ $*}"
+    uv lock "$@"
+}
+
+
+jwpy_uv-tree() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_uv-tree [uv-tree-options]"
+            echo "Shows the project's dependency tree. Options pass straight to uv."
+            echo "Examples:"
+            echo "  jwpy_uv-tree"
+            echo "  jwpy_uv-tree --outdated           # mark packages with newer releases"
+            echo "  jwpy_uv-tree --depth 1"
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_require_uvproject__ || return 1
+
+    echo "🌳 uv tree${*:+ $*}"
+    uv tree "$@"
+}
+
+
+jwpy_uv-export() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_uv-export [file]"
+            echo "Exports the locked dependencies to a requirements file (uv export)."
+            echo "Examples:"
+            echo "  jwpy_uv-export                    # -> requirements.txt"
+            echo "  jwpy_uv-export requirements-prod.txt"
+            echo
+            return 0
+            ;;
+    esac
+
+    __jwpy_require_uvproject__ || return 1
+
+    local file="${1:-requirements.txt}"
+    if [ -e "$file" ]; then
+        echo "⚠️  '$file' already exists."
+        echo -n "Overwrite? [y/N] "
+        local reply
+        read -r reply
+        case "$reply" in
+            y|Y) ;;
+            *)   echo "Operation cancelled."; return 1 ;;
+        esac
+    fi
+
+    if uv export -o "$file"; then
+        echo "✅ Exported locked deps to $file"
+    else
+        echo "❌ export failed"
+        return 1
+    fi
 }
 
 

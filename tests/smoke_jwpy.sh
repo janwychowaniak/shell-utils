@@ -23,7 +23,8 @@
 # on no-args, so they are dropped from the blind no-args sweep; their --help paths are
 # checked in Part C. jwpy_pipx-ensurepath is dropped too (its no-args path edits your
 # shell config ~/.bashrc), as is jwpy_clean (its no-args path begins a delete flow —
-# only its --dry-run/--help are smoked). The other jwpy_pipx-* funcs are required-arg (no-args = usage) or
+# only its --dry-run/--help are smoked), and jwpy_uv-sync/-lock/-export (mutate the lock/
+# env or write a file when in a uv project). The other jwpy_pipx-* funcs are required-arg (no-args = usage) or
 # read-only (jwpy_pipx-list = `pipx list`), so they stay IN the no-args sweep; only
 # their real network/state/exec paths are kept out of Part B — installs/upgrades/
 # uninstalls/injects/uninjects/runs, plus `jwpy_pipx-info <tool>` (output varies by
@@ -85,7 +86,7 @@ run() {
 # jwpy_test/lint/typecheck/format (run external tools against the cwd; format
 # rewrites files).
 mapfile -t FNS < <(grep -oE '^jwpy_[a-z-]+' "$LIB" | sort -u \
-                   | grep -vxE 'jwpy_(outdated|test|lint|typecheck|format|pipx-ensurepath|clean)')
+                   | grep -vxE 'jwpy_(outdated|test|lint|typecheck|format|pipx-ensurepath|clean|uv-sync|uv-lock|uv-export)')
 echo "=== Part A: no-args path of ${#FNS[@]} functions ==="
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -133,6 +134,12 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwpy_pythons'
     'jwpy_proj'
     'jwpy_proj --help'
+    'jwpy_uv-status'
+    'jwpy_uv-status --help'
+    'jwpy_uv-tree'
+    'jwpy_uv-sync --help'
+    'jwpy_uv-lock --help'
+    'jwpy_uv-export --help'
     'jwpy_test --help'
     'jwpy_lint --help'
     'jwpy_typecheck --help'
@@ -204,6 +211,12 @@ B=(
   'jwpy_pythons'
   'jwpy_proj'
   'jwpy_proj --help'
+  'jwpy_uv-status'
+  'jwpy_uv-status --help'
+  'jwpy_uv-tree'
+  'jwpy_uv-sync --help'
+  'jwpy_uv-lock --help'
+  'jwpy_uv-export --help'
   'jwpy_test --help'
   'jwpy_lint --help'
   'jwpy_typecheck --help'

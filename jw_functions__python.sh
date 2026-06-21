@@ -48,6 +48,9 @@ jwpy_toc() {
     echo " - 🟢 jwpy_typecheck"
     echo " - ⚪ jwpy_format"
     echo
+    echo " -----------------------------  project housekeeping"
+    echo " - 🔴 jwpy_clean"
+    echo
     echo " -----------------------------  pipx global tools"
     echo " - 🔵 jwpy_pipx-install"
     echo " - 🔴 jwpy_pipx-uninstall"
@@ -1070,6 +1073,97 @@ jwpy_format() {
     IFS=$'\t' read -r src tool <<<"$res"
     echo "🎨 ruff format  ·  $src"
     "$tool" format "$@"
+}
+
+
+# ---------------------------------------------------------------------------------
+# project housekeeping
+# ---------------------------------------------------------------------------------
+
+jwpy_clean() {
+    local dry=0 target=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -h|--help)
+                echo "Usage: jwpy_clean [--dry-run|-n] [path]"
+                echo "Removes Python build/test cruft under <path> (default: current dir):"
+                echo "  __pycache__/  *.pyc *.pyo  .pytest_cache/  .mypy_cache/  .ruff_cache/"
+                echo "  *.egg-info/  build/  dist/"
+                echo "Skips .git, node_modules and virtualenvs (.venv / venv / env)."
+                echo "Examples:"
+                echo "  jwpy_clean"
+                echo "  jwpy_clean --dry-run        # list what would go, delete nothing"
+                echo "  jwpy_clean src/"
+                echo
+                echo "Shows everything found, then asks before deleting."
+                echo
+                return 0
+                ;;
+            -n|--dry-run) dry=1; shift ;;
+            -*)           echo "❌ unknown option: $1"; return 1 ;;
+            *)            target="$1"; shift ;;
+        esac
+    done
+    [ -n "$target" ] || target="."
+
+    if [ ! -d "$target" ]; then
+        echo "❌ '$target' is not a directory."
+        return 1
+    fi
+    # backstop: never sweep the filesystem root
+    local rp
+    rp=$(cd "$target" 2>/dev/null && pwd)
+    if [ "$rp" = "/" ]; then
+        echo "❌ refusing to clean the filesystem root."
+        return 1
+    fi
+
+    # One scan into a NUL-delimited temp list (safe for odd names). Prune .git /
+    # node_modules / venvs so we neither descend into nor delete a virtualenv; prune
+    # the matched cruft dirs too so they're listed once (not their contents as well).
+    local tmp n
+    tmp=$(mktemp) || return 1
+    find "$target" \
+        \( -type d \( -name .git -o -name node_modules -o -name .venv -o -name venv -o -name env \) -prune \) \
+        -o \( -type d \( -name __pycache__ -o -name .pytest_cache -o -name .mypy_cache \
+                         -o -name .ruff_cache -o -name '*.egg-info' -o -name build -o -name dist \) -prune -print0 \) \
+        -o \( -type f \( -name '*.pyc' -o -name '*.pyo' \) -print0 \) \
+        > "$tmp" 2>/dev/null
+
+    n=$(tr -dc '\000' < "$tmp" | wc -c | tr -d '[:space:]')
+    if [ "$n" -eq 0 ]; then
+        echo "✨ Nothing to clean under '$target'."
+        rm -f "$tmp"
+        return 0
+    fi
+
+    echo "🧹 Removable Python cruft under '$target' ($n item(s)):"
+    tr '\000' '\n' < "$tmp" | sed 's/^/   /'
+
+    if [ "$dry" -eq 1 ]; then
+        echo "💡 Dry run — nothing deleted. Re-run without --dry-run to remove."
+        rm -f "$tmp"
+        return 0
+    fi
+
+    echo -n "🔴 Delete these $n item(s)? [y/N] "
+    local reply
+    read -r reply
+    case "$reply" in
+        y|Y) ;;
+        *)   echo "Operation cancelled."; rm -f "$tmp"; return 1 ;;
+    esac
+
+    local drc
+    xargs -0 rm -rf < "$tmp"
+    drc=$?
+    rm -f "$tmp"
+    if [ "$drc" -eq 0 ]; then
+        echo "✅ Removed $n item(s)."
+    else
+        echo "⚠️  Some items could not be removed."
+        return 1
+    fi
 }
 
 

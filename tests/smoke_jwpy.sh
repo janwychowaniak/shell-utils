@@ -21,7 +21,8 @@
 # pytest/ruff/etc. against the cwd, and format even rewrites files) — only their usage
 # / --help paths are smoked. jwpy_outdated and jwpy_test/lint/typecheck/format all act
 # on no-args, so they are dropped from the blind no-args sweep; their --help paths are
-# checked in Part C. The jwpy_pipx-* funcs are required-arg (no-args = usage) or
+# checked in Part C. jwpy_pipx-ensurepath is dropped too — its no-args path edits your
+# shell config (~/.bashrc). The other jwpy_pipx-* funcs are required-arg (no-args = usage) or
 # read-only (jwpy_pipx-list = `pipx list`), so they stay IN the no-args sweep; only
 # their real network/state/exec paths are kept out of Part B — installs/upgrades/
 # uninstalls/injects/uninjects/runs, plus `jwpy_pipx-info <tool>` (output varies by
@@ -83,7 +84,7 @@ run() {
 # jwpy_test/lint/typecheck/format (run external tools against the cwd; format
 # rewrites files).
 mapfile -t FNS < <(grep -oE '^jwpy_[a-z-]+' "$LIB" | sort -u \
-                   | grep -vxE 'jwpy_(outdated|test|lint|typecheck|format)')
+                   | grep -vxE 'jwpy_(outdated|test|lint|typecheck|format|pipx-ensurepath)')
 echo "=== Part A: no-args path of ${#FNS[@]} functions ==="
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -144,6 +145,11 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwpy_pipx-uninject --help'
     'jwpy_pipx-run --help'
     'jwpy_pipx-info --help'
+    'jwpy_pipx-reinstall --help'
+    'jwpy_pipx-ensurepath --help'
+    'jwpy_pipx-env --help'
+    'jwpy_pipx-env'
+    'jwpy_pipx-env --value PIPX_BIN_DIR'
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -207,6 +213,11 @@ B=(
   'jwpy_pipx-uninject --help'
   'jwpy_pipx-run --help'
   'jwpy_pipx-info --help'
+  'jwpy_pipx-reinstall --help'
+  'jwpy_pipx-ensurepath --help'
+  'jwpy_pipx-env --help'
+  'jwpy_pipx-env'
+  'jwpy_pipx-env --value PIPX_BIN_DIR'
   # venv-first resolution: the fixture .venv has no pytest/linters/formatters/checkers,
   # so these resolve the venv and abort (no tool run) — exercises __jwpy_tool__ safely.
   'jwpy_test'

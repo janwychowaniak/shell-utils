@@ -42,6 +42,9 @@ jwpy_toc() {
     echo " - 🟢 jwpy_which"
     echo " - 🟢 jwpy_pythons"
     echo
+    echo " -----------------------------  project info"
+    echo " - 🟢 jwpy_proj"
+    echo
     echo " -----------------------------  code quality"
     echo " - 🟢 jwpy_test"
     echo " - 🟢 jwpy_lint"
@@ -963,6 +966,215 @@ jwpy_pythons() {
     else
         [ -n "$active" ] && { echo; echo "  ( * = active venv )"; }
     fi
+}
+
+
+# ---------------------------------------------------------------------------------
+# project info
+# ---------------------------------------------------------------------------------
+
+jwpy_proj() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_proj [path]"
+            echo "Profiles a Python project (default: current dir): how it's managed,"
+            echo "its build backend, package-vs-application, declared deps, lockfile, env."
+            echo "Read-only. Examples:"
+            echo "  jwpy_proj"
+            echo "  jwpy_proj ../other-project"
+            echo
+            echo "Manager/backend/lockfile come from file presence; version/requires/"
+            echo "declared from pyproject.toml (parsed with python3 tomllib). Environment"
+            echo "is resolved with the same precedence as the rest of the area."
+            echo
+            return 0
+            ;;
+    esac
+
+    local target="${1:-.}"
+    if [ ! -d "$target" ]; then
+        echo "❌ '$target' is not a directory."
+        return 1
+    fi
+    local pp="$target/pyproject.toml"
+    local has_pp=0
+    [ -f "$pp" ] && has_pp=1
+
+    # --- manager signals: pure file presence + light grep on pyproject (no deps) ---
+    local m_uv=0 m_poetry=0 m_pdm=0 m_pipenv=0 m_conda=0 m_hatch=0 m_reqs=0 m_setup=0 m_build=0
+    [ -f "$target/uv.lock" ] && m_uv=1
+    [ -f "$target/poetry.lock" ] && m_poetry=1
+    [ -f "$target/pdm.lock" ] && m_pdm=1
+    [ -f "$target/Pipfile" ] && m_pipenv=1
+    { [ -f "$target/environment.yml" ] || [ -f "$target/environment.yaml" ]; } && m_conda=1
+    if [ -f "$target/setup.py" ] || [ -f "$target/setup.cfg" ]; then m_setup=1; fi
+    if [ "$has_pp" = 1 ]; then
+        grep -qE '^\[tool\.uv(\]|\.)' "$pp"     && m_uv=1
+        grep -qE '^\[tool\.poetry(\]|\.)' "$pp" && m_poetry=1
+        grep -qE '^\[tool\.pdm(\]|\.)' "$pp"    && m_pdm=1
+        grep -qE '^\[tool\.hatch\.envs' "$pp"   && m_hatch=1
+        grep -qE '^\[build-system\]' "$pp"      && m_build=1
+    fi
+    # requirements*.txt without a glob (zsh-safe)
+    if find "$target" -maxdepth 1 -name 'requirements*.txt' -print 2>/dev/null | grep -q .; then
+        m_reqs=1
+    fi
+
+    # --- primary manager by precedence; 'also' = other competing managers present ---
+    local primary=""
+    if   [ "$m_uv" = 1 ];     then primary="uv"
+    elif [ "$m_poetry" = 1 ]; then primary="poetry"
+    elif [ "$m_pdm" = 1 ];    then primary="pdm"
+    elif [ "$m_pipenv" = 1 ]; then primary="pipenv"
+    elif [ "$m_conda" = 1 ];  then primary="conda"
+    elif [ "$m_hatch" = 1 ];  then primary="hatch"
+    elif [ "$m_reqs" = 1 ];   then primary="pip + requirements"
+    elif [ "$m_setup" = 1 ];  then primary="setuptools (legacy)"
+    elif [ "$has_pp" = 1 ];   then primary="PEP 621 project"
+    fi
+
+    if [ -z "$primary" ]; then
+        echo "🐍 Project: (none here)"
+        echo "ℹ️  No Python project markers in $(cd "$target" 2>/dev/null && pwd)"
+        echo "   (looked for: pyproject.toml, setup.py/.cfg, requirements*.txt, Pipfile, environment.yml)"
+        echo "💡 uv init   ·   or jwpy_venv-create .venv"
+        return 1
+    fi
+
+    local also="" pair lbl val
+    for pair in "uv:$m_uv" "poetry:$m_poetry" "pdm:$m_pdm" "pipenv:$m_pipenv" "conda:$m_conda"; do
+        lbl=${pair%%:*}; val=${pair##*:}
+        [ "$val" = 1 ] || continue
+        [ "$lbl" = "$primary" ] && continue
+        also="${also:+$also, }$lbl"
+    done
+    [ "$m_reqs" = 1 ] && [ "$primary" != "pip + requirements" ] && also="${also:+$also, }requirements.txt"
+
+    # --- metadata from pyproject via tomllib (graceful if python3/tomllib absent) ---
+    local md="" rc mdok=0 name_="" ver="" req="" be="" ndeps="" nopt="" ngroups="" hasproj=0
+    if [ "$has_pp" = 1 ]; then
+        md=$(python3 -c '
+import tomllib, sys
+try:
+    with open(sys.argv[1], "rb") as f:
+        d = tomllib.load(f)
+except Exception:
+    sys.exit(2)
+p = d.get("project", {}) or {}
+bs = d.get("build-system", {}) or {}
+def emit(k, v): print(k + "\t" + str(v))
+if p.get("name"): emit("NAME", p["name"])
+dyn = p.get("dynamic", []) or []
+if p.get("version"): emit("VERSION", p["version"])
+elif "version" in dyn: emit("VERSION", "dynamic")
+if p.get("requires-python"): emit("REQUIRES", p["requires-python"])
+if bs.get("build-backend"): emit("BACKEND", bs["build-backend"])
+emit("NDEPS", len(p.get("dependencies", []) or []))
+opt = p.get("optional-dependencies", {}) or {}
+emit("NOPT", sum(len(v or []) for v in opt.values()))
+g = d.get("dependency-groups", {}) or {}
+emit("NGROUPS", sum(len(v or []) for v in g.values()))
+emit("HASPROJECT", "1" if p else "0")
+' "$pp" 2>/dev/null)
+        rc=$?
+        [ "$rc" -eq 0 ] && mdok=1
+    fi
+    if [ "$mdok" = 1 ]; then
+        local k v
+        while IFS=$'\t' read -r k v; do
+            case "$k" in
+                NAME) name_="$v" ;;
+                VERSION) ver="$v" ;;
+                REQUIRES) req="$v" ;;
+                BACKEND) be="$v" ;;
+                NDEPS) ndeps="$v" ;;
+                NOPT) nopt="$v" ;;
+                NGROUPS) ngroups="$v" ;;
+                HASPROJECT) hasproj="$v" ;;
+            esac
+        done <<< "$md"
+    fi
+    # backend fallback when tomllib is unavailable
+    if [ -z "$be" ] && [ "$has_pp" = 1 ]; then
+        be=$(grep -E '^[[:space:]]*build-backend' "$pp" 2>/dev/null | head -1 | cut -d= -f2 \
+             | tr -d '[:space:]' | tr -d '"' | tr -d "'")
+    fi
+
+    # --- derived display fields ---
+    local backend_disp typ
+    if [ -n "$be" ]; then
+        backend_disp="$be  (packaged)"
+    elif [ "$m_build" = 1 ]; then
+        backend_disp="(build-system present)"
+    elif [ "$m_setup" = 1 ]; then
+        backend_disp="setuptools (implicit, setup.py)"
+    else
+        backend_disp="(none — application, not packaged)"
+    fi
+    if [ "$m_build" = 1 ] || [ "$m_setup" = 1 ]; then
+        typ="package"
+    elif [ "$hasproj" = 1 ] || [ "$m_reqs" = 1 ] || [ "$m_pipenv" = 1 ] || [ "$m_conda" = 1 ]; then
+        typ="application"
+    else
+        typ="—"
+    fi
+
+    local lock_disp="⚠️  none" lf
+    for lf in uv.lock poetry.lock pdm.lock Pipfile.lock; do
+        if [ -f "$target/$lf" ]; then lock_disp="$lf  ✅"; break; fi
+    done
+
+    # declared dependency counts
+    local declared="" rf cnt
+    if [ "$mdok" = 1 ] && [ "$hasproj" = 1 ]; then
+        declared="${ndeps:-0} deps"
+        [ "${ngroups:-0}" -gt 0 ] 2>/dev/null && declared="$declared · $ngroups dev/group"
+        [ "${nopt:-0}" -gt 0 ] 2>/dev/null && declared="$declared · $nopt optional"
+    elif [ "$m_reqs" = 1 ]; then
+        while IFS= read -r rf; do
+            cnt=$(grep -cvE '^[[:space:]]*(#|$)' "$rf" 2>/dev/null)
+            declared="${declared:+$declared · }$(basename "$rf") ($cnt)"
+        done < <(find "$target" -maxdepth 1 -name 'requirements*.txt' | sort)
+    elif [ "$m_pipenv" = 1 ]; then
+        declared="(see Pipfile)"
+    elif [ "$m_conda" = 1 ]; then
+        declared="(see environment.yml)"
+    fi
+
+    # environment — reuse the shared resolver, in the target's context
+    local ekind eroot env_disp pyv
+    IFS=$'\t' read -r ekind eroot <<<"$(cd "$target" 2>/dev/null && __jwpy_envroot__)"
+    case "$ekind" in
+        active)
+            pyv=$([ -x "$eroot/bin/python" ] && "$eroot/bin/python" --version 2>&1 | awk '{print $2}')
+            env_disp="$(basename "$eroot") (active) · Python ${pyv:-?}" ;;
+        venv)
+            pyv=$([ -x "$eroot/bin/python" ] && "$eroot/bin/python" --version 2>&1 | awk '{print $2}')
+            env_disp="$(basename "$eroot") (not activated) · Python ${pyv:-?}" ;;
+        *)
+            pyv=$(command -v python3 >/dev/null 2>&1 && python3 --version 2>&1 | awk '{print $2}')
+            env_disp="system · Python ${pyv:-?}" ;;
+    esac
+
+    # --- render ---
+    local proj_name
+    proj_name="${name_:-$(basename "$(cd "$target" 2>/dev/null && pwd)")}"
+    echo "🐍 Project: $proj_name"
+    __jwpy_kv__ "Path:" "$(cd "$target" 2>/dev/null && pwd)"
+    echo
+    __jwpy_kv__ "Manager:" "$primary${also:+  ·  also: $also}"
+    __jwpy_kv__ "Backend:" "$backend_disp"
+    __jwpy_kv__ "Type:" "$typ"
+    __jwpy_kv__ "Lockfile:" "$lock_disp"
+    if [ -n "$ver$req$declared" ]; then
+        echo
+        [ -n "$ver" ]      && __jwpy_kv__ "Version:" "$ver"
+        [ -n "$req" ]      && __jwpy_kv__ "Requires:" "Python $req"
+        [ -n "$declared" ] && __jwpy_kv__ "Declared:" "$declared"
+    fi
+    echo
+    __jwpy_kv__ "Environment:" "$env_disp"
+    echo
 }
 
 

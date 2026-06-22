@@ -8,7 +8,7 @@ A collection of Bash shell utility functions and aliases, sourced into the user'
 
 ## Conventions
 
-The authoritative coding-convention spec for this repo lives in [`CONVENTIONS.md`](CONVENTIONS.md) — naming (public/internal/legacy), ShellCheck compliance, function & help patterns, safety rules, output style, cross-shell portability (bash + zsh), logical grouping, and the `<area>_toc()` blast-radius markers (🟢 read-only · 🔵 creates · ⚪ state change/transfer · 🔴 destructive). This file is a quick orientation (what the repo is, where things live); `CONVENTIONS.md` is the source of truth and wins on any conflict.
+The authoritative coding-convention spec for this repo lives in [`CONVENTIONS.md`](CONVENTIONS.md) — naming (public/internal/legacy), ShellCheck compliance, function & help patterns, safety rules, output style, cross-shell portability (bash + zsh), logical grouping, the imperative-vs-declarative lane model, and the `<area>_toc()` blast-radius markers (🟢 read-only · 🔵 creates · ⚪ state change/transfer · 🔴 destructive). This file is a quick orientation (what the repo is, where things live); `CONVENTIONS.md` is the source of truth and wins on any conflict.
 
 ## Linting
 

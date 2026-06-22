@@ -66,14 +66,14 @@ jwpy_toc() {
     echo
     echo " -----------------------------  pipx global tools"
     echo " - 🔵 jwpy_pipx-install"
+    echo " - ⚪ jwpy_pipx-upgrade"
     echo " - 🔴 jwpy_pipx-uninstall"
+    echo " - 🟢 jwpy_pipx-list"
     echo " - 🔵 jwpy_pipx-inject"
     echo " - 🔴 jwpy_pipx-uninject"
-    echo " - ⚪ jwpy_pipx-upgrade"
-    echo " - ⚪ jwpy_pipx-reinstall"
     echo " - ⚪ jwpy_pipx-run"
-    echo " - 🟢 jwpy_pipx-list"
     echo " - 🟢 jwpy_pipx-info"
+    echo " - ⚪ jwpy_pipx-reinstall"
     echo " - 🟢 jwpy_pipx-env"
     echo " - ⚪ jwpy_pipx-ensurepath"
     echo

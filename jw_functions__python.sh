@@ -577,12 +577,15 @@ jwpy_venv-info() {
             ;;
     esac
 
-    local vdir="" active="no" py pipver n
+    local vdir="" active="no" py pipver n rp
     if [ -n "${VIRTUAL_ENV:-}" ] && [ -z "${1:-}" ]; then
         vdir="$VIRTUAL_ENV"
         active="yes"
     elif vdir=$(__jwpy_venv_find__ "${1:-}"); then
-        [ "$vdir" = "${VIRTUAL_ENV:-}" ] && active="yes"
+        # canonicalize for the active check: an explicit relative arg (e.g. ".venv") is
+        # echoed verbatim and would never equal the absolute $VIRTUAL_ENV otherwise.
+        rp=$(cd "$vdir" 2>/dev/null && pwd)
+        [ -n "$rp" ] && [ "$rp" = "${VIRTUAL_ENV:-}" ] && active="yes"
     else
         if [ -n "${1:-}" ]; then
             echo "❌ No venv found at '$1'"
@@ -714,11 +717,13 @@ jwpy_uninstall() {
         *)   echo "Operation cancelled."; return 1 ;;
     esac
 
-    # uv pip uninstall does not prompt; python -m pip needs -y to match.
+    # uv pip uninstall does not prompt; the pip path needs -y to match. Route the
+    # non-uv arm through __jwpy_pip__ so it honors a project .venv and never assumes a
+    # bare `python` (absent on python3-only hosts).
     if command -v uv >/dev/null 2>&1; then
         uv pip uninstall "$@"
     else
-        python -m pip uninstall -y "$@"
+        __jwpy_pip__ uninstall -y "$@"
     fi
 }
 
@@ -810,7 +815,7 @@ jwpy_reqs-save() {
             ;;
     esac
 
-    __jwpy_is_uvproject__ && echo "💡 uv project: jwpy_uv-export produces a lockfile-faithful requirements file."
+    __jwpy_is_uvproject__ && echo "💡 uv project: jwpy_uv-export produces a lockfile-faithful requirements file." >&2
 
     local file="${1:-requirements.txt}"
 
@@ -1686,7 +1691,7 @@ jwpy_clean() {
 # each in its own isolated venv via pipx — NOT tied to a project venv. These are thin
 # pipx wrappers for *managing* those apps; running one is just typing its name, so it
 # isn't a jwpy concern. (Project dev tools — ruff/pytest/mypy — are the OTHER lane,
-# resolved venv-first by jwpy_test/lint/typecheck/format.) All four degrade gracefully
+# resolved venv-first by jwpy_test/lint/typecheck/format.) All degrade gracefully
 # when pipx is absent, via __jwpy_pipx__.
 
 jwpy_pipx-install() {

@@ -159,16 +159,23 @@ __jwpy_envroot__() {
     return 1
 }
 
-# Run pip via the chosen backend. With uv: `uv pip` (uv resolves active > project
-# .venv > system itself). Without uv: run pip with the env's resolved python (so a
-# non-activated project .venv is honored too, and we never assume a bare `python`).
+# Run pip via the chosen backend, against the env our resolver picked. uv discovers an
+# active venv ($VIRTUAL_ENV) and ./.venv on its own, but NOT a non-activated venv/ or
+# env/ — so for such a discovered project venv we point uv at its interpreter, matching
+# __jwpy_venv_find__ (and the stdlib arm) instead of silently falling back to the system
+# Python. Without uv: run pip with the env's resolved python (honors a non-activated
+# project venv too, and we never assume a bare `python`).
 __jwpy_pip__() {
-    if command -v uv >/dev/null 2>&1; then
-        uv pip "$@"
-        return
-    fi
     local kind root py
     IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
+    if command -v uv >/dev/null 2>&1; then
+        if [ "$kind" = venv ] && [ -x "$root/bin/python" ]; then
+            uv pip "$@" --python "$root/bin/python"
+        else
+            uv pip "$@"
+        fi
+        return
+    fi
     if [ -n "$root" ] && [ -x "$root/bin/python" ]; then
         py="$root/bin/python"
     else
@@ -639,8 +646,8 @@ jwpy_install() {
         echo "  jwpy_install 'django>=5' pytest"
         echo "  jwpy_install -r requirements.txt"
         echo
-        echo "Targets the active venv (uv also auto-discovers ./.venv); warns"
-        echo "before touching the system Python."
+        echo "Targets the resolved env (active venv, or a discovered .venv/venv/env);"
+        echo "warns before touching the system Python."
         echo
         [ $# -eq 0 ] && return 1
         return 0
@@ -722,11 +729,12 @@ jwpy_uninstall() {
     echo "🔴 This will uninstall: $*"
     __jwpy_confirm__ "Are you sure?" || return 1
 
-    # uv pip uninstall does not prompt; the pip path needs -y to match. Route the
-    # non-uv arm through __jwpy_pip__ so it honors a project .venv and never assumes a
-    # bare `python` (absent on python3-only hosts).
+    # Both arms go through __jwpy_pip__ so a discovered project venv (.venv/venv/env) is
+    # honored on either backend (and we never assume a bare `python`, absent on
+    # python3-only hosts). uv pip uninstall doesn't prompt; the pip path needs -y to
+    # match (we already confirmed above).
     if command -v uv >/dev/null 2>&1; then
-        uv pip uninstall "$@"
+        __jwpy_pip__ uninstall "$@"
     else
         __jwpy_pip__ uninstall -y "$@"
     fi

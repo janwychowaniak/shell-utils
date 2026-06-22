@@ -4,6 +4,7 @@ This repository contains a collection of bash scripts that automate or otherwise
 * navigating file system and working with files
 * working with media material
 * performing some helpful programming tasks
+* managing Python virtual environments, packages and projects (uv / pip / pipx)
 
 ## Installation suggestions
 

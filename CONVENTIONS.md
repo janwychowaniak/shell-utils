@@ -235,3 +235,30 @@ identical; only the process changes:
   smoke test + the agreed spec.
 - **Prevention, not correction.** The bash/zsh trap list is an authoring guide
   here, not an audit pass — write it right the first time.
+
+# Oversight-first (the agent-era lens)
+
+Code is increasingly written *through agents*, so a function's value is judged by
+**who actually invokes it — the human at the terminal, or an agent in its own
+subprocess.** That reshapes what is worth building:
+
+- **Default to oversight.** The highest-value functions answer *"what's the
+  state?"* — read-only profilers / status / listers (🟢). A human supervising
+  agents reaches for these constantly. The blast-radius markers already *are* this
+  map: everything 🟢 is the oversight toolkit; 🔵 ⚪ 🔴 is the "doing" layer.
+- **Prize the agent-impossible.** Anything that manipulates the *interactive
+  shell's own state* (e.g. `jwpy_venv-activate` / `-deactivate`, which `source` a
+  venv so it persists after the function returns) is something an agent
+  fundamentally **cannot** do in your shell — the most justified functions of all.
+- **Be wary of "doing" wrappers.** Imperative mutators (install / add / build /
+  publish / format) are usually run by the agent directly, so a thin re-spelling
+  adds little. Build one only when it adds a **guard or transparency the raw
+  command lacks** — e.g. a system-Python guard, a lane-mixing warning, or a
+  `· active venv` source annotation — never just to rename a command the agent
+  already types.
+- **Forward rule, not a retroactive purge.** This governs what to *add*; existing
+  doing-wrappers that carry real guards stay (they cost nothing and serve the
+  occasional ad-hoc interactive moment). Concretely, this lens is why the uv lane
+  is oversight-only (no `jwpy_uv-add` / `-remove` — uv does those), and why there
+  is no local `jwpy_publish` (PyPI Trusted Publishing keeps the credential-bearing
+  upload on the CI runner; a local publish would bypass that chain).

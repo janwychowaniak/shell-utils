@@ -195,7 +195,7 @@ __jwpy_target__() {
     IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
     case "$kind" in
         active) printf '%s\n' "$root (active venv)"; return 0 ;;
-        venv)   printf '%s\n' "$root (.venv, not activated)"; return 0 ;;
+        venv)   printf '%s\n' "$root (not activated)"; return 0 ;;
         *)      printf '%s\n' "SYSTEM Python"; return 1 ;;
     esac
 }
@@ -957,7 +957,7 @@ jwpy_which() {
 
     case "$kind" in
         active) echo "🔎 Environment: $root (active venv)"; srclabel="active venv" ;;
-        venv)   echo "🔎 Environment: $root (.venv, not activated)"; srclabel="venv" ;;
+        venv)   echo "🔎 Environment: $root (not activated)"; srclabel="venv" ;;
         *)      echo "🔎 Environment: system (no venv)"; srclabel="system" ;;
     esac
 

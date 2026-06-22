@@ -24,7 +24,7 @@ jwpy_toc() {
     echo " - 🟢 jwpy_venv-list"
     echo " - 🟢 jwpy_venv-info"
     echo
-    echo " -----------------------------  package management (pip)"
+    echo " -----------------------------  package management (uv pip / pip)"
     echo " - ⚪ jwpy_install"
     echo " - ⚪ jwpy_upgrade"
     echo " - 🔴 jwpy_uninstall"
@@ -32,7 +32,7 @@ jwpy_toc() {
     echo " - 🟢 jwpy_outdated"
     echo " - 🟢 jwpy_show"
     echo
-    echo " -----------------------------  dependency management"
+    echo " -----------------------------  dependency management (uv pip / pip)"
     echo " - 🟢 jwpy_freeze"
     echo " - 🔵 jwpy_reqs-save"
     echo " - ⚪ jwpy_reqs-install"
@@ -635,8 +635,11 @@ jwpy_venv-info() {
 
 
 # ---------------------------------------------------------------------------------
-# package management (pip)
+# package management (uv pip / pip)
 # ---------------------------------------------------------------------------------
+# The imperative lane: package ops against the resolved env (active venv > project
+# venv > system) via __jwpy_pip__ — uv pip when uv is installed (fast), plain pip
+# otherwise. Backend-agnostic; the dependency-management group below shares this lane.
 
 jwpy_install() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
@@ -789,8 +792,10 @@ jwpy_show() {
 
 
 # ---------------------------------------------------------------------------------
-# dependency management
+# dependency management (uv pip / pip)
 # ---------------------------------------------------------------------------------
+# The requirements round-trip (freeze / save / install) over the SAME imperative
+# __jwpy_pip__ lane (uv pip / pip) as package management above.
 
 jwpy_freeze() {
     case "${1:-}" in

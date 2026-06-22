@@ -89,6 +89,17 @@ __jwpy_kv__() {
     printf "%-${3:-14}s%s\n" "$1" "$2"
 }
 
+# Ask a [y/N] question. rc 0 = yes; rc 1 = no (and prints "Operation cancelled.").
+# Centralizes the confirm/cancel UX for destructive & overwrite prompts.
+__jwpy_confirm__() {
+    echo -n "$1 [y/N] "
+    local reply
+    read -r reply
+    case "$reply" in y|Y) return 0 ;; esac
+    echo "Operation cancelled."
+    return 1
+}
+
 # Resolve a venv directory. With $1: treat it as an explicit dir/name (echoed as
 # given). Without: auto-discover the conventional names (.venv/venv/env) walking UP
 # from the cwd to the filesystem root, like uv — so it works from a project subdir.
@@ -317,13 +328,7 @@ __jwpy_lane_caveat__() {
 # not in a uv project; returns 1 if the user declines.
 __jwpy_lane_guard__() {
     __jwpy_lane_caveat__ || return 0
-    echo -n "Use the imperative pip lane anyway? [y/N] "
-    local reply
-    read -r reply
-    case "$reply" in
-        y|Y) return 0 ;;
-        *)   echo "Operation cancelled."; return 1 ;;
-    esac
+    __jwpy_confirm__ "Use the imperative pip lane anyway?" || return 1
 }
 
 
@@ -515,13 +520,7 @@ jwpy_venv-remove() {
     echo "🔴 This will permanently delete this virtualenv:"
     __jwpy_kv__ "Location:" "$target"
     [ -x "$target/bin/python" ] && __jwpy_kv__ "Python:" "$("$target/bin/python" --version 2>&1)"
-    echo -n "Are you sure? [y/N] "
-    local reply
-    read -r reply
-    case "$reply" in
-        y|Y) ;;
-        *)   echo "Operation cancelled."; return 1 ;;
-    esac
+    __jwpy_confirm__ "Are you sure?" || return 1
 
     if rm -rf "$target"; then
         echo "✅ Removed '$target'"
@@ -709,13 +708,7 @@ jwpy_uninstall() {
 
     __jwpy_lane_caveat__     # nudge (no extra prompt — uninstall already confirms below)
     echo "🔴 This will uninstall: $*"
-    echo -n "Are you sure? [y/N] "
-    local reply
-    read -r reply
-    case "$reply" in
-        y|Y) ;;
-        *)   echo "Operation cancelled."; return 1 ;;
-    esac
+    __jwpy_confirm__ "Are you sure?" || return 1
 
     # uv pip uninstall does not prompt; the pip path needs -y to match. Route the
     # non-uv arm through __jwpy_pip__ so it honors a project .venv and never assumes a
@@ -821,13 +814,7 @@ jwpy_reqs-save() {
 
     if [ -e "$file" ]; then
         echo "⚠️  '$file' already exists."
-        echo -n "Overwrite? [y/N] "
-        local reply
-        read -r reply
-        case "$reply" in
-            y|Y) ;;
-            *)   echo "Operation cancelled."; return 1 ;;
-        esac
+        __jwpy_confirm__ "Overwrite?" || return 1
     fi
 
     local content
@@ -1395,13 +1382,7 @@ jwpy_uv-export() {
     local file="${1:-requirements.txt}"
     if [ -e "$file" ]; then
         echo "⚠️  '$file' already exists."
-        echo -n "Overwrite? [y/N] "
-        local reply
-        read -r reply
-        case "$reply" in
-            y|Y) ;;
-            *)   echo "Operation cancelled."; return 1 ;;
-        esac
+        __jwpy_confirm__ "Overwrite?" || return 1
     fi
 
     if uv export -o "$file"; then
@@ -1768,13 +1749,7 @@ jwpy_pipx-uninstall() {
     __jwpy_pipx__ || return 1
 
     echo "🔴 This will uninstall these pipx tools: $*"
-    echo -n "Are you sure? [y/N] "
-    local reply
-    read -r reply
-    case "$reply" in
-        y|Y) ;;
-        *)   echo "Operation cancelled."; return 1 ;;
-    esac
+    __jwpy_confirm__ "Are you sure?" || return 1
 
     # pipx uninstall takes a single package; loop so multiple names work.
     local p rc=0
@@ -1863,13 +1838,7 @@ jwpy_pipx-uninject() {
 
     local app="$1"; shift
     echo "🔴 This will uninject from '$app': $*"
-    echo -n "Are you sure? [y/N] "
-    local reply
-    read -r reply
-    case "$reply" in
-        y|Y) ;;
-        *)   echo "Operation cancelled."; return 1 ;;
-    esac
+    __jwpy_confirm__ "Are you sure?" || return 1
 
     if pipx uninject "$app" "$@"; then
         echo "✅ Done."

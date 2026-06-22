@@ -143,6 +143,52 @@ Debian Example:
 - Package analysis (installed, size, orphans)
 - Troubleshooting (broken, fix, diagnostics)
 
+# Lanes: imperative vs declarative
+
+Areas that manage an environment's *contents* (today: `python`) split along one
+axis — **where the authoritative state lives, and what you act on.** Two lanes,
+plus orthogonal groups that sit on neither.
+
+- **Imperative lane.** You act *on the environment directly*; commands mutate it
+  *now* (`jwpy_install` / `jwpy_uninstall` / `jwpy_upgrade`). The environment **is**
+  the state — there is no separate manifest of record. In python this is the
+  *package management* + *dependency management* groups, both routed through
+  `__jwpy_pip__` (uv pip / pip).
+- **Declarative lane.** You act *on a manifest* (`pyproject.toml`); the lockfile
+  (`uv.lock`) and `.venv` are **derived** from it (`uv lock` / `uv sync`). The
+  manifest + lock are the **source of truth**; the environment is a reproducible
+  artifact. In python this is the *uv project* group — oversight-skewed (status /
+  sync / lock / tree / export); mutating the *declaration* itself (`uv add` /
+  `remove`) is done with uv directly (see *Oversight-first*).
+
+|                          | imperative                  | declarative                   |
+|--------------------------|-----------------------------|-------------------------------|
+| You act on               | the environment             | a manifest                    |
+| Source of truth          | the env (installed set)     | pyproject + lock              |
+| You express              | *how* (steps: install X)    | *what* (the desired set)      |
+| Reproducible             | no — unless you `freeze`    | yes — deterministic from lock |
+| Env ↔ spec reconciliation | manual round-trip (`freeze` ↔ `reqs-install`) | automatic (`uv sync`, `sync --check`) |
+
+- **A file does not make a lane declarative.** `requirements.txt` keeps the pip
+  group imperative. The test is not "is there a list file" but *"is the env derived
+  and reconciled from an authoritative manifest+lock, or do you push commands at the
+  env with files as mere snapshots?"* `requirements.txt` is a hand-managed snapshot
+  (produced by `freeze`), with no lock and no reconciliation engine — file and env
+  drift freely. Imperative.
+- **Orthogonal groups** (on neither end of the axis): venv **lifecycle**
+  (create / activate / remove — the *container* both lanes sit on); **pipx** (a
+  different axis — global per-app scope, not project scope); **code quality** (runs
+  tools, does not manage deps).
+- **Why the axis exists — it is enforced in exactly one place.** Mixing lanes is a
+  footgun: in a uv (declarative) project an ad-hoc imperative `pip install` is not
+  in the lock, and `uv sync` will revert it. That single hazard is the entire reason
+  for `__jwpy_lane_caveat__` / `__jwpy_lane_guard__`.
+
+**Vocabulary — keep these two axes disjoint.** *imperative / declarative **lane*** is
+this state-management axis (above). The *side-effect* axis — whether a function reads
+or mutates — is the **blast-radius markers** (🟢 vs 🔵 ⚪ 🔴); call those functions
+**mutators** or **"doing"-wrappers**, never "imperative", so the two axes don't blur.
+
 # Intelligence Features
 
 ### Filtering and Search
@@ -250,8 +296,9 @@ subprocess.** That reshapes what is worth building:
   shell's own state* (e.g. `jwpy_venv-activate` / `-deactivate`, which `source` a
   venv so it persists after the function returns) is something an agent
   fundamentally **cannot** do in your shell — the most justified functions of all.
-- **Be wary of "doing" wrappers.** Imperative mutators (install / add / build /
-  publish / format) are usually run by the agent directly, so a thin re-spelling
+- **Be wary of "doing" wrappers.** Mutators (install / add / build / publish /
+  format — the side-effect axis, not the imperative/declarative *lane*) are usually
+  run by the agent directly, so a thin re-spelling
   adds little. Build one only when it adds a **guard or transparency the raw
   command lacks** — e.g. a system-Python guard, a lane-mixing warning, or a
   `· active venv` source annotation — never just to rename a command the agent

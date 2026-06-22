@@ -298,6 +298,31 @@ __jwpy_require_uvproject__() {
     return 0
 }
 
+# Lane-safety: the pip group is the IMPERATIVE lane (uv pip / pip into the env). In a uv
+# PROJECT the env is derived from uv.lock, so ad-hoc pip changes aren't tracked and
+# `uv sync` will undo them. These two print/guard against that footgun; both are no-ops
+# outside a uv project. (Consumers of the shared __jwpy_is_uvproject__ atom.)
+__jwpy_lane_caveat__() {
+    __jwpy_is_uvproject__ || return 1     # rc 1 = not a uv project (nothing printed)
+    echo "⚠️  This is a uv project — pyproject.toml + uv.lock are the source of truth."
+    echo "   Ad-hoc pip changes aren't tracked there, and 'uv sync' will undo them."
+    echo "   💡 Track deps with uv (uv add …), then: jwpy_uv-sync"
+    return 0
+}
+
+# Warn + confirm before a mutating pip op in a uv project. Proceeds silently (0) when
+# not in a uv project; returns 1 if the user declines.
+__jwpy_lane_guard__() {
+    __jwpy_lane_caveat__ || return 0
+    echo -n "Use the imperative pip lane anyway? [y/N] "
+    local reply
+    read -r reply
+    case "$reply" in
+        y|Y) return 0 ;;
+        *)   echo "Operation cancelled."; return 1 ;;
+    esac
+}
+
 
 # ---------------------------------------------------------------------------------
 # virtual environment lifecycle
@@ -605,6 +630,7 @@ jwpy_install() {
     fi
 
     __jwpy_kv__ "Target:" "$(__jwpy_target__)"
+    __jwpy_lane_guard__ || return 1
     __jwpy_guard_venv__ || return 1
 
     echo "📦 Installing: $*"
@@ -630,6 +656,7 @@ jwpy_upgrade() {
     fi
 
     __jwpy_kv__ "Target:" "$(__jwpy_target__)"
+    __jwpy_lane_guard__ || return 1
     __jwpy_guard_venv__ || return 1
 
     if [ "$1" = "--all" ]; then
@@ -674,6 +701,7 @@ jwpy_uninstall() {
     __jwpy_kv__ "Target:" "$(__jwpy_target__)"
     __jwpy_guard_venv__ || return 1
 
+    __jwpy_lane_caveat__     # nudge (no extra prompt — uninstall already confirms below)
     echo "🔴 This will uninstall: $*"
     echo -n "Are you sure? [y/N] "
     local reply
@@ -758,6 +786,9 @@ jwpy_freeze() {
             ;;
     esac
 
+    # In a uv project the lockfile is the source of truth — nudge to the faithful export
+    # on STDERR so stdout stays pipeable.
+    __jwpy_is_uvproject__ && echo "💡 uv project: jwpy_uv-export gives a lockfile-faithful requirements file." >&2
     # No header/decoration: the output is meant to be piped or redirected as-is.
     __jwpy_pip__ freeze "$@"
 }
@@ -775,6 +806,8 @@ jwpy_reqs-save() {
             return 0
             ;;
     esac
+
+    __jwpy_is_uvproject__ && echo "💡 uv project: jwpy_uv-export produces a lockfile-faithful requirements file."
 
     local file="${1:-requirements.txt}"
 
@@ -824,6 +857,7 @@ jwpy_reqs-install() {
     fi
 
     __jwpy_kv__ "Target:" "$(__jwpy_target__)"
+    __jwpy_lane_guard__ || return 1
     __jwpy_guard_venv__ || return 1
 
     echo "📦 Installing from: $file"

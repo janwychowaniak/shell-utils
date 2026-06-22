@@ -58,6 +58,9 @@ jwpy_toc() {
     echo " - 🟢 jwpy_typecheck"
     echo " - ⚪ jwpy_format"
     echo
+    echo " -----------------------------  packaging"
+    echo " - 🟢 jwpy_build-check"
+    echo
     echo " -----------------------------  project housekeeping"
     echo " - 🔴 jwpy_clean"
     echo
@@ -1512,6 +1515,76 @@ jwpy_format() {
     IFS=$'\t' read -r src tool <<<"$res"
     echo "🎨 ruff format  ·  $src"
     "$tool" format "$@"
+}
+
+
+# ---------------------------------------------------------------------------------
+# packaging
+# ---------------------------------------------------------------------------------
+
+jwpy_build-check() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwpy_build-check"
+            echo "Pre-flight for the artifacts in ./dist before CI publishes them:"
+            echo "lists each artifact's contents and validates metadata + README"
+            echo "rendering (twine check). Credential-free — publishing itself stays"
+            echo "in CI (Trusted Publishing). Build first with: uv build"
+            echo "Examples:"
+            echo "  uv build && jwpy_build-check"
+            echo
+            return 0
+            ;;
+    esac
+
+    if [ ! -d dist ]; then
+        echo "ℹ️  No ./dist directory here."
+        echo "💡 Build first:  uv build"
+        return 1
+    fi
+
+    local files=() f
+    while IFS= read -r f; do files+=("$f"); done \
+        < <(find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) | sort)
+    if [ "${#files[@]}" -eq 0 ]; then
+        echo "ℹ️  No artifacts in ./dist (looked for *.whl / *.tar.gz)."
+        echo "💡 Build first:  uv build"
+        return 1
+    fi
+
+    echo "📦 Artifacts in ./dist (${#files[@]})"
+    local sz
+    for f in "${files[@]}"; do
+        sz=$(du -h "$f" 2>/dev/null | cut -f1)
+        printf "  %-7s %s\n" "${sz:-?}" "$f"
+    done
+    echo
+
+    # contents of each artifact — catches missing modules or stray files (secrets,
+    # tests). No unzip dependency: wheels (zip) via python3 -m zipfile, sdists via tar.
+    for f in "${files[@]}"; do
+        echo "---[ contents: $(basename "$f") ]---"
+        case "$f" in
+            *.whl)    python3 -m zipfile -l "$f" 2>/dev/null || echo "  (could not read)" ;;
+            *.tar.gz) tar tzf "$f" 2>/dev/null || echo "  (could not read)" ;;
+        esac
+        echo
+    done
+
+    # metadata + README-render validation — the shippability gate. Ephemeral twine via
+    # uv (uv-first, no install); else a twine on PATH (pipx); else a hint.
+    local twine=()
+    if command -v uv >/dev/null 2>&1; then
+        twine=(uv tool run twine)
+    elif command -v twine >/dev/null 2>&1; then
+        twine=(twine)
+    else
+        echo "❌ twine not available — need uv (for 'uv tool run twine'), or install it:"
+        echo "   jwpy_pipx-install twine"
+        return 1
+    fi
+    echo "🔎 twine check"
+    "${twine[@]}" check "${files[@]}"
 }
 
 

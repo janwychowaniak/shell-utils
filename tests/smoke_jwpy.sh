@@ -144,6 +144,8 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwpy_lint --help'
     'jwpy_typecheck --help'
     'jwpy_format --help'
+    'jwpy_build-check'
+    'jwpy_build-check --help'
     'jwpy_clean --help'
     'jwpy_clean --dry-run'
     # pipx group: only the deterministic --help forms here. jwpy_pipx-list runs real
@@ -221,6 +223,8 @@ B=(
   'jwpy_lint --help'
   'jwpy_typecheck --help'
   'jwpy_format --help'
+  'jwpy_build-check'
+  'jwpy_build-check --help'
   'jwpy_clean --help'
   'jwpy_clean --dry-run'
   # pipx group: --help paths, plus the read-only listing in both forms (real

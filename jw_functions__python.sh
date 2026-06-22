@@ -100,6 +100,18 @@ __jwpy_confirm__() {
     return 1
 }
 
+# Short Python version ("3.12.1") of interpreter $1; or of system python3 when $1 is
+# omitted. Empty if $1 is given-but-not-executable, or no python3 is found.
+__jwpy_pyver__() {
+    local py="${1:-}"
+    if [ -n "$py" ]; then
+        [ -x "$py" ] || return 0
+    else
+        py=$(command -v python3) || return 0
+    fi
+    "$py" --version 2>&1 | awk '{print $2}'
+}
+
 # Resolve a venv directory. With $1: treat it as an explicit dir/name (echoed as
 # given). Without: auto-discover the conventional names (.venv/venv/env) walking UP
 # from the cwd to the filesystem root, like uv — so it works from a project subdir.
@@ -995,7 +1007,7 @@ jwpy_pythons() {
     local kind root pyver
     IFS=$'\t' read -r kind root <<<"$(__jwpy_envroot__)"
     if [ -n "$root" ] && [ -x "$root/bin/python" ]; then
-        pyver=$("$root/bin/python" --version 2>&1 | awk '{print $2}')
+        pyver=$(__jwpy_pyver__ "$root/bin/python")
         if [ "$kind" = active ]; then
             echo "🎯 Resolved here: $root/bin/python ($pyver) — active venv"
         else
@@ -1211,13 +1223,13 @@ emit("HASPROJECT", "1" if p else "0")
     IFS=$'\t' read -r ekind eroot <<<"$(cd "$target" 2>/dev/null && __jwpy_envroot__)"
     case "$ekind" in
         active)
-            pyv=$([ -x "$eroot/bin/python" ] && "$eroot/bin/python" --version 2>&1 | awk '{print $2}')
+            pyv=$(__jwpy_pyver__ "$eroot/bin/python")
             env_disp="$(basename "$eroot") (active) · Python ${pyv:-?}" ;;
         venv)
-            pyv=$([ -x "$eroot/bin/python" ] && "$eroot/bin/python" --version 2>&1 | awk '{print $2}')
+            pyv=$(__jwpy_pyver__ "$eroot/bin/python")
             env_disp="$(basename "$eroot") (not activated) · Python ${pyv:-?}" ;;
         *)
-            pyv=$(command -v python3 >/dev/null 2>&1 && python3 --version 2>&1 | awk '{print $2}')
+            pyv=$(__jwpy_pyver__)
             env_disp="system · Python ${pyv:-?}" ;;
     esac
 
@@ -1287,9 +1299,9 @@ jwpy_uv-status() {
     local ekind eroot pyv pin
     IFS=$'\t' read -r ekind eroot <<<"$(__jwpy_envroot__)"
     if [ -n "$eroot" ] && [ -x "$eroot/bin/python" ]; then
-        pyv=$("$eroot/bin/python" --version 2>&1 | awk '{print $2}')
+        pyv=$(__jwpy_pyver__ "$eroot/bin/python")
     else
-        pyv=$(command -v python3 >/dev/null 2>&1 && python3 --version 2>&1 | awk '{print $2}')
+        pyv=$(__jwpy_pyver__)
     fi
     pin=""
     [ -f .python-version ] && pin=$(head -1 .python-version 2>/dev/null)

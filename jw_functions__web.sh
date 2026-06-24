@@ -11,7 +11,7 @@
 #   HTTP   : jwweb_status              (head/get folded: headers covers HEAD, raw curl covers GET)
 #   TLS    : jwweb_cert-chain          (cert-file → a --file flag on jwweb_cert)
 #   DNS    : jwweb_dns-trace jwweb_dns-reverse
-#   net    : jwweb_trace               (ping = zbyt cienki, by go opakowywać)
+#   net    : jwweb_trace               (ping = too thin to wrap)
 # jwweb_domain (registration) is RDAP-first with a whois fallback — supersedes
 # the old "jwweb_whois" idea (RDAP returns parseable JSON; WHOIS is the fallback).
 
@@ -19,13 +19,13 @@
 # printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
 # every row, so the tagline column aligns regardless of emoji width.
 __jwweb_toc_row__() {
-    printf " - %s %-19s%s\n" "$1" "$2" "$3"
+    printf " - %s %-22s%s\n" "$1" "$2" "$3"
 }
 
 jwweb_toc() {
     echo
-    echo "   blast radius:  🟢 tylko odczyt   🔵 tworzy   ⚪ zmiana stanu / transfer   🔴 kasuje (destructive)"
-    echo "   (marker = skutek po stronie ENDPOINTU, nie lokalny; HTTP GET/HEAD = 🟢 idempotentne)"
+    echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
+    echo "   (marker = effect on the remote ENDPOINT, not local; HTTP GET/HEAD = 🟢 idempotent)"
     echo
     echo " -----------------------------  HTTP inspection / probing"
     __jwweb_toc_row__ 🟢 jwweb_headers   "headers + security audit"
@@ -33,7 +33,7 @@ jwweb_toc() {
     __jwweb_toc_row__ 🟢 jwweb_timing    "DNS/connect/TLS/TTFB split"
     __jwweb_toc_row__ 🟢 jwweb_json      "GET + jq validate/pretty"
     echo
-    echo " -----------------------------  TLS / certyfikaty"
+    echo " -----------------------------  TLS / certificates"
     __jwweb_toc_row__ 🟢 jwweb_cert        "subject/SAN/issuer/validity"
     __jwweb_toc_row__ 🟢 jwweb_cert-expiry "days-to-expiry + thresholds"
     __jwweb_toc_row__ 🟢 jwweb_tls         "proto/cipher + version probe"
@@ -43,10 +43,10 @@ jwweb_toc() {
     __jwweb_toc_row__ 🟢 jwweb_dns-prop "one record, many resolvers"
     __jwweb_toc_row__ 🟢 jwweb_domain   "RDAP-first + whois-fallback"
     echo
-    echo " -----------------------------  łączność / osiągalność"
+    echo " -----------------------------  connectivity / reachability"
     __jwweb_toc_row__ 🟢 jwweb_port "TCP reachability, 1+ ports"
     echo
-    echo " -----------------------------  diagnostyka zbiorcza"
+    echo " -----------------------------  aggregate diagnostics"
     __jwweb_toc_row__ 🟢 jwweb_diag "DNS→TCP→TLS→HTTP→headers"
     echo
 }
@@ -171,7 +171,7 @@ __jwweb_sec_headers__() {
         if [ -n "$val" ]; then
             __jwweb_kv__ "$label" "✅ $val" "$pad"
         else
-            __jwweb_kv__ "$label" "❌ brak" "$pad"
+            __jwweb_kv__ "$label" "❌ missing" "$pad"
         fi
     done
     # info-leak headers: presence is a ⚠️, absence is silent
@@ -232,24 +232,24 @@ jwweb_headers() {
         echo "Examples:"
         echo "  jwweb_headers example.com"
         echo "  jwweb_headers https://api.example.com/health"
-        echo "  jwweb_headers example.com --all      # nagłówki każdego hopa redirectów"
+        echo "  jwweb_headers example.com --all      # headers of every redirect hop"
         echo
-        echo "Nagłówki odpowiedzi + audyt nagłówków bezpieczeństwa (HSTS/CSP/XFO/...)."
+        echo "Response headers + security-header audit (HSTS/CSP/XFO/...)."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v curl >/dev/null 2>&1; then
-        echo "❌ curl nie jest dostępny" >&2; return 1
+        echo "❌ curl not available" >&2; return 1
     fi
 
     local url="" all=0 arg=""
     for arg in "$@"; do
         case "$arg" in
             --all)   all=1 ;;
-            -*)      echo "⚠️ nieznana opcja: $arg" >&2 ;;
+            -*)      echo "⚠️ unknown option: $arg" >&2 ;;
             *)       [ -z "$url" ] && url="$arg" ;;
         esac
     done
-    [ -z "$url" ] && { echo "❌ brak URL" >&2; return 1; }
+    [ -z "$url" ] && { echo "❌ no URL" >&2; return 1; }
     case "$url" in http://*|https://*) ;; *) url="https://$url" ;; esac
 
     local raw="" code="" final=""
@@ -259,7 +259,7 @@ jwweb_headers() {
     case "$code" in
         405|501|"") raw="$(curl -sS -L -o /dev/null -D - "$url" 2>/dev/null)" ;;
     esac
-    [ -z "$raw" ] && { echo "❌ brak odpowiedzi z $url" >&2; return 1; }
+    [ -z "$raw" ] && { echo "❌ no response from $url" >&2; return 1; }
     raw="$(printf '%s\n' "$raw" | tr -d '\r')"
     # final response block = from the last "HTTP/" status line to the end
     final="$(printf '%s\n' "$raw" | awk '/^HTTP\//{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}')"
@@ -281,11 +281,11 @@ jwweb_timing() {
         echo "  jwweb_timing example.com"
         echo "  jwweb_timing https://api.example.com/health"
         echo
-        echo "Rozbicie czasu żądania: DNS / connect / TLS / TTFB / total (curl -w)."
+        echo "Request-timing breakdown: DNS / connect / TLS / TTFB / total (curl -w)."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v curl >/dev/null 2>&1; then
-        echo "❌ curl nie jest dostępny" >&2; return 1
+        echo "❌ curl not available" >&2; return 1
     fi
 
     local url="$1"
@@ -297,14 +297,14 @@ jwweb_timing() {
     winfo="$(curl -sS -o /dev/null -L \
         -w 'CODE=%{http_code}\nT_DNS=%{time_namelookup}\nT_CONN=%{time_connect}\nT_TLS=%{time_appconnect}\nT_TTFB=%{time_starttransfer}\nT_TOTAL=%{time_total}\n' \
         "$url" 2>/dev/null)"
-    [ -z "$winfo" ] && { echo "❌ brak odpowiedzi z $url" >&2; return 1; }
+    [ -z "$winfo" ] && { echo "❌ no response from $url" >&2; return 1; }
 
     local code="" hmark=""
     code="$(printf '%s\n' "$winfo" | grep '^CODE=' | cut -d= -f2)"
     case "$code" in
         2*)      hmark="✅ $code" ;;
         3*)      hmark="↪ $code" ;;
-        000|"")  hmark="❌ brak odpowiedzi" ;;
+        000|"")  hmark="❌ no response" ;;
         4*|5*)   hmark="❌ $code" ;;
         *)       hmark="$code" ;;
     esac
@@ -331,11 +331,11 @@ jwweb_redirects() {
         echo "  jwweb_redirects example.com"
         echo "  jwweb_redirects http://github.com"
         echo
-        echo "Łańcuch przekierowań 3xx hop po hopie + URL/status końcowy."
+        echo "3xx redirect chain hop-by-hop + final URL/status."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v curl >/dev/null 2>&1; then
-        echo "❌ curl nie jest dostępny" >&2; return 1
+        echo "❌ curl not available" >&2; return 1
     fi
 
     local url="$1"
@@ -343,7 +343,7 @@ jwweb_redirects() {
 
     local raw="" chain=""
     raw="$(curl -sS -I -L "$url" 2>/dev/null | tr -d '\r')"
-    [ -z "$raw" ] && { echo "❌ brak odpowiedzi z $url" >&2; return 1; }
+    [ -z "$raw" ] && { echo "❌ no response from $url" >&2; return 1; }
     # per response block: "<code>\t<location-or-empty>"
     chain="$(printf '%s\n' "$raw" | awk '
         /^HTTP\// { if (seen) print code "\t" loc; code=$2; loc=""; seen=1 }
@@ -381,14 +381,14 @@ jwweb_json() {
         echo "  jwweb_json https://api.github.com"
         echo "  jwweb_json api.example.com/v1/health"
         echo
-        echo "GET + walidacja/pretty-print JSON (jq) + status/rozmiar. Niepoprawny JSON → surowe body."
+        echo "GET + validate/pretty-print JSON (jq) + status/size. Invalid JSON → raw body."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v curl >/dev/null 2>&1; then
-        echo "❌ curl nie jest dostępny" >&2; return 1
+        echo "❌ curl not available" >&2; return 1
     fi
     if ! command -v jq >/dev/null 2>&1; then
-        echo "❌ jwweb_json wymaga 'jq'" >&2; return 1
+        echo "❌ jwweb_json requires 'jq'" >&2; return 1
     fi
 
     local url="$1"
@@ -397,7 +397,7 @@ jwweb_json() {
     local resp="" body="" meta="" code="" ctype="" size="" hmark=""
     resp="$(curl -sS -L -H 'Accept: application/json' \
         -w '\n__JWJSON_META__\t%{http_code}\t%{content_type}\t%{size_download}' "$url" 2>/dev/null)"
-    [ -z "$resp" ] && { echo "❌ brak odpowiedzi z $url" >&2; return 1; }
+    [ -z "$resp" ] && { echo "❌ no response from $url" >&2; return 1; }
     body="${resp%$'\n'__JWJSON_META__*}"
     meta="${resp##*__JWJSON_META__$'\t'}"
     code="$(printf '%s' "$meta" | cut -f1)"
@@ -406,7 +406,7 @@ jwweb_json() {
     case "$code" in
         2*)      hmark="✅ $code" ;;
         3*)      hmark="↪ $code" ;;
-        000|"")  hmark="❌ brak odpowiedzi" ;;
+        000|"")  hmark="❌ no response" ;;
         4*|5*)   hmark="❌ $code" ;;
         *)       hmark="$code" ;;
     esac
@@ -435,7 +435,7 @@ jwweb_json() {
 
 
 # ---------------------------------------------------------------------------------
-# TLS / certyfikaty
+# TLS / certificates
 # ---------------------------------------------------------------------------------
 
 # 🟢 Full certificate inspection — subject / SAN / issuer / validity / serial.
@@ -447,24 +447,24 @@ jwweb_cert() {
         echo "  jwweb_cert example.com:8443"
         echo "  jwweb_cert https://example.com/foo"
         echo
-        echo "Pełna inspekcja certyfikatu TLS (subject/SAN/issuer/ważność/serial/proto)."
+        echo "Full TLS certificate inspection (subject/SAN/issuer/validity/serial/proto)."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v openssl >/dev/null 2>&1; then
-        echo "❌ openssl nie jest dostępny" >&2; return 1
+        echo "❌ openssl not available" >&2; return 1
     fi
 
     local scheme="" host="" port="" pth=""
     read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$1")"
-    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+    [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
 
     local sout=""
     sout="$(__jwweb_tls_fetch__ "$host" "$port" "$host")"
-    [ -z "$sout" ] && { echo "❌ nie udało się połączyć z $host:$port" >&2; return 1; }
+    [ -z "$sout" ] && { echo "❌ could not connect to $host:$port" >&2; return 1; }
 
     local x509=""
     x509="$(printf '%s\n' "$sout" | openssl x509 -noout -subject -issuer -startdate -enddate -serial 2>/dev/null)"
-    [ -z "$x509" ] && { echo "❌ brak certyfikatu z $host:$port" >&2; return 1; }
+    [ -z "$x509" ] && { echo "❌ no certificate from $host:$port" >&2; return 1; }
 
     local subject="" issuer="" notbefore="" notafter="" serial="" san="" cn="" iss=""
     subject="$(printf '%s\n' "$x509" | grep '^subject=' | sed 's/^subject=//')"
@@ -488,7 +488,7 @@ jwweb_cert() {
     nn="$(date +%s)"
     if [ -n "$ee" ]; then
         days=$(( (ee - nn) / 86400 ))
-        if   [ "$days" -lt 0 ];  then mark="❌ WYGASŁ (${days} d)"
+        if   [ "$days" -lt 0 ];  then mark="❌ EXPIRED (${days} d)"
         elif [ "$days" -le 7 ];  then mark="❌ $days"
         elif [ "$days" -le 30 ]; then mark="⚠️ $days"
         else                          mark="✅ $days"
@@ -512,8 +512,8 @@ jwweb_cert() {
 }
 
 # 🟢 Days until a TLS certificate expires, with --warn/--crit thresholds.
-# Default exit: 0 success / 1 usage|błąd. With --exit-code (opt-in, nagios-style):
-# 0 ok / 1 warn / 2 crit|wygasły / 3 błąd.
+# Default exit: 0 success / 1 usage|error. With --exit-code (opt-in, nagios-style):
+# 0 ok / 1 warn / 2 crit|expired / 3 error.
 jwweb_cert-expiry() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwweb_cert-expiry <host[:port]|url> [--warn DAYS] [--crit DAYS] [--exit-code]"
@@ -522,11 +522,11 @@ jwweb_cert-expiry() {
         echo "  jwweb_cert-expiry example.com:8443 --warn 45 --crit 10"
         echo "  jwweb_cert-expiry https://example.com/foo --exit-code"
         echo
-        echo "Dni do wygaśnięcia certyfikatu TLS. --exit-code: 0 ok / 1 warn / 2 crit|wygasły / 3 błąd."
+        echo "Days until the TLS certificate expires. --exit-code: 0 ok / 1 warn / 2 crit|expired / 3 error."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v openssl >/dev/null 2>&1; then
-        echo "❌ openssl nie jest dostępny" >&2; return 1
+        echo "❌ openssl not available" >&2; return 1
     fi
 
     local target="" warn=30 crit=7 usecode=0
@@ -536,11 +536,11 @@ jwweb_cert-expiry() {
             --crit)      crit="$2"; shift 2 ;;
             --exit-code) usecode=1; shift ;;
             -h|--help)   shift ;;
-            -*)          echo "⚠️ nieznana opcja: $1" >&2; shift ;;
+            -*)          echo "⚠️ unknown option: $1" >&2; shift ;;
             *)           [ -z "$target" ] && target="$1"; shift ;;
         esac
     done
-    [ -z "$target" ] && { echo "❌ brak host" >&2; return 1; }
+    [ -z "$target" ] && { echo "❌ no host" >&2; return 1; }
 
     local scheme="" host="" port="" pth=""
     read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$target")"
@@ -548,7 +548,7 @@ jwweb_cert-expiry() {
     local fields=""
     fields="$(__jwweb_cert_enddate__ "$host" "$port" "$host")"
     if [ -z "$fields" ]; then
-        echo "❌ nie udało się pobrać certyfikatu z $host:$port" >&2
+        echo "❌ could not fetch certificate from $host:$port" >&2
         [ "$usecode" -eq 1 ] && return 3 || return 1
     fi
 
@@ -565,11 +565,11 @@ jwweb_cert-expiry() {
     endepoch="$(date -d "$notafter" +%s 2>/dev/null)"
     nowepoch="$(date +%s)"
     if [ -z "$endepoch" ]; then
-        echo "❌ nie sparsowałem daty: $notafter" >&2
+        echo "❌ could not parse date: $notafter" >&2
         [ "$usecode" -eq 1 ] && return 3 || return 1
     fi
     days=$(( (endepoch - nowepoch) / 86400 ))
-    if   [ "$days" -lt 0 ];          then mark="❌ WYGASŁ (${days} d)"; sev=2
+    if   [ "$days" -lt 0 ];          then mark="❌ EXPIRED (${days} d)"; sev=2
     elif [ "$days" -le "$crit" ];    then mark="❌ $days";             sev=2
     elif [ "$days" -le "$warn" ];    then mark="⚠️ $days";             sev=1
     else                                  mark="✅ $days";             sev=0
@@ -596,20 +596,20 @@ jwweb_tls() {
         echo "  jwweb_tls example.com"
         echo "  jwweb_tls example.com:8443"
         echo
-        echo "Wynegocjowany protokół/cipher + sonda wspieranych wersji (TLS 1.0–1.3; stare = ⚠️)."
+        echo "Negotiated protocol/cipher + supported-version probe (TLS 1.0–1.3; old = ⚠️)."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v openssl >/dev/null 2>&1; then
-        echo "❌ openssl nie jest dostępny" >&2; return 1
+        echo "❌ openssl not available" >&2; return 1
     fi
 
     local scheme="" host="" port="" pth=""
     read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$1")"
-    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+    [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
 
     local sout="" pc="" proto="" cipher=""
     sout="$(__jwweb_tls_fetch__ "$host" "$port" "$host")"
-    [ -z "$sout" ] && { echo "❌ nie udało się połączyć z $host:$port" >&2; return 1; }
+    [ -z "$sout" ] && { echo "❌ could not connect to $host:$port" >&2; return 1; }
     pc="$(printf '%s\n' "$sout" | __jwweb_protocipher__)"
     proto="$(printf '%s\n' "$pc" | grep '^PROTO ' | sed 's/^PROTO //')"
     cipher="$(printf '%s\n' "$pc" | grep '^CIPHER ' | sed 's/^CIPHER //')"
@@ -629,12 +629,12 @@ jwweb_tls() {
         if echo | openssl s_client -connect "$host:$port" -servername "$host" "$flag" 2>/dev/null \
             | grep -q 'BEGIN CERTIFICATE'; then
             if [ "$cls" = "old" ]; then
-                __jwweb_kv__ "$lbl" "⚠️ tak (przestarzałe)" 10
+                __jwweb_kv__ "$lbl" "⚠️ yes (deprecated)" 10
             else
-                __jwweb_kv__ "$lbl" "✅ tak" 10
+                __jwweb_kv__ "$lbl" "✅ yes" 10
             fi
         else
-            __jwweb_kv__ "$lbl" "✗ nie" 10
+            __jwweb_kv__ "$lbl" "✗ no" 10
         fi
     done
     echo
@@ -654,7 +654,7 @@ jwweb_dns() {
         echo "  jwweb_dns example.com"
         echo "  jwweb_dns https://example.com/path"
         echo
-        echo "Rozwiązanie DNS: CNAME / A / AAAA. CNAME tylko gdy dostępny dig."
+        echo "DNS resolution: CNAME / A / AAAA. CNAME only when dig is available."
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -666,7 +666,7 @@ jwweb_dns() {
             ;;
         *) host="$target" ;;
     esac
-    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+    [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
 
     local kw=10
     echo
@@ -686,7 +686,7 @@ jwweb_dns() {
             "AAAA "*) __jwweb_kv__ "AAAA" "${line#AAAA }" "$kw"; hasip=1 ;;
         esac
     done <<< "$dnsout"
-    [ "$hasip" -eq 0 ] && __jwweb_kv__ "Result" "❌ brak rekordów A/AAAA" "$kw"
+    [ "$hasip" -eq 0 ] && __jwweb_kv__ "Result" "❌ no A/AAAA records" "$kw"
     echo
     return 0
 }
@@ -699,16 +699,16 @@ jwweb_dns-prop() {
         echo "  jwweb_dns-prop example.com"
         echo "  jwweb_dns-prop example.com AAAA"
         echo
-        echo "Pyta o rekord (default A) z system/1.1.1.1/8.8.8.8/9.9.9.9 i wskazuje rozbieżność."
+        echo "Queries one record (default A) from system/1.1.1.1/8.8.8.8/9.9.9.9 and flags divergence."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v dig >/dev/null 2>&1; then
-        echo "❌ jwweb_dns-prop wymaga 'dig' (apt install dnsutils)" >&2; return 1
+        echo "❌ jwweb_dns-prop requires 'dig' (apt install dnsutils)" >&2; return 1
     fi
 
     local scheme="" host="" port="" pth=""
     read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$1")"
-    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+    [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
     local rtype="${2:-A}"
 
     echo
@@ -721,15 +721,15 @@ jwweb_dns-prop() {
         else
             out="$(dig +short "@$r" "$rtype" "$host" 2>/dev/null | grep -vE '^;' | sort | paste -sd, - | sed 's/,/, /g')"
         fi
-        [ -z "$out" ] && out="(brak)"
+        [ -z "$out" ] && out="(none)"
         __jwweb_kv__ "$r" "$out" "$kw"
         if [ "$idx" -eq 0 ]; then first="$out"; elif [ "$out" != "$first" ]; then mism=1; fi
         idx=$((idx + 1))
     done
     if [ "$mism" -eq 1 ]; then
-        __jwweb_kv__ "Consensus" "❌ rozbieżność między resolverami" "$kw"
+        __jwweb_kv__ "Consensus" "❌ resolvers disagree" "$kw"
     else
-        __jwweb_kv__ "Consensus" "✅ wszystkie resolvery zgodne" "$kw"
+        __jwweb_kv__ "Consensus" "✅ all resolvers agree" "$kw"
     fi
     echo
     return 0
@@ -743,13 +743,13 @@ jwweb_domain() {
         echo "  jwweb_domain example.com"
         echo "  jwweb_domain https://example.com/path"
         echo
-        echo "Rejestracja domeny: RDAP-first (JSON, rdap.org) z fallbackiem na whois."
+        echo "Domain registration: RDAP-first (JSON, rdap.org) with a whois fallback."
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local scheme="" domain="" port="" pth=""
     read -r scheme domain port pth <<< "$(__jwweb_parse_url__ "$1")"
-    [ -z "$domain" ] && { echo "❌ brak domeny" >&2; return 1; }
+    [ -z "$domain" ] && { echo "❌ no domain" >&2; return 1; }
 
     local src="" registrar="" created="" expires="" updated="" dstat="" ns="" dnssec=""
 
@@ -796,7 +796,7 @@ jwweb_domain() {
         fi
     fi
 
-    [ -z "$src" ] && { echo "❌ brak danych RDAP/whois dla $domain" >&2; return 1; }
+    [ -z "$src" ] && { echo "❌ no RDAP/whois data for $domain" >&2; return 1; }
 
     # days-to-expiry marker
     local mark="" ee="" nn="" days=""
@@ -805,7 +805,7 @@ jwweb_domain() {
         nn="$(date +%s)"
         if [ -n "$ee" ]; then
             days=$(( (ee - nn) / 86400 ))
-            if   [ "$days" -lt 0 ];  then mark="❌ WYGASŁA (${days} d)"
+            if   [ "$days" -lt 0 ];  then mark="❌ EXPIRED (${days} d)"
             elif [ "$days" -le 7 ];  then mark="❌ $days d"
             elif [ "$days" -le 30 ]; then mark="⚠️ $days d"
             else                          mark="✅ $days d"
@@ -816,7 +816,7 @@ jwweb_domain() {
     # dnssec normalize (unsigned checked first: "unsigned" contains "igned")
     local dnsm=""
     case "$dnssec" in
-        false|*nsigned*) dnsm="— niepodpisany" ;;
+        false|*nsigned*) dnsm="— unsigned" ;;
         true|*igned*)    dnsm="✅ signed" ;;
         "")              dnsm="—" ;;
         *)               dnsm="$dnssec" ;;
@@ -839,7 +839,7 @@ jwweb_domain() {
 
 
 # ---------------------------------------------------------------------------------
-# łączność / osiągalność
+# connectivity / reachability
 # ---------------------------------------------------------------------------------
 
 # 🟢 TCP port reachability — one or more ports on a host (nc → bash /dev/tcp).
@@ -849,16 +849,16 @@ jwweb_port() {
         echo "Examples:"
         echo "  jwweb_port example.com 443"
         echo "  jwweb_port example.com 80 443 8080"
-        echo "  jwweb_port https://example.com         # port z URL-a (443)"
+        echo "  jwweb_port https://example.com         # port from the URL (443)"
         echo
-        echo "Sprawdza otwartość portów TCP. Bez podanego portu bierze go z URL-a/443."
+        echo "Checks TCP port reachability. With no port given, it is taken from the URL/443."
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local target="$1"; shift
     local scheme="" host="" defport="" pth=""
     read -r scheme host defport pth <<< "$(__jwweb_parse_url__ "$target")"
-    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+    [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
 
     local ports=()
     if [ $# -gt 0 ]; then ports=("$@"); else ports=("$defport"); fi
@@ -870,7 +870,7 @@ jwweb_port() {
         __jwweb_tcp_probe__ "$host" "$p"; rc=$?
         case "$rc" in
             0) __jwweb_kv__ "$p" "✅ open"               8 ;;
-            2) __jwweb_kv__ "$p" "⚠️ pominięto (brak nc)" 8 ;;
+            2) __jwweb_kv__ "$p" "⚠️ skipped (no nc)" 8 ;;
             *) __jwweb_kv__ "$p" "❌ closed/filtered"    8 ;;
         esac
     done
@@ -880,11 +880,11 @@ jwweb_port() {
 
 
 # ---------------------------------------------------------------------------------
-# diagnostyka zbiorcza
+# aggregate diagnostics
 # ---------------------------------------------------------------------------------
 
 # 🟢 One-shot endpoint health report: DNS → TCP → TLS → HTTP → timing → sec headers.
-# Hard-aborts only on DNS failure; a missing tool marks its stage "⚠️ pominięto".
+# Hard-aborts only on DNS failure; a missing tool marks its stage "⚠️ skipped".
 jwweb_diag() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwweb_diag <url> [--port N]"
@@ -893,11 +893,11 @@ jwweb_diag() {
         echo "  jwweb_diag https://api.example.com/v1"
         echo "  jwweb_diag example.com --port 8443"
         echo
-        echo "Raport health endpointu: DNS → TCP → TLS → HTTP → timing → security headers."
+        echo "Endpoint health report: DNS → TCP → TLS → HTTP → timing → security headers."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v curl >/dev/null 2>&1; then
-        echo "❌ curl nie jest dostępny" >&2; return 1
+        echo "❌ curl not available" >&2; return 1
     fi
 
     local url="" portovr=""
@@ -905,11 +905,11 @@ jwweb_diag() {
         case "$1" in
             --port)    portovr="$2"; shift 2 ;;
             -h|--help) shift ;;
-            -*)        echo "⚠️ nieznana opcja: $1" >&2; shift ;;
+            -*)        echo "⚠️ unknown option: $1" >&2; shift ;;
             *)         [ -z "$url" ] && url="$1"; shift ;;
         esac
     done
-    [ -z "$url" ] && { echo "❌ brak URL" >&2; return 1; }
+    [ -z "$url" ] && { echo "❌ no URL" >&2; return 1; }
     case "$url" in http://*|https://*) ;; *) url="https://$url" ;; esac
 
     local scheme="" host="" port="" pth=""
@@ -937,7 +937,7 @@ jwweb_diag() {
         esac
     done <<< "$dnsout"
     if [ "$hasip" -eq 0 ]; then
-        __jwweb_kv__ "Result" "❌ brak rekordów A/AAAA — przerywam" "$kw"
+        __jwweb_kv__ "Result" "❌ no A/AAAA records — aborting" "$kw"
         echo
         echo "---[ Verdict ]---"
         echo "❌ DNS"
@@ -953,7 +953,7 @@ jwweb_diag() {
     __jwweb_tcp_probe__ "$host" "$port"; tcprc=$?
     case "$tcprc" in
         0) __jwweb_kv__ "Reachable" "✅ open"               "$kw"; v_tcp="✅" ;;
-        2) __jwweb_kv__ "Reachable" "⚠️ pominięto (brak nc)" "$kw"; v_tcp="⚠️" ;;
+        2) __jwweb_kv__ "Reachable" "⚠️ skipped (no nc)" "$kw"; v_tcp="⚠️" ;;
         *) __jwweb_kv__ "Reachable" "❌ closed/filtered"    "$kw"; v_tcp="❌" ;;
     esac
 
@@ -977,7 +977,7 @@ jwweb_diag() {
                 nn="$(date +%s)"
                 if [ -n "$ee" ]; then
                     days=$(( (ee - nn) / 86400 ))
-                    if   [ "$days" -lt 0 ];  then __jwweb_kv__ "Days left" "❌ WYGASŁ" "$kw"
+                    if   [ "$days" -lt 0 ];  then __jwweb_kv__ "Days left" "❌ EXPIRED" "$kw"
                     elif [ "$days" -le 7 ];  then __jwweb_kv__ "Days left" "❌ $days"  "$kw"
                     elif [ "$days" -le 30 ]; then __jwweb_kv__ "Days left" "⚠️ $days"  "$kw"
                     else                          __jwweb_kv__ "Days left" "✅ $days"  "$kw"
@@ -985,10 +985,10 @@ jwweb_diag() {
                 fi
                 v_tls="✅"
             else
-                __jwweb_kv__ "Result" "❌ handshake nieudany" "$kw"; v_tls="❌"
+                __jwweb_kv__ "Result" "❌ handshake failed" "$kw"; v_tls="❌"
             fi
         else
-            __jwweb_kv__ "Result" "⚠️ pominięto (brak openssl)" "$kw"; v_tls="⚠️"
+            __jwweb_kv__ "Result" "⚠️ skipped (no openssl)" "$kw"; v_tls="⚠️"
         fi
     fi
 
@@ -1008,7 +1008,7 @@ jwweb_diag() {
     case "$code" in
         2*)      hmark="✅ $code"; v_http="✅" ;;
         3*)      hmark="↪ $code";  v_http="✅" ;;
-        000|"")  hmark="❌ brak odpowiedzi"; v_http="❌" ;;
+        000|"")  hmark="❌ no response"; v_http="❌" ;;
         4*|5*)   hmark="❌ $code"; v_http="❌" ;;
         *)       hmark="$code";    v_http="⚠️" ;;
     esac

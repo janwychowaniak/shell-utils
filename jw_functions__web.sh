@@ -8,10 +8,9 @@
 # Blast-radius marker = effect on the remote ENDPOINT, not local state; HTTP
 # GET/HEAD are 🟢 because they are idempotent reads. Built incrementally.
 # Planned next (all 🟢):
-#   HTTP   : jwweb_status              (head/get folded: headers covers HEAD, raw curl covers GET)
-#   TLS    : jwweb_cert-chain          (cert-file → a --file flag on jwweb_cert)
-#   DNS    : jwweb_dns-trace jwweb_dns-reverse
-#   net    : jwweb_trace               (ping = too thin to wrap)
+#   HTTP   : jwweb_status              (one-line "is it 200?")
+#   net    : jwweb_trace               (mtr → traceroute path; ping folded as too thin)
+#   TLS    : jwweb_cert --file         (inspect a local .pem/.crt; folds jwweb_cert-file)
 # jwweb_domain (registration) is RDAP-first with a whois fallback — supersedes
 # the old "jwweb_whois" idea (RDAP returns parseable JSON; WHOIS is the fallback).
 
@@ -35,13 +34,16 @@ jwweb_toc() {
     echo
     echo " -----------------------------  TLS / certificates"
     __jwweb_toc_row__ 🟢 jwweb_cert        "subject/SAN/issuer/validity"
+    __jwweb_toc_row__ 🟢 jwweb_cert-chain  "chain + trust verify"
     __jwweb_toc_row__ 🟢 jwweb_cert-expiry "days-to-expiry + thresholds"
     __jwweb_toc_row__ 🟢 jwweb_tls         "proto/cipher + version probe"
     echo
     echo " -----------------------------  DNS"
-    __jwweb_toc_row__ 🟢 jwweb_dns      "CNAME/A/AAAA resolve"
-    __jwweb_toc_row__ 🟢 jwweb_dns-prop "one record, many resolvers"
-    __jwweb_toc_row__ 🟢 jwweb_domain   "RDAP-first + whois-fallback"
+    __jwweb_toc_row__ 🟢 jwweb_dns         "CNAME/A/AAAA resolve"
+    __jwweb_toc_row__ 🟢 jwweb_dns-trace   "all record types (dig)"
+    __jwweb_toc_row__ 🟢 jwweb_dns-reverse "PTR / reverse lookup"
+    __jwweb_toc_row__ 🟢 jwweb_dns-prop    "one record, many resolvers"
+    __jwweb_toc_row__ 🟢 jwweb_domain      "RDAP-first + whois-fallback"
     echo
     echo " -----------------------------  connectivity / reachability"
     __jwweb_toc_row__ 🟢 jwweb_port "TCP reachability, 1+ ports"
@@ -511,6 +513,68 @@ jwweb_cert() {
     return 0
 }
 
+# 🟢 Full certificate chain (subject/issuer per level) + openssl trust verdict.
+jwweb_cert-chain() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_cert-chain <host[:port]|url>"
+        echo "Examples:"
+        echo "  jwweb_cert-chain example.com"
+        echo "  jwweb_cert-chain example.com:8443"
+        echo
+        echo "Full certificate chain (subject/issuer per level) + openssl trust verdict."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v openssl >/dev/null 2>&1; then
+        echo "❌ openssl not available" >&2; return 1
+    fi
+
+    local scheme="" host="" port="" pth=""
+    read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$1")"
+    [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
+
+    local sout=""
+    sout="$(__jwweb_tls_fetch__ "$host" "$port" "$host")"
+    [ -z "$sout" ] && { echo "❌ could not connect to $host:$port" >&2; return 1; }
+    if ! printf '%s\n' "$sout" | grep -q 'Certificate chain'; then
+        echo "❌ no certificate chain from $host:$port" >&2; return 1
+    fi
+
+    local vrc="" vmark="" ncerts=""
+    vrc="$(printf '%s\n' "$sout" | grep 'Verify return code:' | head -1 | sed -E 's/.*Verify return code: //')"
+    case "$vrc" in
+        "0 "*|"0") vmark="✅ $vrc" ;;
+        "")        vmark="?" ;;
+        *)         vmark="❌ $vrc" ;;
+    esac
+    ncerts="$(printf '%s\n' "$sout" | grep -cE '^[[:space:]]*[0-9]+ s:')"
+
+    local kw=16
+    echo
+    echo "---[ TLS chain: $host:$port ]---"
+    __jwweb_kv__ "Verify" "$vmark"          "$kw"
+    __jwweb_kv__ "Depth"  "$ncerts cert(s)" "$kw"
+    echo
+
+    local line="" idx="" subcn="" isscn=""
+    while IFS= read -r line; do
+        case "$line" in
+            *' s:'*)
+                idx="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*([0-9]+)[[:space:]]+s:.*/\1/')"
+                subcn="$(printf '%s\n' "$line" | grep -oE 'CN ?= ?[^,/]+' | head -1 | sed -E 's/CN ?= ?//')"
+                [ -z "$subcn" ] && subcn="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+s://')"
+                __jwweb_kv__ "[$idx] subject" "$subcn" "$kw"
+                ;;
+            *)
+                isscn="$(printf '%s\n' "$line" | grep -oE 'CN ?= ?[^,/]+' | head -1 | sed -E 's/CN ?= ?//')"
+                [ -z "$isscn" ] && isscn="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*i://')"
+                __jwweb_kv__ "    issuer" "$isscn" "$kw"
+                ;;
+        esac
+    done <<< "$(printf '%s\n' "$sout" | grep -E '^[[:space:]]*[0-9]+ s:|^[[:space:]]*i:')"
+    echo
+    return 0
+}
+
 # 🟢 Days until a TLS certificate expires, with --warn/--crit thresholds.
 # Default exit: 0 success / 1 usage|error. With --exit-code (opt-in, nagios-style):
 # 0 ok / 1 warn / 2 crit|expired / 3 error.
@@ -687,6 +751,98 @@ jwweb_dns() {
         esac
     done <<< "$dnsout"
     [ "$hasip" -eq 0 ] && __jwweb_kv__ "Result" "❌ no A/AAAA records" "$kw"
+    echo
+    return 0
+}
+
+# 🟢 Full DNS record dump — A / AAAA / CNAME / MX / NS / TXT / SOA / CAA (dig).
+jwweb_dns-trace() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_dns-trace <host|url>"
+        echo "Examples:"
+        echo "  jwweb_dns-trace example.com"
+        echo "  jwweb_dns-trace https://example.com/path"
+        echo
+        echo "Dumps A / AAAA / CNAME / MX / NS / TXT / SOA / CAA records (requires dig)."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v dig >/dev/null 2>&1; then
+        echo "❌ jwweb_dns-trace requires 'dig' (apt install dnsutils)" >&2; return 1
+    fi
+
+    local target="$1" host=""
+    case "$target" in
+        http://*|https://*|*/*|*:*)
+            local scheme="" port="" pth=""
+            read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$target")"
+            ;;
+        *) host="$target" ;;
+    esac
+    [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
+
+    echo
+    echo "---[ DNS records: $host ]---"
+    local kw=8 t="" recs="" r="" firstrec=1
+    for t in A AAAA CNAME MX NS TXT SOA CAA; do
+        recs="$(dig +short "$t" "$host" 2>/dev/null)"
+        firstrec=1
+        if [ -z "$recs" ]; then
+            __jwweb_kv__ "$t" "(none)" "$kw"
+            continue
+        fi
+        while IFS= read -r r; do
+            [ -z "$r" ] && continue
+            if [ "$firstrec" -eq 1 ]; then
+                __jwweb_kv__ "$t" "$r" "$kw"; firstrec=0
+            else
+                __jwweb_kv__ "" "$r" "$kw"
+            fi
+        done <<< "$recs"
+    done
+    echo
+    return 0
+}
+
+# 🟢 Reverse DNS (PTR) for an IP, or for the IPs a host resolves to.
+jwweb_dns-reverse() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_dns-reverse <ip|host>"
+        echo "Examples:"
+        echo "  jwweb_dns-reverse 1.1.1.1"
+        echo "  jwweb_dns-reverse example.com      # PTR of each resolved IP"
+        echo
+        echo "PTR lookup. A host argument is resolved first, then each IP is reversed."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v dig >/dev/null 2>&1; then
+        echo "❌ jwweb_dns-reverse requires 'dig' (apt install dnsutils)" >&2; return 1
+    fi
+
+    local arg="$1" dnsout="" line=""
+    local ips=()
+    case "$arg" in
+        *:*:*)                        ips+=("$arg") ;;                # IPv6 literal
+        [0-9]*.[0-9]*.[0-9]*.[0-9]*)  ips+=("$arg") ;;                # IPv4 literal
+        *)
+            dnsout="$(__jwweb_resolve__ "$arg")"
+            while IFS= read -r line; do
+                case "$line" in
+                    "A "*)    ips+=("${line#A }") ;;
+                    "AAAA "*) ips+=("${line#AAAA }") ;;
+                esac
+            done <<< "$dnsout"
+            ;;
+    esac
+    [ "${#ips[@]}" -eq 0 ] && { echo "❌ could not resolve $arg to an IP" >&2; return 1; }
+
+    echo
+    echo "---[ Reverse DNS: $arg ]---"
+    local ip="" ptr=""
+    for ip in "${ips[@]}"; do
+        ptr="$(dig +short -x "$ip" 2>/dev/null | sed 's/\.$//' | paste -sd, - | sed 's/,/, /g')"
+        [ -z "$ptr" ] && ptr="(none)"
+        printf '  %s  →  %s\n' "$ip" "$ptr"
+    done
     echo
     return 0
 }

@@ -109,6 +109,18 @@ else
     curl -sS -o /dev/null "http://127.0.0.1:$PORT/" 2>/dev/null && break
     sleep 0.3
   done
+  # throwaway self-signed cert for the jwweb_cert --file path
+  # (fallback: a real non-cert file that exercises the parse-fail branch instead)
+  GENCERT=""
+  CERTFILE=/etc/hostname
+  if command -v openssl >/dev/null 2>&1; then
+    GENCERT="$(mktemp 2>/dev/null)"
+    if [ -n "$GENCERT" ] && openssl req -x509 -newkey rsa:2048 -keyout /dev/null \
+         -out "$GENCERT" -days 1 -nodes -subj '/CN=smoke.local' >/dev/null 2>&1; then
+      CERTFILE="$GENCERT"
+    fi
+  fi
+  trap 'kill "$SRV" >/dev/null 2>&1; [ -n "$GENCERT" ] && rm -f "$GENCERT"' EXIT
 
   B=(
     "jwweb_headers http://127.0.0.1:$PORT/"
@@ -122,6 +134,9 @@ else
     "jwweb_redirects http://127.0.0.1:$PORT/"   # 200, no redirects (0-hop path)
     "jwweb_json http://127.0.0.1:$PORT/"        # HTML body -> invalid-JSON path
     "jwweb_cert 127.0.0.1:$PORT"                # plaintext -> cert-fetch fail path
+    "jwweb_cert --file $CERTFILE"               # generated self-signed cert (valid --file path)
+    "jwweb_cert --file /etc/hostname"           # exists but not a cert -> parse-fail path
+    "jwweb_cert --file /nonexistent.pem"        # missing file -> cannot-read path
     "jwweb_cert-chain 127.0.0.1:$PORT"          # plaintext -> no-chain fail path
     "jwweb_tls 127.0.0.1:$PORT"                 # plaintext -> handshake fail path
     "jwweb_dns-trace localhost"                 # all record types (likely (none))
@@ -129,7 +144,7 @@ else
     "jwweb_dns-reverse localhost"               # host -> resolve -> reverse each IP
     "jwweb_dns localhost"                       # /etc/hosts name (dig may return nothing)
     "jwweb_dns 127.0.0.1"
-    "jwweb_dns-prop localhost"                  # resolver fan-out (likely (brak) everywhere)
+    "jwweb_dns-prop localhost"                  # resolver fan-out (likely (none) everywhere)
     "jwweb_dns-prop 127.0.0.1 PTR"
     "jwweb_port 127.0.0.1 $PORT 1"              # one open, one closed
     "jwweb_port http://127.0.0.1:$PORT/"        # port taken from the URL
@@ -145,6 +160,20 @@ else
     done
     [ "$n" -eq 0 ] && echo "  ✅ $sh: all clean"
   done
+
+  # bash↔zsh parity on the deterministic --file path (same cert file, same path
+  # string) — guards the zsh-reserved-name class (e.g. a `path` local ties to $PATH).
+  if [ "${#SHELLS[@]}" -ge 2 ]; then
+    cb=$( timeout 15 bash -c "source '$LIB'; jwweb_cert --file '$CERTFILE'" </dev/null 2>/dev/null )
+    cz=$( timeout 15 zsh  -c "source '$LIB'; jwweb_cert --file '$CERTFILE'" </dev/null 2>/dev/null )
+    if [ "$cb" = "$cz" ]; then
+      echo "  ✅ jwweb_cert --file: identical in bash and zsh"
+    else
+      echo "  ❌ jwweb_cert --file differs (bash vs zsh):"
+      diff <(printf '%s\n' "$cb") <(printf '%s\n' "$cz") | grep -E '^[<>]' | head -4 | sed 's/^/      /'
+      FAILED=$((FAILED + 1))
+    fi
+  fi
 fi
 
 echo

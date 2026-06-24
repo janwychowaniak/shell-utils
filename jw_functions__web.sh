@@ -33,7 +33,7 @@ jwweb_toc() {
     __jwweb_toc_row__ 🟢 jwweb_json      "GET + jq validate/pretty"
     echo
     echo " -----------------------------  TLS / certificates"
-    __jwweb_toc_row__ 🟢 jwweb_cert        "subject/SAN/issuer/validity"
+    __jwweb_toc_row__ 🟢 jwweb_cert        "all fields; host or file"
     __jwweb_toc_row__ 🟢 jwweb_cert-chain  "chain + trust verify"
     __jwweb_toc_row__ 🟢 jwweb_cert-expiry "days-to-expiry + thresholds"
     __jwweb_toc_row__ 🟢 jwweb_tls         "proto/cipher + version probe"
@@ -440,52 +440,68 @@ jwweb_json() {
 # TLS / certificates
 # ---------------------------------------------------------------------------------
 
-# 🟢 Full certificate inspection — subject / SAN / issuer / validity / serial.
+# 🟢 Full certificate inspection — a live host, or a local PEM/DER file (--file).
 jwweb_cert() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwweb_cert <host[:port]|url>"
+        echo "       jwweb_cert --file <path>"
         echo "Examples:"
         echo "  jwweb_cert example.com"
         echo "  jwweb_cert example.com:8443"
         echo "  jwweb_cert https://example.com/foo"
+        echo "  jwweb_cert --file /etc/ssl/certs/mycert.pem"
         echo
         echo "Full TLS certificate inspection (subject/SAN/issuer/validity/serial/proto)."
+        echo "--file inspects a local PEM/DER certificate instead of a live handshake."
         [ $# -eq 0 ] && return 1 || return 0
     fi
     if ! command -v openssl >/dev/null 2>&1; then
         echo "❌ openssl not available" >&2; return 1
     fi
 
-    local scheme="" host="" port="" pth=""
-    read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$1")"
-    [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
+    local x509="" san="" header="" islocal=0 proto="" cipher=""
 
-    local sout=""
-    sout="$(__jwweb_tls_fetch__ "$host" "$port" "$host")"
-    [ -z "$sout" ] && { echo "❌ could not connect to $host:$port" >&2; return 1; }
+    if [ "$1" = "--file" ]; then
+        local cfile="$2" form=""   # NOT `path` — zsh ties `path` to $PATH (reserved)
+        [ -z "$cfile" ] && { echo "❌ --file requires a path" >&2; return 1; }
+        { [ -f "$cfile" ] && [ -r "$cfile" ]; } || { echo "❌ cannot read file: $cfile" >&2; return 1; }
+        local inopt=()
+        x509="$(openssl x509 -in "$cfile" -noout -subject -issuer -startdate -enddate -serial 2>/dev/null)"
+        if [ -z "$x509" ]; then
+            inopt=(-inform DER); form=" (DER)"
+            x509="$(openssl x509 "${inopt[@]}" -in "$cfile" -noout -subject -issuer -startdate -enddate -serial 2>/dev/null)"
+        fi
+        [ -z "$x509" ] && { echo "❌ not a valid certificate: $cfile" >&2; return 1; }
+        san="$(openssl x509 "${inopt[@]}" -in "$cfile" -noout -ext subjectAltName 2>/dev/null | grep -i 'DNS:\|IP Address:' | sed 's/^[[:space:]]*//')"
+        header="$cfile$form"
+        islocal=1
+    else
+        local scheme="" host="" port="" pth="" sout="" pc=""
+        read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$1")"
+        [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
+        sout="$(__jwweb_tls_fetch__ "$host" "$port" "$host")"
+        [ -z "$sout" ] && { echo "❌ could not connect to $host:$port" >&2; return 1; }
+        x509="$(printf '%s\n' "$sout" | openssl x509 -noout -subject -issuer -startdate -enddate -serial 2>/dev/null)"
+        [ -z "$x509" ] && { echo "❌ no certificate from $host:$port" >&2; return 1; }
+        san="$(printf '%s\n' "$sout" | openssl x509 -noout -ext subjectAltName 2>/dev/null | grep -i 'DNS:\|IP Address:' | sed 's/^[[:space:]]*//')"
+        pc="$(printf '%s\n' "$sout" | __jwweb_protocipher__)"
+        proto="$(printf '%s\n' "$pc" | grep '^PROTO ' | sed 's/^PROTO //')"
+        cipher="$(printf '%s\n' "$pc" | grep '^CIPHER ' | sed 's/^CIPHER //')"
+        header="$host:$port"
+    fi
 
-    local x509=""
-    x509="$(printf '%s\n' "$sout" | openssl x509 -noout -subject -issuer -startdate -enddate -serial 2>/dev/null)"
-    [ -z "$x509" ] && { echo "❌ no certificate from $host:$port" >&2; return 1; }
-
-    local subject="" issuer="" notbefore="" notafter="" serial="" san="" cn="" iss=""
+    local subject="" issuer="" notbefore="" notafter="" serial="" cn="" iss=""
     subject="$(printf '%s\n' "$x509" | grep '^subject=' | sed 's/^subject=//')"
     issuer="$(printf '%s\n' "$x509" | grep '^issuer=' | sed 's/^issuer=//')"
     notbefore="$(printf '%s\n' "$x509" | grep '^notBefore=' | sed 's/^notBefore=//')"
     notafter="$(printf '%s\n' "$x509" | grep '^notAfter=' | sed 's/^notAfter=//')"
     serial="$(printf '%s\n' "$x509" | grep '^serial=' | sed 's/^serial=//')"
-    san="$(printf '%s\n' "$sout" | openssl x509 -noout -ext subjectAltName 2>/dev/null | grep -i 'DNS:\|IP Address:' | sed 's/^[[:space:]]*//')"
     cn="$(printf '%s' "$subject" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
     iss="$(printf '%s' "$issuer" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
     [ -z "$cn" ]  && cn="$subject"
     [ -z "$iss" ] && iss="$issuer"
 
-    local pc="" proto="" cipher="" mark=""
-    pc="$(printf '%s\n' "$sout" | __jwweb_protocipher__)"
-    proto="$(printf '%s\n' "$pc" | grep '^PROTO ' | sed 's/^PROTO //')"
-    cipher="$(printf '%s\n' "$pc" | grep '^CIPHER ' | sed 's/^CIPHER //')"
-
-    local ee="" nn="" days=""
+    local ee="" nn="" days="" mark=""
     ee="$(date -d "$notafter" +%s 2>/dev/null)"
     nn="$(date +%s)"
     if [ -n "$ee" ]; then
@@ -499,8 +515,13 @@ jwweb_cert() {
 
     local kw=12
     echo
-    echo "---[ TLS certificate: $host:$port ]---"
-    __jwweb_kv__ "Host"       "$host:$port" "$kw"
+    if [ "$islocal" -eq 1 ]; then
+        echo "---[ TLS certificate (file) ]---"
+        __jwweb_kv__ "File"       "$header" "$kw"
+    else
+        echo "---[ TLS certificate: $header ]---"
+        __jwweb_kv__ "Host"       "$header" "$kw"
+    fi
     __jwweb_kv__ "Subject CN" "$cn"         "$kw"
     [ -n "$san" ]      && __jwweb_kv__ "SAN"        "$san"        "$kw"
     __jwweb_kv__ "Issuer CN"  "$iss"        "$kw"

@@ -8,9 +8,9 @@
 # Blast-radius marker = effect on the remote ENDPOINT, not local state; HTTP
 # GET/HEAD are 🟢 because they are idempotent reads. Built incrementally.
 # Planned next (all 🟢):
-#   HTTP   : jwweb_head jwweb_status jwweb_get jwweb_redirects jwweb_json
-#   TLS    : jwweb_cert jwweb_cert-chain jwweb_tls jwweb_cert-file
-#   DNS    : jwweb_dns-trace jwweb_dns-reverse jwweb_dns-prop jwweb_whois
+#   HTTP   : jwweb_head jwweb_status jwweb_get jwweb_json
+#   TLS    : jwweb_cert-chain jwweb_tls jwweb_cert-file
+#   DNS    : jwweb_dns-trace jwweb_dns-reverse jwweb_whois
 #   net    : jwweb_ping jwweb_trace
 
 jwweb_toc() {
@@ -20,13 +20,16 @@ jwweb_toc() {
     echo
     echo " -----------------------------  HTTP inspection / probing"
     echo " - 🟢 jwweb_headers"
+    echo " - 🟢 jwweb_redirects"
     echo " - 🟢 jwweb_timing"
     echo
     echo " -----------------------------  TLS / certyfikaty"
+    echo " - 🟢 jwweb_cert"
     echo " - 🟢 jwweb_cert-expiry"
     echo
     echo " -----------------------------  DNS"
     echo " - 🟢 jwweb_dns"
+    echo " - 🟢 jwweb_dns-prop"
     echo
     echo " -----------------------------  łączność / osiągalność"
     echo " - 🟢 jwweb_port"
@@ -99,27 +102,39 @@ __jwweb_resolve__() {
     while IFS= read -r ip; do [ -n "$ip" ] && echo "AAAA $ip"; done <<< "$aaaa"
 }
 
-# One TLS handshake to host:port (SNI=arg3|host). Echoes the openssl x509 fields
-# (notAfter= / subject= / issuer=) plus "PROTO <v>" and "CIPHER <c>". Returns 1
-# if unreachable / no certificate.
-__jwweb_cert_enddate__() {
+# One TLS handshake to host:port (SNI=arg3|host). Echoes the raw openssl
+# s_client output (empty if unreachable). The single capture point both the
+# cert helpers and jwweb_cert parse, so a host is hit only once per call.
+__jwweb_tls_fetch__() {
     local host="$1" port="${2:-443}" sni="${3:-$1}"
-    local sout="" x509=""
-    sout="$(echo | openssl s_client -servername "$sni" -connect "$host:$port" 2>/dev/null)"
-    [ -z "$sout" ] && return 1
-    x509="$(printf '%s\n' "$sout" | openssl x509 -noout -enddate -subject -issuer 2>/dev/null)"
-    [ -z "$x509" ] && return 1
-    printf '%s\n' "$x509"
-    # protocol + cipher: handle both the "Protocol  :"/"Cipher    :" SSL-Session
-    # block and the terse "New, TLSv1.3, Cipher is <c>" summary (depends on the
-    # openssl build / whether the full session block is emitted).
-    local proto="" cipher=""
+    echo | openssl s_client -servername "$sni" -connect "$host:$port" 2>/dev/null
+}
+
+# Read s_client output on stdin, echo "PROTO <v>" / "CIPHER <c>". Handles both
+# the "Protocol  :"/"Cipher    :" SSL-Session block and the terse
+# "New, TLSv1.3, Cipher is <c>" summary (depends on the openssl build).
+__jwweb_protocipher__() {
+    local sout="" proto="" cipher=""
+    sout="$(cat)"
     proto="$(printf '%s\n' "$sout" | grep -E 'Protocol[[:space:]]*:' | head -1 | sed 's/.*:[[:space:]]*//')"
     cipher="$(printf '%s\n' "$sout" | grep -E 'Cipher[[:space:]]*:' | head -1 | sed 's/.*:[[:space:]]*//')"
     [ -z "$proto" ]  && proto="$(printf '%s\n' "$sout" | grep -E '^New, ' | head -1 | awk -F', ' '{print $2}')"
     [ -z "$cipher" ] && cipher="$(printf '%s\n' "$sout" | grep -iE 'Cipher is ' | head -1 | sed 's/.*Cipher is //')"
     [ -n "$proto" ]  && echo "PROTO $proto"
     [ -n "$cipher" ] && echo "CIPHER $cipher"
+}
+
+# Echo the openssl x509 fields (notAfter= / subject= / issuer=) plus
+# "PROTO <v>" / "CIPHER <c>" for host:port. Returns 1 if unreachable / no cert.
+__jwweb_cert_enddate__() {
+    local host="$1" port="${2:-443}" sni="${3:-$1}"
+    local sout="" x509=""
+    sout="$(__jwweb_tls_fetch__ "$host" "$port" "$sni")"
+    [ -z "$sout" ] && return 1
+    x509="$(printf '%s\n' "$sout" | openssl x509 -noout -enddate -subject -issuer 2>/dev/null)"
+    [ -z "$x509" ] && return 1
+    printf '%s\n' "$x509"
+    printf '%s\n' "$sout" | __jwweb_protocipher__
 }
 
 # Extract one header's value (case-insensitive) from a header block on $1.
@@ -296,10 +311,133 @@ jwweb_timing() {
     return 0
 }
 
+# 🟢 Trace the HTTP redirect chain hop-by-hop, ending at the final URL/status.
+jwweb_redirects() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_redirects <url>"
+        echo "Examples:"
+        echo "  jwweb_redirects example.com"
+        echo "  jwweb_redirects http://github.com"
+        echo
+        echo "Łańcuch przekierowań 3xx hop po hopie + URL/status końcowy."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "❌ curl nie jest dostępny" >&2; return 1
+    fi
+
+    local url="$1"
+    case "$url" in http://*|https://*) ;; *) url="https://$url" ;; esac
+
+    local raw="" chain=""
+    raw="$(curl -sS -I -L "$url" 2>/dev/null | tr -d '\r')"
+    [ -z "$raw" ] && { echo "❌ brak odpowiedzi z $url" >&2; return 1; }
+    # per response block: "<code>\t<location-or-empty>"
+    chain="$(printf '%s\n' "$raw" | awk '
+        /^HTTP\// { if (seen) print code "\t" loc; code=$2; loc=""; seen=1 }
+        tolower($0) ~ /^location:/ { loc=$2 }
+        END { if (seen) print code "\t" loc }')"
+
+    echo
+    echo "---[ Redirect chain: $url ]---"
+    local code="" loc="" i=0 finalcode="" finalurl="$url" hmark=""
+    while IFS="$(printf '\t')" read -r code loc; do
+        [ -z "$code" ] && continue
+        if [ -n "$loc" ]; then
+            i=$((i + 1))
+            __jwweb_kv__ "Hop $i" "$code  →  $loc" 9
+            finalurl="$loc"
+        fi
+        finalcode="$code"
+    done <<< "$chain"
+    case "$finalcode" in
+        2*)     hmark="✅ $finalcode" ;;
+        3*)     hmark="↪ $finalcode" ;;
+        4*|5*)  hmark="❌ $finalcode" ;;
+        *)      hmark="${finalcode:-?}" ;;
+    esac
+    __jwweb_kv__ "Final" "$hmark  $finalurl  ($i redirects)" 9
+    echo
+    return 0
+}
+
 
 # ---------------------------------------------------------------------------------
 # TLS / certyfikaty
 # ---------------------------------------------------------------------------------
+
+# 🟢 Full certificate inspection — subject / SAN / issuer / validity / serial.
+jwweb_cert() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_cert <host[:port]|url>"
+        echo "Examples:"
+        echo "  jwweb_cert example.com"
+        echo "  jwweb_cert example.com:8443"
+        echo "  jwweb_cert https://example.com/foo"
+        echo
+        echo "Pełna inspekcja certyfikatu TLS (subject/SAN/issuer/ważność/serial/proto)."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v openssl >/dev/null 2>&1; then
+        echo "❌ openssl nie jest dostępny" >&2; return 1
+    fi
+
+    local scheme="" host="" port="" pth=""
+    read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$1")"
+    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+
+    local sout=""
+    sout="$(__jwweb_tls_fetch__ "$host" "$port" "$host")"
+    [ -z "$sout" ] && { echo "❌ nie udało się połączyć z $host:$port" >&2; return 1; }
+
+    local x509=""
+    x509="$(printf '%s\n' "$sout" | openssl x509 -noout -subject -issuer -startdate -enddate -serial 2>/dev/null)"
+    [ -z "$x509" ] && { echo "❌ brak certyfikatu z $host:$port" >&2; return 1; }
+
+    local subject="" issuer="" notbefore="" notafter="" serial="" san="" cn="" iss=""
+    subject="$(printf '%s\n' "$x509" | grep '^subject=' | sed 's/^subject=//')"
+    issuer="$(printf '%s\n' "$x509" | grep '^issuer=' | sed 's/^issuer=//')"
+    notbefore="$(printf '%s\n' "$x509" | grep '^notBefore=' | sed 's/^notBefore=//')"
+    notafter="$(printf '%s\n' "$x509" | grep '^notAfter=' | sed 's/^notAfter=//')"
+    serial="$(printf '%s\n' "$x509" | grep '^serial=' | sed 's/^serial=//')"
+    san="$(printf '%s\n' "$sout" | openssl x509 -noout -ext subjectAltName 2>/dev/null | grep -i 'DNS:\|IP Address:' | sed 's/^[[:space:]]*//')"
+    cn="$(printf '%s' "$subject" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
+    iss="$(printf '%s' "$issuer" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
+    [ -z "$cn" ]  && cn="$subject"
+    [ -z "$iss" ] && iss="$issuer"
+
+    local pc="" proto="" cipher="" mark=""
+    pc="$(printf '%s\n' "$sout" | __jwweb_protocipher__)"
+    proto="$(printf '%s\n' "$pc" | grep '^PROTO ' | sed 's/^PROTO //')"
+    cipher="$(printf '%s\n' "$pc" | grep '^CIPHER ' | sed 's/^CIPHER //')"
+
+    local ee="" nn="" days=""
+    ee="$(date -d "$notafter" +%s 2>/dev/null)"
+    nn="$(date +%s)"
+    if [ -n "$ee" ]; then
+        days=$(( (ee - nn) / 86400 ))
+        if   [ "$days" -lt 0 ];  then mark="❌ WYGASŁ (${days} d)"
+        elif [ "$days" -le 7 ];  then mark="❌ $days"
+        elif [ "$days" -le 30 ]; then mark="⚠️ $days"
+        else                          mark="✅ $days"
+        fi
+    fi
+
+    local kw=12
+    echo
+    echo "---[ TLS certificate: $host:$port ]---"
+    __jwweb_kv__ "Host"       "$host:$port" "$kw"
+    __jwweb_kv__ "Subject CN" "$cn"         "$kw"
+    [ -n "$san" ]      && __jwweb_kv__ "SAN"        "$san"        "$kw"
+    __jwweb_kv__ "Issuer CN"  "$iss"        "$kw"
+    [ -n "$serial" ]   && __jwweb_kv__ "Serial"     "$serial"     "$kw"
+    __jwweb_kv__ "Valid from" "$notbefore"  "$kw"
+    __jwweb_kv__ "Valid to"   "$notafter"   "$kw"
+    [ -n "$mark" ]     && __jwweb_kv__ "Days left"  "$mark"       "$kw"
+    [ -n "$proto" ]    && __jwweb_kv__ "Protocol"   "$proto${cipher:+ / $cipher}" "$kw"
+    echo
+    return 0
+}
 
 # 🟢 Days until a TLS certificate expires, with --warn/--crit thresholds.
 # Default exit: 0 success / 1 usage|błąd. With --exit-code (opt-in, nagios-style):
@@ -424,6 +562,50 @@ jwweb_dns() {
         esac
     done <<< "$dnsout"
     [ "$hasip" -eq 0 ] && __jwweb_kv__ "Result" "❌ brak rekordów A/AAAA" "$kw"
+    echo
+    return 0
+}
+
+# 🟢 DNS propagation — query one record from several resolvers, flag divergence.
+jwweb_dns-prop() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_dns-prop <host|url> [type]"
+        echo "Examples:"
+        echo "  jwweb_dns-prop example.com"
+        echo "  jwweb_dns-prop example.com AAAA"
+        echo
+        echo "Pyta o rekord (default A) z system/1.1.1.1/8.8.8.8/9.9.9.9 i wskazuje rozbieżność."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v dig >/dev/null 2>&1; then
+        echo "❌ jwweb_dns-prop wymaga 'dig' (apt install dnsutils)" >&2; return 1
+    fi
+
+    local scheme="" host="" port="" pth=""
+    read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$1")"
+    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+    local rtype="${2:-A}"
+
+    echo
+    echo "---[ DNS propagation: $host ($rtype) ]---"
+    local kw=10
+    local r="" out="" first="" idx=0 mism=0
+    for r in system 1.1.1.1 8.8.8.8 9.9.9.9; do
+        if [ "$r" = "system" ]; then
+            out="$(dig +short "$rtype" "$host" 2>/dev/null | grep -vE '^;' | sort | paste -sd, - | sed 's/,/, /g')"
+        else
+            out="$(dig +short "@$r" "$rtype" "$host" 2>/dev/null | grep -vE '^;' | sort | paste -sd, - | sed 's/,/, /g')"
+        fi
+        [ -z "$out" ] && out="(brak)"
+        __jwweb_kv__ "$r" "$out" "$kw"
+        if [ "$idx" -eq 0 ]; then first="$out"; elif [ "$out" != "$first" ]; then mism=1; fi
+        idx=$((idx + 1))
+    done
+    if [ "$mism" -eq 1 ]; then
+        __jwweb_kv__ "Consensus" "❌ rozbieżność między resolverami" "$kw"
+    else
+        __jwweb_kv__ "Consensus" "✅ wszystkie resolvery zgodne" "$kw"
+    fi
     echo
     return 0
 }

@@ -15,32 +15,39 @@
 # jwweb_domain (registration) is RDAP-first with a whois fallback — supersedes
 # the old "jwweb_whois" idea (RDAP returns parseable JSON; WHOIS is the fallback).
 
+# One TOC row: blast-radius marker, padded function name, one-line "soul" tagline.
+# printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
+# every row, so the tagline column aligns regardless of emoji width.
+__jwweb_toc_row__() {
+    printf " - %s %-19s%s\n" "$1" "$2" "$3"
+}
+
 jwweb_toc() {
     echo
     echo "   blast radius:  🟢 tylko odczyt   🔵 tworzy   ⚪ zmiana stanu / transfer   🔴 kasuje (destructive)"
     echo "   (marker = skutek po stronie ENDPOINTU, nie lokalny; HTTP GET/HEAD = 🟢 idempotentne)"
     echo
     echo " -----------------------------  HTTP inspection / probing"
-    echo " - 🟢 jwweb_headers"
-    echo " - 🟢 jwweb_redirects"
-    echo " - 🟢 jwweb_timing"
-    echo " - 🟢 jwweb_json"
+    __jwweb_toc_row__ 🟢 jwweb_headers   "headers + security audit"
+    __jwweb_toc_row__ 🟢 jwweb_redirects "3xx chain, hop-by-hop"
+    __jwweb_toc_row__ 🟢 jwweb_timing    "DNS/connect/TLS/TTFB split"
+    __jwweb_toc_row__ 🟢 jwweb_json      "GET + jq validate/pretty"
     echo
     echo " -----------------------------  TLS / certyfikaty"
-    echo " - 🟢 jwweb_cert"
-    echo " - 🟢 jwweb_cert-expiry"
-    echo " - 🟢 jwweb_tls"
+    __jwweb_toc_row__ 🟢 jwweb_cert        "subject/SAN/issuer/validity"
+    __jwweb_toc_row__ 🟢 jwweb_cert-expiry "days-to-expiry + thresholds"
+    __jwweb_toc_row__ 🟢 jwweb_tls         "proto/cipher + version probe"
     echo
     echo " -----------------------------  DNS"
-    echo " - 🟢 jwweb_dns"
-    echo " - 🟢 jwweb_dns-prop"
-    echo " - 🟢 jwweb_domain"
+    __jwweb_toc_row__ 🟢 jwweb_dns      "CNAME/A/AAAA resolve"
+    __jwweb_toc_row__ 🟢 jwweb_dns-prop "one record, many resolvers"
+    __jwweb_toc_row__ 🟢 jwweb_domain   "RDAP-first + whois-fallback"
     echo
     echo " -----------------------------  łączność / osiągalność"
-    echo " - 🟢 jwweb_port"
+    __jwweb_toc_row__ 🟢 jwweb_port "TCP reachability, 1+ ports"
     echo
     echo " -----------------------------  diagnostyka zbiorcza"
-    echo " - 🟢 jwweb_diag"
+    __jwweb_toc_row__ 🟢 jwweb_diag "DNS→TCP→TLS→HTTP→headers"
     echo
 }
 

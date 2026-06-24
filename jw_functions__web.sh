@@ -8,10 +8,12 @@
 # Blast-radius marker = effect on the remote ENDPOINT, not local state; HTTP
 # GET/HEAD are 🟢 because they are idempotent reads. Built incrementally.
 # Planned next (all 🟢):
-#   HTTP   : jwweb_head jwweb_status jwweb_get jwweb_json
-#   TLS    : jwweb_cert-chain jwweb_tls jwweb_cert-file
-#   DNS    : jwweb_dns-trace jwweb_dns-reverse jwweb_whois
-#   net    : jwweb_ping jwweb_trace
+#   HTTP   : jwweb_status              (head/get folded: headers covers HEAD, raw curl covers GET)
+#   TLS    : jwweb_cert-chain          (cert-file → a --file flag on jwweb_cert)
+#   DNS    : jwweb_dns-trace jwweb_dns-reverse
+#   net    : jwweb_trace               (ping = zbyt cienki, by go opakowywać)
+# jwweb_domain (registration) is RDAP-first with a whois fallback — supersedes
+# the old "jwweb_whois" idea (RDAP returns parseable JSON; WHOIS is the fallback).
 
 jwweb_toc() {
     echo
@@ -22,14 +24,17 @@ jwweb_toc() {
     echo " - 🟢 jwweb_headers"
     echo " - 🟢 jwweb_redirects"
     echo " - 🟢 jwweb_timing"
+    echo " - 🟢 jwweb_json"
     echo
     echo " -----------------------------  TLS / certyfikaty"
     echo " - 🟢 jwweb_cert"
     echo " - 🟢 jwweb_cert-expiry"
+    echo " - 🟢 jwweb_tls"
     echo
     echo " -----------------------------  DNS"
     echo " - 🟢 jwweb_dns"
     echo " - 🟢 jwweb_dns-prop"
+    echo " - 🟢 jwweb_domain"
     echo
     echo " -----------------------------  łączność / osiągalność"
     echo " - 🟢 jwweb_port"
@@ -361,6 +366,66 @@ jwweb_redirects() {
     return 0
 }
 
+# 🟢 GET a URL and validate + pretty-print the JSON body (jq), with status/size.
+jwweb_json() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_json <url>"
+        echo "Examples:"
+        echo "  jwweb_json https://api.github.com"
+        echo "  jwweb_json api.example.com/v1/health"
+        echo
+        echo "GET + walidacja/pretty-print JSON (jq) + status/rozmiar. Niepoprawny JSON → surowe body."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "❌ curl nie jest dostępny" >&2; return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "❌ jwweb_json wymaga 'jq'" >&2; return 1
+    fi
+
+    local url="$1"
+    case "$url" in http://*|https://*) ;; *) url="https://$url" ;; esac
+
+    local resp="" body="" meta="" code="" ctype="" size="" hmark=""
+    resp="$(curl -sS -L -H 'Accept: application/json' \
+        -w '\n__JWJSON_META__\t%{http_code}\t%{content_type}\t%{size_download}' "$url" 2>/dev/null)"
+    [ -z "$resp" ] && { echo "❌ brak odpowiedzi z $url" >&2; return 1; }
+    body="${resp%$'\n'__JWJSON_META__*}"
+    meta="${resp##*__JWJSON_META__$'\t'}"
+    code="$(printf '%s' "$meta" | cut -f1)"
+    ctype="$(printf '%s' "$meta" | cut -f2)"
+    size="$(printf '%s' "$meta" | cut -f3)"
+    case "$code" in
+        2*)      hmark="✅ $code" ;;
+        3*)      hmark="↪ $code" ;;
+        000|"")  hmark="❌ brak odpowiedzi" ;;
+        4*|5*)   hmark="❌ $code" ;;
+        *)       hmark="$code" ;;
+    esac
+
+    local valid=0
+    printf '%s' "$body" | jq empty >/dev/null 2>&1 && valid=1
+
+    echo
+    echo "---[ JSON GET: $url ]---"
+    __jwweb_kv__ "Status" "$hmark" 14
+    [ -n "$ctype" ] && __jwweb_kv__ "Content-Type" "$ctype"    14
+    [ -n "$size" ]  && __jwweb_kv__ "Size"         "${size} B" 14
+    if [ "$valid" -eq 1 ]; then
+        __jwweb_kv__ "Valid JSON" "✅" 14
+        echo
+        echo "---[ Body ]---"
+        printf '%s' "$body" | jq .
+    else
+        __jwweb_kv__ "Valid JSON" "❌ (parse error)" 14
+        echo
+        echo "---[ Body (raw) ]---"
+        printf '%s\n' "$body"
+    fi
+    return 0
+}
+
 
 # ---------------------------------------------------------------------------------
 # TLS / certyfikaty
@@ -516,6 +581,59 @@ jwweb_cert-expiry() {
     return 0
 }
 
+# 🟢 Negotiated protocol/cipher + supported TLS-version probe (TLS 1.0–1.3).
+jwweb_tls() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_tls <host[:port]|url>"
+        echo "Examples:"
+        echo "  jwweb_tls example.com"
+        echo "  jwweb_tls example.com:8443"
+        echo
+        echo "Wynegocjowany protokół/cipher + sonda wspieranych wersji (TLS 1.0–1.3; stare = ⚠️)."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v openssl >/dev/null 2>&1; then
+        echo "❌ openssl nie jest dostępny" >&2; return 1
+    fi
+
+    local scheme="" host="" port="" pth=""
+    read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$1")"
+    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+
+    local sout="" pc="" proto="" cipher=""
+    sout="$(__jwweb_tls_fetch__ "$host" "$port" "$host")"
+    [ -z "$sout" ] && { echo "❌ nie udało się połączyć z $host:$port" >&2; return 1; }
+    pc="$(printf '%s\n' "$sout" | __jwweb_protocipher__)"
+    proto="$(printf '%s\n' "$pc" | grep '^PROTO ' | sed 's/^PROTO //')"
+    cipher="$(printf '%s\n' "$pc" | grep '^CIPHER ' | sed 's/^CIPHER //')"
+
+    echo
+    echo "---[ TLS: $host:$port ]---"
+    __jwweb_kv__ "Negotiated" "${proto:-?}${cipher:+ / $cipher}" 12
+
+    echo
+    echo "---[ Supported versions ]---"
+    local spec="" lbl="" rest="" flag="" cls=""
+    for spec in "TLS 1.0|-tls1|old" "TLS 1.1|-tls1_1|old" "TLS 1.2|-tls1_2|ok" "TLS 1.3|-tls1_3|ok"; do
+        lbl="${spec%%|*}"
+        rest="${spec#*|}"
+        flag="${rest%%|*}"
+        cls="${rest##*|}"
+        if echo | openssl s_client -connect "$host:$port" -servername "$host" "$flag" 2>/dev/null \
+            | grep -q 'BEGIN CERTIFICATE'; then
+            if [ "$cls" = "old" ]; then
+                __jwweb_kv__ "$lbl" "⚠️ tak (przestarzałe)" 10
+            else
+                __jwweb_kv__ "$lbl" "✅ tak" 10
+            fi
+        else
+            __jwweb_kv__ "$lbl" "✗ nie" 10
+        fi
+    done
+    echo
+    return 0
+}
+
 
 # ---------------------------------------------------------------------------------
 # DNS
@@ -606,6 +724,108 @@ jwweb_dns-prop() {
     else
         __jwweb_kv__ "Consensus" "✅ wszystkie resolvery zgodne" "$kw"
     fi
+    echo
+    return 0
+}
+
+# 🟢 Domain registration data — RDAP-first (rdap.org), whois fallback.
+jwweb_domain() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_domain <domain|url>"
+        echo "Examples:"
+        echo "  jwweb_domain example.com"
+        echo "  jwweb_domain https://example.com/path"
+        echo
+        echo "Rejestracja domeny: RDAP-first (JSON, rdap.org) z fallbackiem na whois."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+
+    local scheme="" domain="" port="" pth=""
+    read -r scheme domain port pth <<< "$(__jwweb_parse_url__ "$1")"
+    [ -z "$domain" ] && { echo "❌ brak domeny" >&2; return 1; }
+
+    local src="" registrar="" created="" expires="" updated="" dstat="" ns="" dnssec=""
+
+    # --- RDAP first (structured JSON) ---
+    if command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+        local rdap="" kv=""
+        rdap="$(curl -sSL --max-time 15 -H 'Accept: application/rdap+json' \
+            "https://rdap.org/domain/$domain" 2>/dev/null)"
+        if printf '%s' "$rdap" | jq -e '.objectClassName=="domain"' >/dev/null 2>&1; then
+            kv="$(printf '%s' "$rdap" | jq -r '
+                def ev(a): ([.events[]?|select(.eventAction==a)|.eventDate]|first) // "";
+                "REGISTRAR\t" + (([.entities[]?|select(.roles and (.roles|index("registrar")))|.vcardArray[1][]?|select(.[0]=="fn")|.[3]]|first) // ""),
+                "CREATED\t"   + ev("registration"),
+                "EXPIRES\t"   + ev("expiration"),
+                "UPDATED\t"   + ev("last changed"),
+                "STATUS\t"    + ((.status // [])|join(", ")),
+                "NS\t"        + (([.nameservers[]?.ldhName])|join(", ")),
+                "DNSSEC\t"    + ((.secureDNS.delegationSigned // false)|tostring)
+            ' 2>/dev/null)"
+            registrar="$(printf '%s\n' "$kv" | grep '^REGISTRAR' | cut -f2-)"
+            created="$(printf   '%s\n' "$kv" | grep '^CREATED'   | cut -f2- | sed 's/T.*//')"
+            expires="$(printf   '%s\n' "$kv" | grep '^EXPIRES'   | cut -f2- | sed 's/T.*//')"
+            updated="$(printf   '%s\n' "$kv" | grep '^UPDATED'   | cut -f2- | sed 's/T.*//')"
+            dstat="$(printf     '%s\n' "$kv" | grep '^STATUS'    | cut -f2-)"
+            ns="$(printf        '%s\n' "$kv" | grep '^NS'        | cut -f2-)"
+            dnssec="$(printf    '%s\n' "$kv" | grep '^DNSSEC'    | cut -f2-)"
+            src="RDAP"
+        fi
+    fi
+
+    # --- whois fallback (free-text, best-effort parse) ---
+    if [ -z "$src" ] && command -v whois >/dev/null 2>&1; then
+        local who=""
+        who="$(whois "$domain" 2>/dev/null)"
+        if [ -n "$who" ]; then
+            registrar="$(printf '%s\n' "$who" | grep -iE '^[[:space:]]*Registrar:' | head -1 | sed 's/^[^:]*:[[:space:]]*//')"
+            created="$(printf   '%s\n' "$who" | grep -iE '^[[:space:]]*Creation Date:' | head -1 | sed 's/^[^:]*:[[:space:]]*//' | sed 's/T.*//')"
+            expires="$(printf   '%s\n' "$who" | grep -iE 'Expir(y|ation) Date:' | head -1 | sed 's/^[^:]*:[[:space:]]*//' | sed 's/T.*//')"
+            updated="$(printf   '%s\n' "$who" | grep -iE '^[[:space:]]*Updated Date:' | head -1 | sed 's/^[^:]*:[[:space:]]*//' | sed 's/T.*//')"
+            dstat="$(printf     '%s\n' "$who" | grep -iE '^[[:space:]]*Domain Status:' | sed 's/^[^:]*:[[:space:]]*//' | awk '{print $1}' | sort -u | paste -sd, - | sed 's/,/, /g')"
+            ns="$(printf        '%s\n' "$who" | grep -iE '^[[:space:]]*Name Server:' | sed 's/^[^:]*:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' | sort -u | paste -sd, - | sed 's/,/, /g')"
+            dnssec="$(printf    '%s\n' "$who" | grep -iE '^[[:space:]]*DNSSEC:' | head -1 | sed 's/^[^:]*:[[:space:]]*//')"
+            src="whois (fallback)"
+        fi
+    fi
+
+    [ -z "$src" ] && { echo "❌ brak danych RDAP/whois dla $domain" >&2; return 1; }
+
+    # days-to-expiry marker
+    local mark="" ee="" nn="" days=""
+    if [ -n "$expires" ]; then
+        ee="$(date -d "$expires" +%s 2>/dev/null)"
+        nn="$(date +%s)"
+        if [ -n "$ee" ]; then
+            days=$(( (ee - nn) / 86400 ))
+            if   [ "$days" -lt 0 ];  then mark="❌ WYGASŁA (${days} d)"
+            elif [ "$days" -le 7 ];  then mark="❌ $days d"
+            elif [ "$days" -le 30 ]; then mark="⚠️ $days d"
+            else                          mark="✅ $days d"
+            fi
+        fi
+    fi
+
+    # dnssec normalize (unsigned checked first: "unsigned" contains "igned")
+    local dnsm=""
+    case "$dnssec" in
+        false|*nsigned*) dnsm="— niepodpisany" ;;
+        true|*igned*)    dnsm="✅ signed" ;;
+        "")              dnsm="—" ;;
+        *)               dnsm="$dnssec" ;;
+    esac
+
+    local kw=13
+    echo
+    echo "---[ Domain: $domain ]---"
+    __jwweb_kv__ "Source" "$src" "$kw"
+    [ -n "$registrar" ] && __jwweb_kv__ "Registrar"   "$registrar" "$kw"
+    [ -n "$created" ]   && __jwweb_kv__ "Created"     "$created"   "$kw"
+    [ -n "$expires" ]   && __jwweb_kv__ "Expires"     "$expires${mark:+   ($mark)}" "$kw"
+    [ -n "$updated" ]   && __jwweb_kv__ "Updated"     "$updated"   "$kw"
+    [ -n "$dstat" ]     && __jwweb_kv__ "Status"      "$dstat"     "$kw"
+    [ -n "$ns" ]        && __jwweb_kv__ "Nameservers" "$ns"        "$kw"
+    __jwweb_kv__ "DNSSEC" "$dnsm" "$kw"
     echo
     return 0
 }

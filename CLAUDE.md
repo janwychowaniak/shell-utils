@@ -42,6 +42,7 @@ Config is `.gitleaks.toml` (extends the default ruleset; add false positives to
 | `jw_functions__deb.sh` | Debian/apt package management (`jwdeb*`) |
 | `jw_functions__docker.sh` | Docker operations (`jwdocker*`) |
 | `jw_functions__python.sh` | Python virtualenvs, packages, projects & tooling — uv/pip/pipx (`jwpy_*`) |
+| `jw_functions__web.sh` | Web/API diagnostics — HTTP/TLS/DNS/connectivity, oversight-first/diag-first (`jwweb_*`) |
 | `jw_functions__fs.sh` | File system / file naming (`jwdiff`, `jwodspacjacz*`, etc.) |
 | `jw_functions__media.sh` | Media notes/templates (sox, etc.) |
 | `jw_functions__mediaff.sh` | FFmpeg/ffprobe functions (`jwff*`) |

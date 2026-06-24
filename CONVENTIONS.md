@@ -16,6 +16,10 @@
 ### Legacy Names
 - Some older functions use Polish names (e.g. `jwodspacjacz` = space remover, `jwnotatki` = notes)
 
+### Language — English-only prose
+- **All prose authored in the repo is English**: comments, function help/usage text, user-facing `echo` output, and `<area>_toc()` group headers / legend / taglines. The working conversation may be in another language (e.g. Polish), but it must not leak into committed files.
+- **Exception — legacy identifiers.** The Polish *function names* above (`jwodspacjacz`, `jwnotatki`) are grandfathered identifiers, not prose; they stay. New names follow `jw<area>_<action>` in English.
+
 # Code Quality Standards
 
 ### ShellCheck Compliance
@@ -36,13 +40,13 @@
 
 ### Blast-radius Markers in the TOC
 - Every function entry in `<area>_toc()` is prefixed with an emoji marker classifying its side effects, so the impact of a function is visible at a glance — without reading its code or remembering it. Four classes:
-  - 🟢 **tylko odczyt (safe RO)** — only reads/queries state; never mutates anything. Safe to run and experiment with freely. (e.g. `jwdocker_ps`, `jwdocker_*-inspect`, `jwdocker_logs`, `jwdocker_monitor-*`)
-  - 🔵 **tworzy** — creates a resource (image, volume, network, container, file); typically reversible. (e.g. `jwdocker_image-pull`, `jwdocker_volume-create`, `jwdocker_run`, `jwdocker_save`)
-  - ⚪ **zmiana stanu / transfer** — mutates existing state or moves data, but does **not** delete. (e.g. `jwdocker_container-start`/`-stop`/`-restart`, `jwdocker_network-connect`/`-disconnect`, `jwdocker_cp`, `jwdocker_push`, `jwdocker_exec`)
-  - 🔴 **kasuje (destructive)** — removes or prunes resources; the "handle with care" class. (e.g. `jwdocker_*-remove`, `jwdocker_*-prune`, `jwdocker_cleanup`)
+  - 🟢 **read-only (safe RO)** — only reads/queries state; never mutates anything. Safe to run and experiment with freely. (e.g. `jwdocker_ps`, `jwdocker_*-inspect`, `jwdocker_logs`, `jwdocker_monitor-*`)
+  - 🔵 **creates** — creates a resource (image, volume, network, container, file); typically reversible. (e.g. `jwdocker_image-pull`, `jwdocker_volume-create`, `jwdocker_run`, `jwdocker_save`)
+  - ⚪ **state change / transfer** — mutates existing state or moves data, but does **not** delete. (e.g. `jwdocker_container-start`/`-stop`/`-restart`, `jwdocker_network-connect`/`-disconnect`, `jwdocker_cp`, `jwdocker_push`, `jwdocker_exec`)
+  - 🔴 **destructive** — removes or prunes resources; the "handle with care" class. (e.g. `jwdocker_*-remove`, `jwdocker_*-prune`, `jwdocker_cleanup`)
 - The TOC opens with a legend line so the key is always at hand:
 ```bash
-echo "   blast radius:  🟢 tylko odczyt   🔵 tworzy   ⚪ zmiana stanu / transfer   🔴 kasuje (destructive)"
+echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
 ```
 - Per-entry format places the marker between the dash and the function name:
 ```bash
@@ -50,6 +54,16 @@ echo " - 🟢 jwdocker_psall"
 echo " - 🔴 jwdocker_image-rm"
 ```
 - When a function's class is ambiguous, classify conservatively — assign the higher-impact marker (e.g. a tool that opens an interactive shell is ⚪, not 🟢, because of what can be done inside it).
+
+### TOC entry taglines (soul-capture)
+- Each `<area>_toc()` entry carries a short keyword **tagline** capturing what the function does at a glance — e.g. `jwweb_domain` → `RDAP-first + whois-fallback`, `jwweb_diag` → `DNS→TCP→TLS→HTTP→headers`. It makes the TOC self-documenting without opening any function.
+- **Keyword-slogan, not a sentence** — ≤ ~30 chars, technical English, no trailing period.
+- **Rendered via a per-area `__<area>_toc_row__` helper**, never hand-spaced:
+```bash
+__jwweb_toc_row__() { printf " - %s %-22s%s\n" "$1" "$2" "$3"; }   # marker, name, tagline
+```
+- **Alignment is static and hardcoded.** The tagline column starts **five spaces after the longest function name in that file**: `width = len(longest name) + 5` (web: `jwweb_cert-expiry` = 17 → `%-22s`). Compute it once per file and hardcode the width — the marker sits in a fixed `" - %s "` slot so it never shifts the column, and `printf` is byte-width so bash and zsh render identically (the bash↔zsh TOC parity check in the smoke test guards this).
+- Pioneered in `jw_functions__web.sh`; **being backported** to the earlier `<area>_toc()` functions (deb/docker/git/python), each with its own statically-computed width.
 
 ### Cross-shell Portability (bash + zsh)
 - Files are sourced into both bash and zsh, so code must behave identically in both. The key trap: **zsh does not word-split unquoted parameter expansions** by default (no `SH_WORD_SPLIT`), whereas bash does — so `cmd $scalar` passes one argument in zsh but several in bash.

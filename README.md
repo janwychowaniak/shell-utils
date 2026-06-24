@@ -24,6 +24,7 @@ And then _.bashrc_ (or _.zshrc_ — the snippet is identical for both shells) mi
 [[ -f "$HOME/bin/shell-utils/jw_functions__git.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__git.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__deb.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__deb.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__python.sh" ]]  && . "$HOME/bin/shell-utils/jw_functions__python.sh"
+[[ -f "$HOME/bin/shell-utils/jw_functions__web.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__web.sh"
 #
 [[ -f "$HOME/bin/shell-utils/jw_functions__fs.sh" ]]      && . "$HOME/bin/shell-utils/jw_functions__fs.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__media.sh" ]]   && . "$HOME/bin/shell-utils/jw_functions__media.sh"

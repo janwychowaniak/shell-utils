@@ -162,6 +162,20 @@ __jwweb_issuer__() {
     printf '%s' "$out"
 }
 
+# Relative age of a date as "(N days ago)" / "(today)" / "(in N days)".
+# Empty (prints nothing) if the date is missing/unparseable. Input: a date on $1.
+__jwweb_days_ago__() {
+    local epoch="" now="" d=""
+    epoch="$(date -d "$1" +%s 2>/dev/null)"
+    [ -z "$epoch" ] && return 0
+    now="$(date +%s)"
+    d=$(( (now - epoch) / 86400 ))
+    if   [ "$d" -gt 0 ]; then printf '(%d days ago)' "$d"
+    elif [ "$d" -eq 0 ]; then printf '(today)'
+    else                      printf '(in %d days)' "$(( -d ))"
+    fi
+}
+
 # Extract one header's value (case-insensitive) from a header block on $1.
 __jwweb_hdr_get__() {
     printf '%s\n' "$1" | grep -i "^$2:" | head -1 | sed "s/^[^:]*:[[:space:]]*//"
@@ -1008,14 +1022,18 @@ jwweb_domain() {
         *)               dnsm="$dnssec" ;;
     esac
 
+    local cago="" uago=""
+    [ -n "$created" ] && cago="$(__jwweb_days_ago__ "$created")"
+    [ -n "$updated" ] && uago="$(__jwweb_days_ago__ "$updated")"
+
     local kw=13
     echo
     echo "---[ Domain: $domain ]---"
     __jwweb_kv__ "Source" "$src" "$kw"
     [ -n "$registrar" ] && __jwweb_kv__ "Registrar"   "$registrar" "$kw"
-    [ -n "$created" ]   && __jwweb_kv__ "Created"     "$created"   "$kw"
+    [ -n "$created" ]   && __jwweb_kv__ "Created"     "$created${cago:+   $cago}"   "$kw"
     [ -n "$expires" ]   && __jwweb_kv__ "Expires"     "$expires${mark:+   ($mark)}" "$kw"
-    [ -n "$updated" ]   && __jwweb_kv__ "Updated"     "$updated"   "$kw"
+    [ -n "$updated" ]   && __jwweb_kv__ "Updated"     "$updated${uago:+   $uago}"   "$kw"
     [ -n "$dstat" ]     && __jwweb_kv__ "Status"      "$dstat"     "$kw"
     [ -n "$ns" ]        && __jwweb_kv__ "Nameservers" "$ns"        "$kw"
     __jwweb_kv__ "DNSSEC" "$dnsm" "$kw"

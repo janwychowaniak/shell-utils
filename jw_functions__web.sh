@@ -1139,17 +1139,25 @@ jwweb_diag() {
         echo
         echo "---[ TLS ]---"
         if command -v openssl >/dev/null 2>&1; then
-            local cfields="" proto="" cipher="" notafter="" subject="" cn="" days="" ee="" nn=""
+            local cfields="" proto="" cipher="" notafter="" subject="" issuer="" cn="" iss="" days="" ee="" nn=""
             cfields="$(__jwweb_cert_enddate__ "$host" "$port" "$host")"
             if [ -n "$cfields" ]; then
                 proto="$(printf '%s\n' "$cfields" | grep '^PROTO ' | sed 's/^PROTO //')"
                 cipher="$(printf '%s\n' "$cfields" | grep '^CIPHER ' | sed 's/^CIPHER //')"
                 notafter="$(printf '%s\n' "$cfields" | grep '^notAfter=' | sed 's/^notAfter=//')"
                 subject="$(printf '%s\n' "$cfields" | grep '^subject=' | sed 's/^subject=//')"
+                issuer="$(printf '%s\n' "$cfields" | grep '^issuer=' | sed 's/^issuer=//')"
                 cn="$(printf '%s' "$subject" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
                 [ -z "$cn" ] && cn="$subject"
+                # Issuer = CA organization (O) — the recognizable brand for a
+                # credibility glance (Let's Encrypt / DigiCert / Google Trust
+                # Services); fall back to the issuer CN, then the raw DN.
+                iss="$(printf '%s' "$issuer" | grep -oE 'O ?= ?[^,/]+' | head -1 | sed -E 's/O ?= ?//')"
+                [ -z "$iss" ] && iss="$(printf '%s' "$issuer" | grep -oE 'CN ?= ?[^,/]+' | head -1 | sed -E 's/CN ?= ?//')"
+                [ -z "$iss" ] && iss="$issuer"
                 [ -n "$proto" ] && __jwweb_kv__ "Protocol" "$proto${cipher:+ / $cipher}" "$kw"
                 [ -n "$cn" ]    && __jwweb_kv__ "Subject CN" "$cn" "$kw"
+                [ -n "$iss" ]   && __jwweb_kv__ "Issuer" "$iss" "$kw"
                 ee="$(date -d "$notafter" +%s 2>/dev/null)"
                 nn="$(date +%s)"
                 if [ -n "$ee" ]; then

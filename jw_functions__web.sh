@@ -151,6 +151,17 @@ __jwweb_cert_enddate__() {
     printf '%s\n' "$sout" | __jwweb_protocipher__
 }
 
+# Best human label for a cert issuer: the CA organization (O) — the recognizable
+# brand (Let's Encrypt / DigiCert / Google Trust Services) — falling back to the
+# issuer CN, then the raw DN. Input: the issuer DN string on $1.
+__jwweb_issuer__() {
+    local dn="$1" out=""
+    out="$(printf '%s' "$dn" | grep -oE 'O ?= ?[^,/]+' | head -1 | sed -E 's/O ?= ?//')"
+    [ -z "$out" ] && out="$(printf '%s' "$dn" | grep -oE 'CN ?= ?[^,/]+' | head -1 | sed -E 's/CN ?= ?//')"
+    [ -z "$out" ] && out="$dn"
+    printf '%s' "$out"
+}
+
 # Extract one header's value (case-insensitive) from a header block on $1.
 __jwweb_hdr_get__() {
     printf '%s\n' "$1" | grep -i "^$2:" | head -1 | sed "s/^[^:]*:[[:space:]]*//"
@@ -497,9 +508,8 @@ jwweb_cert() {
     notafter="$(printf '%s\n' "$x509" | grep '^notAfter=' | sed 's/^notAfter=//')"
     serial="$(printf '%s\n' "$x509" | grep '^serial=' | sed 's/^serial=//')"
     cn="$(printf '%s' "$subject" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
-    iss="$(printf '%s' "$issuer" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
     [ -z "$cn" ]  && cn="$subject"
-    [ -z "$iss" ] && iss="$issuer"
+    iss="$(__jwweb_issuer__ "$issuer")"
 
     local ee="" nn="" days="" mark=""
     ee="$(date -d "$notafter" +%s 2>/dev/null)"
@@ -524,7 +534,7 @@ jwweb_cert() {
     fi
     __jwweb_kv__ "Subject CN" "$cn"         "$kw"
     [ -n "$san" ]      && __jwweb_kv__ "SAN"        "$san"        "$kw"
-    __jwweb_kv__ "Issuer CN"  "$iss"        "$kw"
+    __jwweb_kv__ "Issuer"     "$iss"        "$kw"
     [ -n "$serial" ]   && __jwweb_kv__ "Serial"     "$serial"     "$kw"
     __jwweb_kv__ "Valid from" "$notbefore"  "$kw"
     __jwweb_kv__ "Valid to"   "$notafter"   "$kw"
@@ -642,9 +652,8 @@ jwweb_cert-expiry() {
     subject="$(printf '%s\n' "$fields" | grep '^subject=' | sed 's/^subject=//')"
     issuer="$(printf '%s\n' "$fields" | grep '^issuer=' | sed 's/^issuer=//')"
     cn="$(printf '%s' "$subject" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
-    iss="$(printf '%s' "$issuer" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
     [ -z "$cn" ] && cn="$subject"
-    [ -z "$iss" ] && iss="$issuer"
+    iss="$(__jwweb_issuer__ "$issuer")"
 
     local endepoch="" nowepoch="" days="" mark="" sev=0
     endepoch="$(date -d "$notafter" +%s 2>/dev/null)"
@@ -1149,12 +1158,7 @@ jwweb_diag() {
                 issuer="$(printf '%s\n' "$cfields" | grep '^issuer=' | sed 's/^issuer=//')"
                 cn="$(printf '%s' "$subject" | grep -oE 'CN *= *[^,/]+' | head -1 | sed 's/CN *= *//')"
                 [ -z "$cn" ] && cn="$subject"
-                # Issuer = CA organization (O) — the recognizable brand for a
-                # credibility glance (Let's Encrypt / DigiCert / Google Trust
-                # Services); fall back to the issuer CN, then the raw DN.
-                iss="$(printf '%s' "$issuer" | grep -oE 'O ?= ?[^,/]+' | head -1 | sed -E 's/O ?= ?//')"
-                [ -z "$iss" ] && iss="$(printf '%s' "$issuer" | grep -oE 'CN ?= ?[^,/]+' | head -1 | sed -E 's/CN ?= ?//')"
-                [ -z "$iss" ] && iss="$issuer"
+                iss="$(__jwweb_issuer__ "$issuer")"
                 [ -n "$proto" ] && __jwweb_kv__ "Protocol" "$proto${cipher:+ / $cipher}" "$kw"
                 [ -n "$cn" ]    && __jwweb_kv__ "Subject CN" "$cn" "$kw"
                 [ -n "$iss" ]   && __jwweb_kv__ "Issuer" "$iss" "$kw"

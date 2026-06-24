@@ -67,10 +67,13 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwweb_headers -h'
     'jwweb_redirects -h'
     'jwweb_timing -h'
+    'jwweb_json -h'
     'jwweb_cert -h'
     'jwweb_cert-expiry -h'
+    'jwweb_tls -h'
     'jwweb_dns -h'
     'jwweb_dns-prop -h'
+    'jwweb_domain -h'
     'jwweb_port -h'
     'jwweb_diag -h'
   )
@@ -114,7 +117,9 @@ else
     "jwweb_cert-expiry 127.0.0.1:$PORT"         # no TLS -> cert-fetch fail path
     "jwweb_cert-expiry 127.0.0.1:$PORT --exit-code"
     "jwweb_redirects http://127.0.0.1:$PORT/"   # 200, no redirects (0-hop path)
+    "jwweb_json http://127.0.0.1:$PORT/"        # HTML body -> invalid-JSON path
     "jwweb_cert 127.0.0.1:$PORT"                # plaintext -> cert-fetch fail path
+    "jwweb_tls 127.0.0.1:$PORT"                 # plaintext -> handshake fail path
     "jwweb_dns localhost"                       # /etc/hosts name (dig may return nothing)
     "jwweb_dns 127.0.0.1"
     "jwweb_dns-prop localhost"                  # resolver fan-out (likely (brak) everywhere)

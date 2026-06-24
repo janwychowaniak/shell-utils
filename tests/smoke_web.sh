@@ -65,7 +65,10 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
   RO=(
     'jwweb_toc'
     'jwweb_headers -h'
+    'jwweb_timing -h'
     'jwweb_cert-expiry -h'
+    'jwweb_dns -h'
+    'jwweb_port -h'
     'jwweb_diag -h'
   )
   n=0
@@ -101,11 +104,16 @@ else
   B=(
     "jwweb_headers http://127.0.0.1:$PORT/"
     "jwweb_headers 127.0.0.1:$PORT --all"
+    "jwweb_timing http://127.0.0.1:$PORT/"
     "jwweb_diag http://127.0.0.1:$PORT/"
     "jwweb_diag http://127.0.0.1:1/"            # closed port -> TCP/HTTP fail path
     "jwweb_diag https://127.0.0.1:$PORT/"       # TLS-to-plaintext -> handshake fail path
     "jwweb_cert-expiry 127.0.0.1:$PORT"         # no TLS -> cert-fetch fail path
     "jwweb_cert-expiry 127.0.0.1:$PORT --exit-code"
+    "jwweb_dns localhost"                       # /etc/hosts name (dig may return nothing)
+    "jwweb_dns 127.0.0.1"
+    "jwweb_port 127.0.0.1 $PORT 1"              # one open, one closed
+    "jwweb_port http://127.0.0.1:$PORT/"        # port taken from the URL
   )
   for sh in "${SHELLS[@]}"; do
     n=0

@@ -6,12 +6,12 @@
 #
 # Diag-first, oversight-only area (HTTP / TLS / DNS / connectivity diagnostics).
 # Blast-radius marker = effect on the remote ENDPOINT, not local state; HTTP
-# GET/HEAD are 🟢 because they are idempotent reads. Built incrementally — this
-# first iteration ships the diag-first trio. Planned next (all 🟢):
-#   HTTP   : jwweb_head jwweb_status jwweb_get jwweb_redirects jwweb_timing jwweb_json
+# GET/HEAD are 🟢 because they are idempotent reads. Built incrementally.
+# Planned next (all 🟢):
+#   HTTP   : jwweb_head jwweb_status jwweb_get jwweb_redirects jwweb_json
 #   TLS    : jwweb_cert jwweb_cert-chain jwweb_tls jwweb_cert-file
-#   DNS    : jwweb_dns jwweb_dns-trace jwweb_dns-reverse jwweb_dns-prop jwweb_whois
-#   net    : jwweb_ping jwweb_port jwweb_trace
+#   DNS    : jwweb_dns-trace jwweb_dns-reverse jwweb_dns-prop jwweb_whois
+#   net    : jwweb_ping jwweb_trace
 
 jwweb_toc() {
     echo
@@ -20,9 +20,16 @@ jwweb_toc() {
     echo
     echo " -----------------------------  HTTP inspection / probing"
     echo " - 🟢 jwweb_headers"
+    echo " - 🟢 jwweb_timing"
     echo
     echo " -----------------------------  TLS / certyfikaty"
     echo " - 🟢 jwweb_cert-expiry"
+    echo
+    echo " -----------------------------  DNS"
+    echo " - 🟢 jwweb_dns"
+    echo
+    echo " -----------------------------  łączność / osiągalność"
+    echo " - 🟢 jwweb_port"
     echo
     echo " -----------------------------  diagnostyka zbiorcza"
     echo " - 🟢 jwweb_diag"
@@ -157,6 +164,35 @@ __jwweb_ms_delta__() {
     awk -v a="$1" -v b="$2" 'BEGIN{ d=(a-b)*1000; if(d<0)d=0; printf "%d ms", d }'
 }
 
+# TCP reachability probe. Returns 0 open / 1 closed / 2 no-tool (no nc, non-bash).
+# nc → bash /dev/tcp fallback (zsh lacks /dev/tcp). Prints nothing.
+__jwweb_tcp_probe__() {
+    local host="$1" port="$2"
+    if command -v nc >/dev/null 2>&1; then
+        nc -z -w 5 "$host" "$port" >/dev/null 2>&1 && return 0
+        return 1
+    elif [ -n "${BASH_VERSION:-}" ]; then
+        (exec 3<>"/dev/tcp/$host/$port") >/dev/null 2>&1 && return 0
+        return 1
+    fi
+    return 2
+}
+
+# Print the per-stage timing breakdown from curl's cumulative -w values.
+# args: scheme t_namelookup t_connect t_appconnect t_starttransfer t_total [width]
+__jwweb_print_timing__() {
+    local scheme="$1" t_dns="$2" t_conn="$3" t_tls="$4" t_ttfb="$5" t_total="$6" tw="${7:-9}"
+    __jwweb_kv__ "DNS"     "$(__jwweb_ms_delta__ "$t_dns"  0)"        "$tw"
+    __jwweb_kv__ "Connect" "$(__jwweb_ms_delta__ "$t_conn" "$t_dns")" "$tw"
+    if [ "$scheme" = "https" ]; then
+        __jwweb_kv__ "TLS"  "$(__jwweb_ms_delta__ "$t_tls"  "$t_conn")" "$tw"
+        __jwweb_kv__ "TTFB" "$(__jwweb_ms_delta__ "$t_ttfb" "$t_tls")"  "$tw"
+    else
+        __jwweb_kv__ "TTFB" "$(__jwweb_ms_delta__ "$t_ttfb" "$t_conn")" "$tw"
+    fi
+    __jwweb_kv__ "Total" "$(__jwweb_ms_delta__ "$t_total" 0)" "$tw"
+}
+
 
 # ---------------------------------------------------------------------------------
 # HTTP inspection / probing
@@ -207,6 +243,56 @@ jwweb_headers() {
     echo
     echo "---[ Security headers ]---"
     printf '%s\n' "$final" | __jwweb_sec_headers__
+    return 0
+}
+
+# 🟢 Request-timing breakdown (DNS / connect / TLS / TTFB / total) for a URL.
+jwweb_timing() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_timing <url>"
+        echo "Examples:"
+        echo "  jwweb_timing example.com"
+        echo "  jwweb_timing https://api.example.com/health"
+        echo
+        echo "Rozbicie czasu żądania: DNS / connect / TLS / TTFB / total (curl -w)."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "❌ curl nie jest dostępny" >&2; return 1
+    fi
+
+    local url="$1"
+    case "$url" in http://*|https://*) ;; *) url="https://$url" ;; esac
+    local scheme="" host="" port="" pth=""
+    read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$url")"
+
+    local winfo=""
+    winfo="$(curl -sS -o /dev/null -L \
+        -w 'CODE=%{http_code}\nT_DNS=%{time_namelookup}\nT_CONN=%{time_connect}\nT_TLS=%{time_appconnect}\nT_TTFB=%{time_starttransfer}\nT_TOTAL=%{time_total}\n' \
+        "$url" 2>/dev/null)"
+    [ -z "$winfo" ] && { echo "❌ brak odpowiedzi z $url" >&2; return 1; }
+
+    local code="" hmark=""
+    code="$(printf '%s\n' "$winfo" | grep '^CODE=' | cut -d= -f2)"
+    case "$code" in
+        2*)      hmark="✅ $code" ;;
+        3*)      hmark="↪ $code" ;;
+        000|"")  hmark="❌ brak odpowiedzi" ;;
+        4*|5*)   hmark="❌ $code" ;;
+        *)       hmark="$code" ;;
+    esac
+
+    local t_dns="" t_conn="" t_tls="" t_ttfb="" t_total=""
+    t_dns="$(printf   '%s\n' "$winfo" | grep '^T_DNS='   | cut -d= -f2)"
+    t_conn="$(printf  '%s\n' "$winfo" | grep '^T_CONN='  | cut -d= -f2)"
+    t_tls="$(printf   '%s\n' "$winfo" | grep '^T_TLS='   | cut -d= -f2)"
+    t_ttfb="$(printf  '%s\n' "$winfo" | grep '^T_TTFB='  | cut -d= -f2)"
+    t_total="$(printf '%s\n' "$winfo" | grep '^T_TOTAL=' | cut -d= -f2)"
+
+    echo
+    echo "---[ Timing: $url ]---"
+    __jwweb_kv__ "Status" "$hmark" 9
+    __jwweb_print_timing__ "$scheme" "$t_dns" "$t_conn" "$t_tls" "$t_ttfb" "$t_total" 9
     return 0
 }
 
@@ -294,6 +380,97 @@ jwweb_cert-expiry() {
 
 
 # ---------------------------------------------------------------------------------
+# DNS
+# ---------------------------------------------------------------------------------
+
+# 🟢 DNS resolution — CNAME / A / AAAA for a host (dig → host → getent).
+jwweb_dns() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_dns <host|url>"
+        echo "Examples:"
+        echo "  jwweb_dns example.com"
+        echo "  jwweb_dns https://example.com/path"
+        echo
+        echo "Rozwiązanie DNS: CNAME / A / AAAA. CNAME tylko gdy dostępny dig."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+
+    local target="$1" host=""
+    case "$target" in
+        http://*|https://*|*/*|*:*)
+            local scheme="" port="" pth=""
+            read -r scheme host port pth <<< "$(__jwweb_parse_url__ "$target")"
+            ;;
+        *) host="$target" ;;
+    esac
+    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+
+    local kw=10
+    echo
+    echo "---[ DNS: $host ]---"
+    local cname=""
+    command -v dig >/dev/null 2>&1 && \
+        cname="$(dig +short CNAME "$host" 2>/dev/null | head -1 | sed 's/\.$//')"
+
+    local dnsout="" rline="" line="" hasip=0
+    dnsout="$(__jwweb_resolve__ "$host")"
+    rline="$(printf '%s\n' "$dnsout" | grep '^RESOLVER ' | head -1 | sed 's/^RESOLVER //')"
+    [ -n "$rline" ]  && __jwweb_kv__ "Resolver" "$rline"  "$kw"
+    [ -n "$cname" ]  && __jwweb_kv__ "CNAME"    "$cname"  "$kw"
+    while IFS= read -r line; do
+        case "$line" in
+            "A "*)    __jwweb_kv__ "A"    "${line#A }"    "$kw"; hasip=1 ;;
+            "AAAA "*) __jwweb_kv__ "AAAA" "${line#AAAA }" "$kw"; hasip=1 ;;
+        esac
+    done <<< "$dnsout"
+    [ "$hasip" -eq 0 ] && __jwweb_kv__ "Result" "❌ brak rekordów A/AAAA" "$kw"
+    echo
+    return 0
+}
+
+
+# ---------------------------------------------------------------------------------
+# łączność / osiągalność
+# ---------------------------------------------------------------------------------
+
+# 🟢 TCP port reachability — one or more ports on a host (nc → bash /dev/tcp).
+jwweb_port() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwweb_port <host|url> [port ...]"
+        echo "Examples:"
+        echo "  jwweb_port example.com 443"
+        echo "  jwweb_port example.com 80 443 8080"
+        echo "  jwweb_port https://example.com         # port z URL-a (443)"
+        echo
+        echo "Sprawdza otwartość portów TCP. Bez podanego portu bierze go z URL-a/443."
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+
+    local target="$1"; shift
+    local scheme="" host="" defport="" pth=""
+    read -r scheme host defport pth <<< "$(__jwweb_parse_url__ "$target")"
+    [ -z "$host" ] && { echo "❌ brak host" >&2; return 1; }
+
+    local ports=()
+    if [ $# -gt 0 ]; then ports=("$@"); else ports=("$defport"); fi
+
+    echo
+    echo "---[ TCP ports: $host ]---"
+    local p="" rc=0
+    for p in "${ports[@]}"; do
+        __jwweb_tcp_probe__ "$host" "$p"; rc=$?
+        case "$rc" in
+            0) __jwweb_kv__ "$p" "✅ open"               8 ;;
+            2) __jwweb_kv__ "$p" "⚠️ pominięto (brak nc)" 8 ;;
+            *) __jwweb_kv__ "$p" "❌ closed/filtered"    8 ;;
+        esac
+    done
+    echo
+    return 0
+}
+
+
+# ---------------------------------------------------------------------------------
 # diagnostyka zbiorcza
 # ---------------------------------------------------------------------------------
 
@@ -363,18 +540,13 @@ jwweb_diag() {
     # --- TCP ---
     echo
     echo "---[ TCP :$port ]---"
-    local tcpok=0 tcp_skip=0
-    if command -v nc >/dev/null 2>&1; then
-        nc -z -w 5 "$host" "$port" >/dev/null 2>&1 && tcpok=1
-    elif [ -n "${BASH_VERSION:-}" ]; then
-        (exec 3<>"/dev/tcp/$host/$port") >/dev/null 2>&1 && { tcpok=1; exec 3>&- 2>/dev/null; }
-    else
-        tcp_skip=1
-    fi
-    if   [ "$tcp_skip" -eq 1 ]; then __jwweb_kv__ "Reachable" "⚠️ pominięto (brak nc)" "$kw"; v_tcp="⚠️"
-    elif [ "$tcpok" -eq 1 ];    then __jwweb_kv__ "Reachable" "✅ open"               "$kw"; v_tcp="✅"
-    else                             __jwweb_kv__ "Reachable" "❌ closed/filtered"    "$kw"; v_tcp="❌"
-    fi
+    local tcprc=0
+    __jwweb_tcp_probe__ "$host" "$port"; tcprc=$?
+    case "$tcprc" in
+        0) __jwweb_kv__ "Reachable" "✅ open"               "$kw"; v_tcp="✅" ;;
+        2) __jwweb_kv__ "Reachable" "⚠️ pominięto (brak nc)" "$kw"; v_tcp="⚠️" ;;
+        *) __jwweb_kv__ "Reachable" "❌ closed/filtered"    "$kw"; v_tcp="❌" ;;
+    esac
 
     # --- TLS (https only) ---
     if [ "$scheme" = "https" ]; then
@@ -437,21 +609,13 @@ jwweb_diag() {
 
     echo
     echo "---[ Timing ]---"
-    local t_dns="" t_conn="" t_tls="" t_ttfb="" t_total="" tw=9
+    local t_dns="" t_conn="" t_tls="" t_ttfb="" t_total=""
     t_dns="$(printf   '%s\n' "$winfo" | grep '^T_DNS='   | cut -d= -f2)"
     t_conn="$(printf  '%s\n' "$winfo" | grep '^T_CONN='  | cut -d= -f2)"
     t_tls="$(printf   '%s\n' "$winfo" | grep '^T_TLS='   | cut -d= -f2)"
     t_ttfb="$(printf  '%s\n' "$winfo" | grep '^T_TTFB='  | cut -d= -f2)"
     t_total="$(printf '%s\n' "$winfo" | grep '^T_TOTAL=' | cut -d= -f2)"
-    __jwweb_kv__ "DNS"     "$(__jwweb_ms_delta__ "$t_dns"  0)"        "$tw"
-    __jwweb_kv__ "Connect" "$(__jwweb_ms_delta__ "$t_conn" "$t_dns")" "$tw"
-    if [ "$scheme" = "https" ]; then
-        __jwweb_kv__ "TLS"  "$(__jwweb_ms_delta__ "$t_tls"  "$t_conn")" "$tw"
-        __jwweb_kv__ "TTFB" "$(__jwweb_ms_delta__ "$t_ttfb" "$t_tls")"  "$tw"
-    else
-        __jwweb_kv__ "TTFB" "$(__jwweb_ms_delta__ "$t_ttfb" "$t_conn")" "$tw"
-    fi
-    __jwweb_kv__ "Total" "$(__jwweb_ms_delta__ "$t_total" 0)" "$tw"
+    __jwweb_print_timing__ "$scheme" "$t_dns" "$t_conn" "$t_tls" "$t_ttfb" "$t_total"
 
     # --- Security headers ---
     echo

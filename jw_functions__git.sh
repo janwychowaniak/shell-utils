@@ -5,50 +5,58 @@
 # table of contents
 # ---------------------------------------------------------------------------------
 
+# One TOC row: blast-radius marker, padded function name, one-line "soul" tagline.
+# printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
+# every row, so the tagline column aligns regardless of emoji width.
+__jwgit_toc_row__() {
+    printf " - %s %-22s%s\n" "$1" "$2" "$3"
+}
+
 jwgit_toc() {
     echo
-    echo "   blast radius:  🟢 tylko odczyt   🔵 tworzy   ⚪ zmiana stanu / transfer   🔴 kasuje (destructive)"
+    echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
+    echo "   (marker = effect on your local repo & working tree; push/pull/fetch = ⚪ transfer)"
     echo
     echo " -----------------------------  repository management"
-    echo " - 🔵 jwgit_init"
-    echo " - 🔵 jwgit_clone"
-    echo " - ⚪ jwgit_remote"
-    echo " - ⚪ jwgit_config"
+    __jwgit_toc_row__ 🔵 jwgit_init   "fresh repo; optional --bare"
+    __jwgit_toc_row__ 🔵 jwgit_clone  "clone + repo-info summary"
+    __jwgit_toc_row__ ⚪ jwgit_remote "list / add / set-url remotes"
+    __jwgit_toc_row__ ⚪ jwgit_config "get/set/unset, scope-aware"
     echo
     echo " -----------------------------  branch operations"
-    echo " - ⚪ jwgit_branch"
-    echo " - ⚪ jwgit_checkout"
-    echo " - ⚪ jwgit_merge"
-    echo " - ⚪ jwgit_rebase"
-    echo " - 🔵 jwgit_tag"
+    __jwgit_toc_row__ ⚪ jwgit_branch   "list / create / delete / rename"
+    __jwgit_toc_row__ ⚪ jwgit_checkout "switch branch / restore file"
+    __jwgit_toc_row__ ⚪ jwgit_merge    "merge a branch into HEAD"
+    __jwgit_toc_row__ ⚪ jwgit_rebase   "replay commits onto base"
+    __jwgit_toc_row__ 🔵 jwgit_tag      "create / annotate / list tags"
     echo
     echo " -----------------------------  staging & commits"
-    echo " - ⚪ jwgit_add"
-    echo " - 🔵 jwgit_commit"
-    echo " - ⚪ jwgit_stash"
-    echo " - 🔴 jwgit_reset"
-    echo " - ⚪ jwgit_revert"
+    __jwgit_toc_row__ ⚪ jwgit_add    "stage files; --patch hunks"
+    __jwgit_toc_row__ 🔵 jwgit_commit "commit; -m / --amend / --all"
+    __jwgit_toc_row__ ⚪ jwgit_stash  "push / pop / list / drop stashes"
+    __jwgit_toc_row__ 🔴 jwgit_reset  "soft / mixed / hard reset"
+    __jwgit_toc_row__ ⚪ jwgit_revert "new commit that undoes one"
     echo
     echo " -----------------------------  remote operations"
-    echo " - ⚪ jwgit_push"
-    echo " - ⚪ jwgit_pull"
-    echo " - ⚪ jwgit_fetch"
+    __jwgit_toc_row__ ⚪ jwgit_push  "push branch to remote"
+    __jwgit_toc_row__ ⚪ jwgit_pull  "fetch + integrate remote"
+    __jwgit_toc_row__ ⚪ jwgit_fetch "fetch refs, no merge"
     echo
     echo " -----------------------------  history & information"
-    echo " - 🟢 jwgit_log"
-    echo " - 🟢 jwgit_status"
-    echo " - 🟢 jwgit_diff"
-    echo " - 🟢 jwgit_blame"
+    __jwgit_toc_row__ 🟢 jwgit_log    "history: graph / oneline / stat"
+    __jwgit_toc_row__ 🟢 jwgit_status "branch + ahead/behind + files"
+    __jwgit_toc_row__ 🟢 jwgit_diff   "unstaged / cached / range diff"
+    __jwgit_toc_row__ 🟢 jwgit_blame  "per-line authorship"
     echo
     echo " -----------------------------  maintenance & cleanup"
-    echo " - 🔴 jwgit_clean"
-    echo " - 🔴 jwgit_prune"
-    echo " - ⚪ jwgit_gc"
+    __jwgit_toc_row__ 🔴 jwgit_clean "remove untracked; dry-run first"
+    __jwgit_toc_row__ 🔴 jwgit_prune "deep gc + prune unreachable"
+    __jwgit_toc_row__ ⚪ jwgit_gc    "safe repack; --deep option"
     echo
     echo " -----------------------------  advanced operations"
-    echo " - ⚪ jwgit_cherry-pick"
-    echo " - ⚪ jwgit_bisect"
-    echo " - 🟢 jwgit_reflog"
+    __jwgit_toc_row__ ⚪ jwgit_cherry-pick "apply one commit onto HEAD"
+    __jwgit_toc_row__ ⚪ jwgit_bisect      "binary-search a bad commit"
+    __jwgit_toc_row__ 🟢 jwgit_reflog      "HEAD movement history"
     echo
 }
 

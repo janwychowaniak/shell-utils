@@ -170,9 +170,9 @@ __jwweb_days_ago__() {
     [ -z "$epoch" ] && return 0
     now="$(date +%s)"
     d=$(( (now - epoch) / 86400 ))
-    if   [ "$d" -gt 0 ]; then printf '(%d days ago)' "$d"
+    if   [ "$d" -gt 0 ]; then printf '(%d d ago)' "$d"
     elif [ "$d" -eq 0 ]; then printf '(today)'
-    else                      printf '(in %d days)' "$(( -d ))"
+    else                      printf '(in %d d)' "$(( -d ))"
     fi
 }
 
@@ -1032,8 +1032,8 @@ jwweb_domain() {
     __jwweb_kv__ "Source" "$src" "$kw"
     [ -n "$registrar" ] && __jwweb_kv__ "Registrar"   "$registrar" "$kw"
     [ -n "$created" ]   && __jwweb_kv__ "Created"     "$created${cago:+   $cago}"   "$kw"
-    [ -n "$expires" ]   && __jwweb_kv__ "Expires"     "$expires${mark:+   ($mark)}" "$kw"
     [ -n "$updated" ]   && __jwweb_kv__ "Updated"     "$updated${uago:+   $uago}"   "$kw"
+    [ -n "$expires" ]   && __jwweb_kv__ "Expires"     "$expires${mark:+   ($mark)}" "$kw"
     [ -n "$dstat" ]     && __jwweb_kv__ "Status"      "$dstat"     "$kw"
     [ -n "$ns" ]        && __jwweb_kv__ "Nameservers" "$ns"        "$kw"
     __jwweb_kv__ "DNSSEC" "$dnsm" "$kw"

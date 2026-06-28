@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A collection of Bash shell utility functions and aliases, sourced into the user's interactive shell via `.bashrc`/`.zshrc`. There is no build step, no test suite, and no package manager. Files are sourced directly.
+A collection of Bash shell utility functions and aliases, sourced into the user's interactive shell via `.bashrc`/`.zshrc`. There is no build step and no package manager — files are sourced directly. Verification is via per-area smoke tests (`tests/smoke_<area>.sh`) run in both bash and zsh; there is no CI suite.
 
 ## Conventions
 
@@ -17,6 +17,18 @@ shellcheck jw_functions__<area>.sh
 ```
 
 All function files should include `# shellcheck shell=bash` at the top.
+
+## Testing
+
+Per-area smoke tests live in `tests/smoke_<area>.sh` (e.g. `smoke_jwgit.sh`,
+`smoke_web.sh`). Each builds a throwaway fixture, runs every function under
+**both bash and zsh**, scans for shell runtime-error signatures, and diffs
+bash-vs-zsh stdout of the deterministic read-only functions (cross-shell
+parity). Run after any change:
+
+```bash
+bash tests/smoke_<area>.sh
+```
 
 ## Secret scanning
 

@@ -5,47 +5,55 @@
 # table of contents
 # ---------------------------------------------------------------------------------
 
+# One TOC row: blast-radius marker, padded function name, one-line "soul" tagline.
+# printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
+# every row, so the tagline column aligns regardless of emoji width.
+__jwdeb_toc_row__() {
+    printf " - %s %-23s%s\n" "$1" "$2" "$3"
+}
+
 jwdeb_toc() {
     echo
-    echo "   blast radius:  🟢 tylko odczyt   🔵 tworzy   ⚪ zmiana stanu / transfer   🔴 kasuje (destructive)"
+    echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
+    echo "   (marker = effect on installed packages & apt cache; dist-upgrade can remove pkgs → 🔴)"
     echo
     echo " -----------------------------  package search & information"
-    echo " - 🟢 jwdeb_search"
-    echo " - 🟢 jwdeb_info"
-    echo " - 🟢 jwdeb_policy"
-    echo " - 🟢 jwdeb_depends"
-    echo " - 🟢 jwdeb_files"
-    echo " - 🟢 jwdeb_which"
+    __jwdeb_toc_row__ 🟢 jwdeb_search  "search the package catalog"
+    __jwdeb_toc_row__ 🟢 jwdeb_info    "package metadata / details"
+    __jwdeb_toc_row__ 🟢 jwdeb_policy  "installed vs candidate version"
+    __jwdeb_toc_row__ 🟢 jwdeb_depends "dependency list; --tree view"
+    __jwdeb_toc_row__ 🟢 jwdeb_files   "list files a package owns"
+    __jwdeb_toc_row__ 🟢 jwdeb_which   "which package owns a file"
     echo
     echo " -----------------------------  package management"
-    echo " - 🔵 jwdeb_install"
-    echo " - 🔴 jwdeb_remove"
-    echo " - 🔴 jwdeb_purge"
-    echo " - ⚪ jwdeb_reinstall"
-    echo " - 🔵 jwdeb_download"
-    echo " - ⚪ jwdeb_hold"
-    echo " - ⚪ jwdeb_unhold"
+    __jwdeb_toc_row__ 🔵 jwdeb_install   "install one or more pkgs"
+    __jwdeb_toc_row__ 🔴 jwdeb_remove    "remove pkgs, keep config"
+    __jwdeb_toc_row__ 🔴 jwdeb_purge     "remove pkgs + their config"
+    __jwdeb_toc_row__ ⚪ jwdeb_reinstall "reinstall current version"
+    __jwdeb_toc_row__ 🔵 jwdeb_download  "fetch .deb, don't install"
+    __jwdeb_toc_row__ ⚪ jwdeb_hold      "pin: block from upgrades"
+    __jwdeb_toc_row__ ⚪ jwdeb_unhold    "release a held package"
     echo
     echo " -----------------------------  system updates"
-    echo " - ⚪ jwdeb_update"
-    echo " - ⚪ jwdeb_upgrade"
-    echo " - 🔴 jwdeb_dist-upgrade"
+    __jwdeb_toc_row__ ⚪ jwdeb_update       "refresh package indexes"
+    __jwdeb_toc_row__ ⚪ jwdeb_upgrade      "upgrade pkgs; no removals"
+    __jwdeb_toc_row__ 🔴 jwdeb_dist-upgrade "full-upgrade; may remove pkgs"
     echo
     echo " -----------------------------  system maintenance"
-    echo " - 🔴 jwdeb_autoremove"
-    echo " - 🔴 jwdeb_autoclean"
-    echo " - 🔴 jwdeb_clean"
+    __jwdeb_toc_row__ 🔴 jwdeb_autoremove "remove unused dependencies"
+    __jwdeb_toc_row__ 🔴 jwdeb_autoclean  "purge stale cached .debs"
+    __jwdeb_toc_row__ 🔴 jwdeb_clean      "empty the whole .deb cache"
     echo
     echo " -----------------------------  package analysis"
-    echo " - 🟢 jwdeb_installed"
-    echo " - 🟢 jwdeb_size"
-    echo " - 🟢 jwdeb_orphans"
-    echo " - 🟢 jwdeb_history"
+    __jwdeb_toc_row__ 🟢 jwdeb_installed "list installed; sort/filter"
+    __jwdeb_toc_row__ 🟢 jwdeb_size      "disk usage; --top N largest"
+    __jwdeb_toc_row__ 🟢 jwdeb_orphans   "orphaned libs (deborphan)"
+    __jwdeb_toc_row__ 🟢 jwdeb_history   "apt log: installs / removes"
     echo
     echo " -----------------------------  troubleshooting"
-    echo " - 🟢 jwdeb_broken"
-    echo " - ⚪ jwdeb_fix"
-    echo " - 🟢 jwdeb_diag"
+    __jwdeb_toc_row__ 🟢 jwdeb_broken "find broken / unmet deps"
+    __jwdeb_toc_row__ ⚪ jwdeb_fix    "repair broken dependencies"
+    __jwdeb_toc_row__ 🟢 jwdeb_diag   "apt subsystem health report"
     echo
 }
 

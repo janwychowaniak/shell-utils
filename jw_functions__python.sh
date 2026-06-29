@@ -12,70 +12,78 @@
 # table of contents
 # ---------------------------------------------------------------------------------
 
+# One TOC row: blast-radius marker, padded function name, one-line "soul" tagline.
+# printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
+# every row, so the tagline column aligns regardless of emoji width.
+__jwpy_toc_row__() {
+    printf " - %s %-25s%s\n" "$1" "$2" "$3"
+}
+
 jwpy_toc() {
     echo
-    echo "   blast radius:  🟢 tylko odczyt   🔵 tworzy   ⚪ zmiana stanu / transfer   🔴 kasuje (destructive)"
+    echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
+    echo "   (marker = effect on the active venv / project; pipx-* act on global CLI tools)"
     echo
     echo " -----------------------------  virtual environment lifecycle"
-    echo " - 🔵 jwpy_venv-create"
-    echo " - ⚪ jwpy_venv-activate"
-    echo " - ⚪ jwpy_venv-deactivate"
-    echo " - 🔴 jwpy_venv-remove"
-    echo " - 🟢 jwpy_venv-list"
-    echo " - 🟢 jwpy_venv-info"
+    __jwpy_toc_row__ 🔵 jwpy_venv-create     "new venv (uv or stdlib)"
+    __jwpy_toc_row__ ⚪ jwpy_venv-activate   "source a venv (persists)"
+    __jwpy_toc_row__ ⚪ jwpy_venv-deactivate "leave the active venv"
+    __jwpy_toc_row__ 🔴 jwpy_venv-remove     "delete a venv directory"
+    __jwpy_toc_row__ 🟢 jwpy_venv-list       "venvs under cwd (depth ≤2)"
+    __jwpy_toc_row__ 🟢 jwpy_venv-info       "active venv: python/pip/pkgs"
     echo
     echo " -----------------------------  package management (uv pip / pip)"
-    echo " - ⚪ jwpy_install"
-    echo " - ⚪ jwpy_upgrade"
-    echo " - 🔴 jwpy_uninstall"
-    echo " - 🟢 jwpy_list"
-    echo " - 🟢 jwpy_outdated"
-    echo " - 🟢 jwpy_show"
+    __jwpy_toc_row__ ⚪ jwpy_install   "install into the venv"
+    __jwpy_toc_row__ ⚪ jwpy_upgrade   "upgrade pkg(s) | --all"
+    __jwpy_toc_row__ 🔴 jwpy_uninstall "uninstall from the venv"
+    __jwpy_toc_row__ 🟢 jwpy_list      "list installed packages"
+    __jwpy_toc_row__ 🟢 jwpy_outdated  "show outdated packages"
+    __jwpy_toc_row__ 🟢 jwpy_show      "package metadata / details"
     echo
     echo " -----------------------------  dependency management (uv pip / pip)"
-    echo " - 🟢 jwpy_freeze"
-    echo " - 🔵 jwpy_reqs-save"
-    echo " - ⚪ jwpy_reqs-install"
+    __jwpy_toc_row__ 🟢 jwpy_freeze       "pinned freeze to stdout"
+    __jwpy_toc_row__ 🔵 jwpy_reqs-save    "write requirements.txt"
+    __jwpy_toc_row__ ⚪ jwpy_reqs-install "install from requirements"
     echo
     echo " -----------------------------  interpreter & version info"
-    echo " - 🟢 jwpy_version"
-    echo " - 🟢 jwpy_which"
-    echo " - 🟢 jwpy_pythons"
+    __jwpy_toc_row__ 🟢 jwpy_version "active python version"
+    __jwpy_toc_row__ 🟢 jwpy_which   "resolve tools: venv > global"
+    __jwpy_toc_row__ 🟢 jwpy_pythons "discover installed pythons"
     echo
     echo " -----------------------------  project info"
-    echo " - 🟢 jwpy_proj"
+    __jwpy_toc_row__ 🟢 jwpy_proj "profile: manager/backend/type"
     echo
     echo " -----------------------------  uv project"
-    echo " - 🟢 jwpy_uv-status"
-    echo " - ⚪ jwpy_uv-sync"
-    echo " - ⚪ jwpy_uv-lock"
-    echo " - 🟢 jwpy_uv-tree"
-    echo " - 🔵 jwpy_uv-export"
+    __jwpy_toc_row__ 🟢 jwpy_uv-status "uv project + lock state"
+    __jwpy_toc_row__ ⚪ jwpy_uv-sync   "sync env to the lockfile"
+    __jwpy_toc_row__ ⚪ jwpy_uv-lock   "resolve + write uv.lock"
+    __jwpy_toc_row__ 🟢 jwpy_uv-tree   "dependency tree (uv)"
+    __jwpy_toc_row__ 🔵 jwpy_uv-export "export to requirements.txt"
     echo
     echo " -----------------------------  code quality"
-    echo " - 🟢 jwpy_test"
-    echo " - 🟢 jwpy_lint"
-    echo " - 🟢 jwpy_typecheck"
-    echo " - ⚪ jwpy_format"
+    __jwpy_toc_row__ 🟢 jwpy_test      "run pytest"
+    __jwpy_toc_row__ 🟢 jwpy_lint      "ruff check"
+    __jwpy_toc_row__ 🟢 jwpy_typecheck "mypy type check"
+    __jwpy_toc_row__ ⚪ jwpy_format    "ruff format; --check opt"
     echo
     echo " -----------------------------  packaging"
-    echo " - 🟢 jwpy_build-check"
+    __jwpy_toc_row__ 🟢 jwpy_build-check "verify ./dist (twine check)"
     echo
     echo " -----------------------------  project housekeeping"
-    echo " - 🔴 jwpy_clean"
+    __jwpy_toc_row__ 🔴 jwpy_clean "remove build & cache cruft"
     echo
     echo " -----------------------------  pipx global tools"
-    echo " - 🔵 jwpy_pipx-install"
-    echo " - ⚪ jwpy_pipx-upgrade"
-    echo " - 🔴 jwpy_pipx-uninstall"
-    echo " - 🟢 jwpy_pipx-list"
-    echo " - 🔵 jwpy_pipx-inject"
-    echo " - 🔴 jwpy_pipx-uninject"
-    echo " - ⚪ jwpy_pipx-run"
-    echo " - 🟢 jwpy_pipx-info"
-    echo " - ⚪ jwpy_pipx-reinstall"
-    echo " - 🟢 jwpy_pipx-env"
-    echo " - ⚪ jwpy_pipx-ensurepath"
+    __jwpy_toc_row__ 🔵 jwpy_pipx-install    "install a global CLI tool"
+    __jwpy_toc_row__ ⚪ jwpy_pipx-upgrade    "upgrade tool(s) | --all"
+    __jwpy_toc_row__ 🔴 jwpy_pipx-uninstall  "remove a global tool"
+    __jwpy_toc_row__ 🟢 jwpy_pipx-list       "list pipx-managed tools"
+    __jwpy_toc_row__ 🔵 jwpy_pipx-inject     "add a lib into a tool"
+    __jwpy_toc_row__ 🔴 jwpy_pipx-uninject   "remove an injected lib"
+    __jwpy_toc_row__ ⚪ jwpy_pipx-run        "run a tool once, no install"
+    __jwpy_toc_row__ 🟢 jwpy_pipx-info       "tool details / metadata"
+    __jwpy_toc_row__ ⚪ jwpy_pipx-reinstall  "reinstall tool(s) | --all"
+    __jwpy_toc_row__ 🟢 jwpy_pipx-env        "pipx paths & config vars"
+    __jwpy_toc_row__ ⚪ jwpy_pipx-ensurepath "put pipx bin on PATH"
     echo
 }
 

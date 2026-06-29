@@ -67,14 +67,14 @@ jwgit_toc() {
 # ---------------------------------------------------------------------------------
 
 jwgit_init() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_init [directory] [--bare]"
         echo "Examples:"
         echo "  jwgit_init .                  # Initialize current directory"
         echo "  jwgit_init myproject          # Initialize new directory"
         echo "  jwgit_init myrepo --bare      # Initialize bare repository"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     # Order-independent parse: --bare toggles bare mode, any other arg is the dir.
@@ -121,7 +121,7 @@ jwgit_init() {
 
 
 jwgit_clone() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_clone <repository_url> [directory] [options]"
         echo "Examples:"
         echo "  jwgit_clone https://github.com/user/repo.git"
@@ -135,7 +135,7 @@ jwgit_clone() {
         echo "  --single-branch  Clone only one branch"
         echo "  --recursive      Clone with submodules"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local REPO_URL=$1
@@ -189,7 +189,7 @@ jwgit_clone() {
 
 
 jwgit_remote() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_remote [add|remove|set-url|show] [name] [url]"
         echo "Examples:"
         echo "  jwgit_remote                           # List all remotes"
@@ -205,7 +205,7 @@ jwgit_remote() {
             echo "  (not in a git repository)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local ACTION=$1
@@ -337,7 +337,7 @@ jwgit_remote() {
 
 
 jwgit_config() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_config <show|get|set|unset|edit> [args]"
         echo "Examples:"
         echo "  jwgit_config show                        # Layered effective config (all scopes)"
@@ -354,7 +354,7 @@ jwgit_config() {
         echo "  --local      .git/config            (default for set / unset / edit)"
         echo "  --worktree   .git/config.worktree   (needs extensions.worktreeConfig)"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     # local/worktree scopes and the repo header only make sense inside a repo
@@ -715,7 +715,7 @@ __jwgit_config_dump__() {
 # ---------------------------------------------------------------------------------
 
 jwgit_branch() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_branch [list|create|delete|rename] [branch_name] [options]"
         echo "Examples:"
         echo "  jwgit_branch                    # List all branches"
@@ -736,7 +736,7 @@ jwgit_branch() {
             echo "  (not in a git repository)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local ACTION=$1
@@ -900,7 +900,7 @@ jwgit_branch() {
 
 
 jwgit_checkout() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_checkout <branch|commit|file> [options]"
         echo "Examples:"
         echo "  jwgit_checkout main              # Switch to main branch"
@@ -919,7 +919,7 @@ jwgit_checkout() {
             echo "  (not in a git repository)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local TARGET=$1
@@ -1071,7 +1071,7 @@ jwgit_checkout() {
 
 
 jwgit_merge() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_merge <branch> [options]"
         echo "Examples:"
         echo "  jwgit_merge feature-branch       # Merge feature branch"
@@ -1089,7 +1089,7 @@ jwgit_merge() {
             echo "  (not in a git repository)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local BRANCH=$1
@@ -1227,7 +1227,7 @@ jwgit_merge() {
 
 
 jwgit_rebase() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_rebase <branch|commit> [options]"
         echo "Examples:"
         echo "  jwgit_rebase main                # Rebase current branch onto main"
@@ -1246,7 +1246,7 @@ jwgit_rebase() {
             echo "  (not in a git repository)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local TARGET=$1
@@ -1406,7 +1406,7 @@ jwgit_rebase() {
 
 
 jwgit_tag() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_tag [name] [commit] | -a <name> -m <msg> [commit] | -d <name> | list"
         echo "Examples:"
         echo "  jwgit_tag                         # List all tags"
@@ -1422,7 +1422,7 @@ jwgit_tag() {
             echo "  (not in a git repository)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     case $1 in
@@ -1513,7 +1513,7 @@ jwgit_tag() {
 # ---------------------------------------------------------------------------------
 
 jwgit_add() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_add <files|pattern> [options]"
         echo "Examples:"
         echo "  jwgit_add .                    # Add all changes"
@@ -1532,7 +1532,7 @@ jwgit_add() {
             echo "  (no changes to add)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     # Standalone modes (no pathspec needed)
@@ -1541,7 +1541,7 @@ jwgit_add() {
             echo "Adding all modified tracked files..."
             if git add --update; then
                 echo "✅ Updated files added to staging area"
-                jwgit_status
+                __jwgit_status__
             else
                 echo "❌ Failed to add updated files"
                 return 1
@@ -1558,7 +1558,7 @@ jwgit_add() {
             if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
                 if git add --all; then
                     echo "✅ All changes added to staging area"
-                    jwgit_status
+                    __jwgit_status__
                 else
                     echo "❌ Failed to add all changes"
                     return 1
@@ -1620,7 +1620,7 @@ jwgit_add() {
 
 
 jwgit_commit() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_commit [message] [options]"
         echo "Examples:"
         echo "  jwgit_commit \"Fix bug in user login\"    # Commit with message"
@@ -1647,7 +1647,7 @@ jwgit_commit() {
             echo "💡 Use 'jwgit_add' to stage files first"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local MESSAGE=""
@@ -1821,7 +1821,7 @@ jwgit_commit() {
 
 
 jwgit_stash() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_stash [push|pop|list|show|drop|clear] [options]"
         echo "Examples:"
         echo "  jwgit_stash                        # Stash current changes"
@@ -1847,7 +1847,7 @@ jwgit_stash() {
         echo "Existing stashes:"
         git stash list | head -5 | sed 's/^/  /' 2>/dev/null || echo "  (no stashes)"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local ACTION=$1
@@ -2086,7 +2086,7 @@ jwgit_stash() {
 
 
 jwgit_reset() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_reset [--soft|--mixed|--hard] [commit] [files]"
         echo "Examples:"
         echo "  jwgit_reset                    # Unstage all files (mixed reset to HEAD)"
@@ -2111,7 +2111,7 @@ jwgit_reset() {
         echo "Recent commits:"
         git log --oneline -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local RESET_TYPE=""
@@ -2290,7 +2290,7 @@ jwgit_reset() {
 
 
 jwgit_revert() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_revert <commit> [options] | --continue | --abort | --skip"
         echo "Examples:"
         echo "  jwgit_revert abc123               # Create a commit that undoes abc123"
@@ -2301,7 +2301,7 @@ jwgit_revert() {
         echo "Recent commits:"
         git log --oneline -10 2>/dev/null | sed 's/^/  /' || echo "  (no commits)"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     # Control commands
@@ -2352,7 +2352,7 @@ jwgit_revert() {
 # ---------------------------------------------------------------------------------
 
 jwgit_push() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_push [remote] [branch] [options]"
         echo "Examples:"
         echo "  jwgit_push                     # Push current branch to upstream"
@@ -2393,7 +2393,7 @@ jwgit_push() {
         echo "Available remotes:"
         git remote -v | sed 's/^/  /' || echo "  (no remotes configured)"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local REMOTE=""
@@ -2592,7 +2592,7 @@ jwgit_push() {
 
 
 jwgit_pull() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_pull [remote] [branch] [options]"
         echo "Examples:"
         echo "  jwgit_pull                     # Pull current branch from upstream"
@@ -2637,7 +2637,7 @@ jwgit_pull() {
         echo "Available remotes:"
         git remote -v | sed 's/^/  /' || echo "  (no remotes configured)"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local REMOTE=""
@@ -2841,7 +2841,7 @@ jwgit_pull() {
 
 
 jwgit_fetch() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_fetch [remote] [options]"
         echo "Examples:"
         echo "  jwgit_fetch                    # Fetch from all remotes"
@@ -2873,7 +2873,7 @@ jwgit_fetch() {
             echo "  (not on any branch)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local REMOTE=""
@@ -3210,6 +3210,16 @@ __jwgit_kv__() {
 }
 
 jwgit_status() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwgit_status"
+        echo "Repository status: branch, upstream, ahead/behind, staged & unstaged files."
+        return 0
+    fi
+    __jwgit_status__
+}
+
+# internal: the rich status report (no flag parsing); also called after staging.
+__jwgit_status__() {
     echo "📊 Git Repository Status"
     echo "=================================================="
     echo
@@ -3595,7 +3605,7 @@ jwgit_diff() {
 
 
 jwgit_blame() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_blame <file> [options]"
         echo "Examples:"
         echo "  jwgit_blame file.txt           # Show line-by-line authorship"
@@ -3615,7 +3625,7 @@ jwgit_blame() {
             echo "  (not in a git repository)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local FILE=$1
@@ -3695,7 +3705,7 @@ jwgit_blame() {
 # ---------------------------------------------------------------------------------
 
 jwgit_clean() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_clean [options]"
         echo "Examples:"
         echo "  jwgit_clean                    # Show what would be cleaned (dry run)"
@@ -3718,7 +3728,7 @@ jwgit_clean() {
             echo "  (no untracked files)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local FORCE=""
@@ -3896,6 +3906,13 @@ jwgit_clean() {
 
 
 jwgit_prune() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwgit_prune"
+        echo "Deep maintenance: prune stale remote-tracking branches, expire unreachable"
+        echo "reflog entries, then run aggressive gc. Prompts before doing anything."
+        echo "⚠️  Removes unreachable objects irreversibly."
+        return 0
+    fi
     echo "🧹 Git Repository Maintenance"
     echo "=================================================="
     echo
@@ -4067,7 +4084,7 @@ jwgit_gc() {
 # ---------------------------------------------------------------------------------
 
 jwgit_cherry-pick() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_cherry-pick <commit> [target_branch]"
         echo "Examples:"
         echo "  jwgit_cherry-pick abc123            # Cherry-pick commit to current branch"
@@ -4083,7 +4100,7 @@ jwgit_cherry-pick() {
             echo "  (no commits available)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local COMMIT=$1
@@ -4243,7 +4260,7 @@ jwgit_cherry-pick() {
 
 
 jwgit_bisect() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_bisect <start|good|bad|reset|skip|run> [commit]"
         echo "Examples:"
         echo "  jwgit_bisect start             # Start bisect session"
@@ -4264,7 +4281,7 @@ jwgit_bisect() {
         echo "  5. jwgit_bisect good/bad for each test"
         echo "  6. jwgit_bisect reset when done"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local ACTION=$1

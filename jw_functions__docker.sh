@@ -112,6 +112,11 @@ alias jwdocker_psup="jwdocker_containers"
 
 
 jwdocker_psall() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_psall [name-filter]"
+        echo "List all containers (running + stopped); optional name filter."
+        return 0
+    fi
     if [ $# -eq 0 ]; then
         docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
     else
@@ -123,6 +128,11 @@ jwdocker_psall() {
 
 
 jwdocker_psdown() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_psdown [name-filter]"
+        echo "List stopped / created containers; optional name filter."
+        return 0
+    fi
     if [ $# -eq 0 ]; then
         docker ps --filter status=created \
                   --filter status=restarting \
@@ -153,6 +163,11 @@ jwdocker_psdown() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_containers() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_containers [name-filter]"
+        echo "List running containers; optional name filter."
+        return 0
+    fi
     if [ $# -eq 0 ]; then
         docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
     else
@@ -164,11 +179,11 @@ jwdocker_containers() {
 
 
 jwdocker_container-start() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker ps --filter status=exited --filter status=created --format "{{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -182,6 +197,11 @@ jwdocker_container-start() {
 
 
 jwdocker_container-stop() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_container-stop [container]"
+        echo "Stop a container; with no name, prompts to stop all running."
+        return 0
+    fi
     if [ $# -eq 0 ]; then
         local running_containers
         running_containers=$(docker ps --filter status=running --format "{{.Names}}")
@@ -222,11 +242,11 @@ jwdocker_container-stop() {
 
 
 jwdocker_container-restart() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker ps -a --format "{{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -242,11 +262,11 @@ jwdocker_container-restart() {
 
 
 jwdocker_container-remove() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker ps -a --filter status=exited --filter status=created --format "{{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -272,7 +292,7 @@ jwdocker_container-inspect() {
     # [https://docs.docker.com/config/formatting/]
     # [https://golang.org/pkg/text/template/#hdr-Functions]
     # [https://golang.org/pkg/fmt/]
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker ps --filter status=running --format "- {{.Names}}"
         echo "---"
@@ -283,7 +303,7 @@ jwdocker_container-inspect() {
                   --filter status=exited \
                   --filter status=dead --format "- {{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -322,6 +342,11 @@ jwdocker_container-inspect() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_images() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_images [repo-filter]"
+        echo "List images; optional repository-name filter."
+        return 0
+    fi
     if [ $# -eq 0 ]; then
         # Show all images with clean formatting
         docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}"
@@ -334,13 +359,13 @@ jwdocker_images() {
 
 
 jwdocker_image-pull() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_image-pull <image[:tag]>"
         echo "Examples:"
         echo "  jwdocker_image-pull nginx"
         echo "  jwdocker_image-pull nginx:alpine"
         echo "  jwdocker_image-pull ubuntu:20.04"
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local IMAGE=$1
@@ -356,13 +381,13 @@ jwdocker_image-pull() {
 
 
 jwdocker_image-build() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_image-build <tag> [dockerfile_path] [build_context]"
         echo "Examples:"
         echo "  jwdocker_image-build myapp:latest"
         echo "  jwdocker_image-build myapp:v1.0 ./Dockerfile ."
         echo "  jwdocker_image-build myapp:dev ./docker/Dockerfile.dev ./src"
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local TAG=$1
@@ -385,11 +410,11 @@ jwdocker_image-build() {
 
 
 jwdocker_image-rm() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker images --format "{{.Repository}}:{{.Tag}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local IMAGE=$1
@@ -419,13 +444,13 @@ jwdocker_image-rm() {
 
 
 jwdocker_image-history() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         echo "Usage: jwdocker_image-history <image> [--no-trunc]"
         echo
         docker images --format "{{.Repository}}:{{.Tag}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local IMAGE=$1
@@ -448,6 +473,11 @@ jwdocker_image-history() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_volumes() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_volumes [name-filter]"
+        echo "List volumes; optional name filter."
+        return 0
+    fi
     if [ $# -eq 0 ]; then
         # Show all volumes with clean formatting
         docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}"
@@ -460,11 +490,11 @@ jwdocker_volumes() {
 
 
 jwdocker_volume-inspect() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker volume ls --format "{{.Name}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local VOLUME=$1
@@ -499,13 +529,13 @@ jwdocker_volume-inspect() {
 
 
 jwdocker_volume-create() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_volume-create <volume_name> [driver] [options]"
         echo "Examples:"
         echo "  jwdocker_volume-create mydata"
         echo "  jwdocker_volume-create mydata local"
         echo "  jwdocker_volume-create mydata local --opt type=tmpfs"
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local VOLUME_NAME=$1
@@ -533,11 +563,11 @@ jwdocker_volume-create() {
 
 
 jwdocker_volume-remove() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker volume ls --format "{{.Name}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local VOLUME=$1
@@ -567,6 +597,16 @@ jwdocker_volume-remove() {
 
 
 jwdocker_volume-prune() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_volume-prune"
+        echo "Remove all unused local volumes (prompts first)."
+        return 0
+    fi
+    __jwdocker_volume-prune__
+}
+
+# internal: the body (no flag parsing); also called by jwdocker_prune.
+__jwdocker_volume-prune__() {
     echo "This will remove all unused local volumes."
     echo -n "Are you sure? [y/N] "
     read -r response
@@ -586,6 +626,11 @@ jwdocker_volume-prune() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_networks() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_networks [name-filter]"
+        echo "List networks; optional name filter."
+        return 0
+    fi
     if [ $# -eq 0 ]; then
         # Show all networks with clean formatting
         docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}"
@@ -598,11 +643,11 @@ jwdocker_networks() {
 
 
 jwdocker_network-inspect() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker network ls --format "- {{.Name}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local NETWORK=$1
@@ -618,14 +663,14 @@ jwdocker_network-inspect() {
 
 
 jwdocker_network-create() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_network-create <network_name> [driver] [options]"
         echo "Examples:"
         echo "  jwdocker_network-create mynetwork"
         echo "  jwdocker_network-create mynetwork bridge"
         echo "  jwdocker_network-create mynetwork bridge --subnet=172.20.0.0/16"
         echo "  jwdocker_network-create mynetwork overlay --attachable"
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local NETWORK_NAME=$1
@@ -653,12 +698,12 @@ jwdocker_network-create() {
 
 
 jwdocker_network-remove() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         echo "Available networks (excluding system networks):"
         docker network ls --filter type=custom --format "- {{.Name}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local NETWORK=$1
@@ -695,7 +740,7 @@ jwdocker_network-remove() {
 
 
 jwdocker_network-connect() {
-    if [ $# -lt 2 ]; then
+    if [ $# -lt 2 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_network-connect <network> <container> [options]"
         echo "Examples:"
         echo "  jwdocker_network-connect mynetwork mycontainer"
@@ -708,7 +753,7 @@ jwdocker_network-connect() {
         echo "Available containers:"
         docker ps -a --format "- {{.Names}}"
         echo
-        return 1
+        { [ "$1" = "-h" ] || [ "$1" = "--help" ]; } && return 0 || return 1
     fi
 
     local NETWORK=$1
@@ -733,7 +778,7 @@ jwdocker_network-connect() {
 
 
 jwdocker_network-disconnect() {
-    if [ $# -lt 2 ]; then
+    if [ $# -lt 2 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_network-disconnect <network> <container> [force]"
         echo "Examples:"
         echo "  jwdocker_network-disconnect mynetwork mycontainer"
@@ -745,7 +790,7 @@ jwdocker_network-disconnect() {
         echo "Available containers:"
         docker ps -a --format "- {{.Names}}"
         echo
-        return 1
+        { [ "$1" = "-h" ] || [ "$1" = "--help" ]; } && return 0 || return 1
     fi
 
     local NETWORK=$1
@@ -762,6 +807,16 @@ jwdocker_network-disconnect() {
 
 
 jwdocker_network-prune() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_network-prune"
+        echo "Remove all unused networks (prompts first)."
+        return 0
+    fi
+    __jwdocker_network-prune__
+}
+
+# internal: the body (no flag parsing); also called by jwdocker_prune.
+__jwdocker_network-prune__() {
     echo "This will remove all unused networks."
     echo -n "Are you sure? [y/N] "
     read -r response
@@ -781,6 +836,11 @@ jwdocker_network-prune() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_monitor-stats() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_monitor-stats [container ...]"
+        echo "Live CPU/mem/IO stats; all running, or the named containers."
+        return 0
+    fi
     if [ $# -eq 0 ]; then
         # Show stats for all running containers with clean formatting
         docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
@@ -792,11 +852,11 @@ jwdocker_monitor-stats() {
 
 
 jwdocker_monitor-top() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker ps --filter status=running --format "{{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -808,6 +868,11 @@ jwdocker_monitor-top() {
 
 
 jwdocker_monitor-health() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_monitor-health"
+        echo "Health / status of every container (color-coded)."
+        return 0
+    fi
     echo
     echo "---[ Container Health Status ]-------------------------"
     docker ps --format "table {{.Names}}\t{{.Status}}" | head -1
@@ -832,6 +897,11 @@ jwdocker_monitor-health() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_disk-usage() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_disk-usage"
+        echo "Docker disk usage — docker system df (-v for detail)."
+        return 0
+    fi
     echo
     echo "---[ Docker Disk Usage ]---------------------------"
     docker system df
@@ -843,6 +913,11 @@ jwdocker_disk-usage() {
 
 
 jwdocker_system-info() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_system-info"
+        echo "Docker client/server versions + system info."
+        return 0
+    fi
     echo
     echo "---[ Docker System Information ]-------------------"
     docker version --format "Client Version: {{.Client.Version}}"
@@ -861,7 +936,7 @@ jwdocker_system-info() {
 
 
 jwdocker_prune() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_prune [containers|images|volumes|networks|system|all]"
         echo "Examples:"
         echo "  jwdocker_prune containers  # Remove stopped containers"
@@ -870,7 +945,7 @@ jwdocker_prune() {
         echo "  jwdocker_prune networks    # Remove unused networks"
         echo "  jwdocker_prune system      # Remove containers, networks, images (not volumes)"
         echo "  jwdocker_prune all         # Remove everything unused (including volumes)"
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local TYPE=$1
@@ -901,10 +976,10 @@ jwdocker_prune() {
             fi
             ;;
         volumes)
-            jwdocker_volume-prune
+            __jwdocker_volume-prune__
             ;;
         networks)
-            jwdocker_network-prune
+            __jwdocker_network-prune__
             ;;
         system)
             echo "This will remove:"
@@ -953,6 +1028,11 @@ jwdocker_prune() {
 
 
 jwdocker_cleanup() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_cleanup"
+        echo "Interactive wizard to clean up stopped / unused Docker objects."
+        return 0
+    fi
     echo "🧹 Docker Cleanup Wizard"
     echo "========================"
     echo
@@ -1037,14 +1117,14 @@ jwdocker_cleanup() {
 
 
 jwdocker_size() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_size [containers|images|volumes|all]"
         echo "Examples:"
         echo "  jwdocker_size containers  # Show container sizes"
         echo "  jwdocker_size images      # Show image sizes"
         echo "  jwdocker_size volumes     # Show volume sizes"
         echo "  jwdocker_size all         # Show everything"
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local TYPE=$1
@@ -1088,7 +1168,7 @@ jwdocker_size() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_save() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_save <image> [output_file]"
         echo "Examples:"
         echo "  jwdocker_save nginx                    # Saves to nginx.tar"
@@ -1098,7 +1178,7 @@ jwdocker_save() {
         echo "Available images:"
         docker images --format "- {{.Repository}}:{{.Tag}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local IMAGE=$1
@@ -1122,7 +1202,7 @@ jwdocker_save() {
 
 
 jwdocker_load() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_load <tar_file>"
         echo "Examples:"
         echo "  jwdocker_load nginx.tar"
@@ -1133,7 +1213,7 @@ jwdocker_load() {
         tars=$(find . -maxdepth 1 -name '*.tar' 2>/dev/null | sort)
         if [ -n "$tars" ]; then printf '%s\n' "$tars"; else echo "  (no .tar files found)"; fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local TAR_FILE=$1
@@ -1160,7 +1240,7 @@ jwdocker_load() {
 
 
 jwdocker_export() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_export <container> [output_file]"
         echo "Examples:"
         echo "  jwdocker_export mycontainer                    # Exports to mycontainer.tar"
@@ -1169,7 +1249,7 @@ jwdocker_export() {
         echo "Available containers:"
         docker ps -a --format "- {{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -1193,7 +1273,7 @@ jwdocker_export() {
 
 
 jwdocker_import() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_import <tar_file> [repository[:tag]]"
         echo "Examples:"
         echo "  jwdocker_import container.tar                    # Imports as <none>:<none>"
@@ -1204,7 +1284,7 @@ jwdocker_import() {
         tars=$(find . -maxdepth 1 -name '*.tar' 2>/dev/null | sort)
         if [ -n "$tars" ]; then printf '%s\n' "$tars"; else echo "  (no .tar files found)"; fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local TAR_FILE=$1
@@ -1249,13 +1329,13 @@ jwdocker_import() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_search() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_search <search_term> [limit]"
         echo "Examples:"
         echo "  jwdocker_search nginx"
         echo "  jwdocker_search nginx 10"
         echo "  jwdocker_search ubuntu/nginx"
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local SEARCH_TERM=$1
@@ -1269,7 +1349,7 @@ jwdocker_search() {
 
 
 jwdocker_backup() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_backup <container> [backup_dir]"
         echo "Examples:"
         echo "  jwdocker_backup mycontainer"
@@ -1283,7 +1363,7 @@ jwdocker_backup() {
         echo "Available containers:"
         docker ps -a --format "- {{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -1350,7 +1430,7 @@ EOF
 
 
 jwdocker_cp() {
-    if [ $# -lt 2 ]; then
+    if [ $# -lt 2 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_cp <source> <destination>"
         echo "Examples:"
         echo "  jwdocker_cp mycontainer:/app/config.txt ./config.txt"
@@ -1360,7 +1440,7 @@ jwdocker_cp() {
         echo "Available containers:"
         docker ps -a --format "- {{.Names}}"
         echo
-        return 1
+        { [ "$1" = "-h" ] || [ "$1" = "--help" ]; } && return 0 || return 1
     fi
 
     local SOURCE=$1
@@ -1386,7 +1466,7 @@ jwdocker_cp() {
 
 
 jwdocker_run() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_run [options] <image> [command]"
         echo "       (arguments are passed straight to 'docker run' in native order)"
         echo "Examples:"
@@ -1404,7 +1484,7 @@ jwdocker_run() {
         echo "  -e <VAR>=<value>      Environment variable"
         echo "  --name <name>         Container name"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     echo "Running container..."
@@ -1426,7 +1506,7 @@ jwdocker_run() {
 
 
 jwdocker_tag() {
-    if [ $# -lt 2 ]; then
+    if [ $# -lt 2 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_tag <source_image> <target_image>"
         echo "Examples:"
         echo "  jwdocker_tag nginx:latest myregistry.com/nginx:v1.0"
@@ -1436,7 +1516,7 @@ jwdocker_tag() {
         echo "Available images:"
         docker images --format "- {{.Repository}}:{{.Tag}}"
         echo
-        return 1
+        { [ "$1" = "-h" ] || [ "$1" = "--help" ]; } && return 0 || return 1
     fi
 
     local SOURCE_IMAGE=$1
@@ -1457,7 +1537,7 @@ jwdocker_tag() {
 
 
 jwdocker_push() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_push <image>"
         echo "Examples:"
         echo "  jwdocker_push myregistry.com/myapp:latest"
@@ -1466,7 +1546,7 @@ jwdocker_push() {
         echo "Available images:"
         docker images --format "- {{.Repository}}:{{.Tag}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local IMAGE=$1
@@ -1483,7 +1563,7 @@ jwdocker_push() {
 
 
 jwdocker_test-connectivity() {
-    if [ $# -lt 2 ]; then
+    if [ $# -lt 2 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_test-connectivity <source_container> <target_container> [port]"
         echo "Examples:"
         echo "  jwdocker_test-connectivity web database"
@@ -1499,7 +1579,7 @@ jwdocker_test-connectivity() {
         echo "Available running containers:"
         docker ps --format "- {{.Names}}"
         echo
-        return 1
+        { [ "$1" = "-h" ] || [ "$1" = "--help" ]; } && return 0 || return 1
     fi
 
     local SOURCE_CONTAINER=$1
@@ -1661,11 +1741,11 @@ jwdocker_test-connectivity() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_exec() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker ps --filter status=running --format "{{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -1677,11 +1757,11 @@ jwdocker_exec() {
 
 
 jwdocker_logs() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo -e "\n\t???"
         docker ps -a --format "{{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -1695,6 +1775,11 @@ jwdocker_logs() {
 
 
 jwdocker_port() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdocker_port [container]"
+        echo "Show port mappings; all containers, or the named one."
+        return 0
+    fi
     if [ $# -eq 0 ]; then
         echo
         echo "---[ Port Mappings ]--------------------------------"
@@ -1715,7 +1800,7 @@ jwdocker_port() {
 # ---------------------------------------------------------------------------------
 
 jwdocker_test() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_test <container> <test_type> [options]"
         echo "Test types:"
         echo "  health      - Check container health, status, and restart count"
@@ -1736,7 +1821,7 @@ jwdocker_test() {
         echo "Available containers:"
         docker ps -a --format "- {{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1
@@ -2180,7 +2265,7 @@ __jwdocker_test_stats__() {
 
 
 jwdocker_debug() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdocker_debug <container> [focus_area]"
         echo "Focus areas:"
         echo "  startup     - Debug container startup issues"
@@ -2197,7 +2282,7 @@ jwdocker_debug() {
         echo "Available containers:"
         docker ps -a --format "- {{.Names}}"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local CONTAINER=$1

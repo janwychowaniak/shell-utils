@@ -75,7 +75,7 @@ __jwdeb_kv__() {
 # ---------------------------------------------------------------------------------
 
 jwdeb_search() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_search <search_term> [options]"
         echo "Examples:"
         echo "  jwdeb_search nginx"
@@ -86,7 +86,7 @@ jwdeb_search() {
         echo "  --installed     Search only installed packages"
         echo "  --names-only    Search package names only"
         echo "  --full          Show full descriptions"
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local SEARCH_TERM=$1
@@ -132,7 +132,7 @@ jwdeb_search() {
 
 
 jwdeb_info() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_info <package_name>"
         echo "Examples:"
         echo "  jwdeb_info nginx"
@@ -141,7 +141,7 @@ jwdeb_info() {
         echo "Available packages (recently updated):"
         apt list --upgradable 2>/dev/null | tail -n +2 | cut -d'/' -f1 | sed 's/^/- /'
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local PACKAGE=$1
@@ -194,7 +194,7 @@ jwdeb_info() {
 
 
 jwdeb_depends() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_depends <package_name> [--tree]"
         echo "Examples:"
         echo "  jwdeb_depends nginx"
@@ -203,7 +203,7 @@ jwdeb_depends() {
         echo "Available installed packages:"
         dpkg -l | grep "^ii" | awk '{print $2}' | sed 's/^/- /'
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local PACKAGE=$1
@@ -239,7 +239,7 @@ jwdeb_depends() {
 
 
 jwdeb_files() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_files <package_name>"
         echo "Examples:"
         echo "  jwdeb_files nginx"
@@ -248,7 +248,7 @@ jwdeb_files() {
         echo "Recently installed packages:"
         grep " install " /var/log/dpkg.log 2>/dev/null | awk '{print $4}' | sed 's/^/- /' || echo "- (log not accessible)"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local PACKAGE=$1
@@ -287,14 +287,14 @@ jwdeb_files() {
 
 
 jwdeb_which() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_which <file_path>"
         echo "Examples:"
         echo "  jwdeb_which /usr/bin/nginx"
         echo "  jwdeb_which /etc/nginx/nginx.conf"
         echo "  jwdeb_which nginx"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     local FILE_PATH=$1
@@ -393,7 +393,7 @@ jwdeb_policy() {
 # ---------------------------------------------------------------------------------
 
 jwdeb_install() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_install <package_name> [package2] [package3] ..."
         echo "Examples:"
         echo "  jwdeb_install nginx"
@@ -405,7 +405,7 @@ jwdeb_install() {
         echo "- python3-pip nodejs npm"
         echo "- nginx apache2 mysql-server postgresql"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     echo "📦 Installing packages: $*"
@@ -465,7 +465,7 @@ jwdeb_install() {
 
 
 jwdeb_remove() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_remove <package_name> [package2] [package3] ..."
         echo "Examples:"
         echo "  jwdeb_remove nginx"
@@ -474,7 +474,7 @@ jwdeb_remove() {
         echo "Recently installed packages:"
         grep " install " /var/log/dpkg.log 2>/dev/null | awk '{print $4}' | sed 's/^/- /' || echo "- (log not accessible)"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     echo "🗑️  Removing packages: $*"
@@ -555,7 +555,7 @@ jwdeb_remove() {
 
 
 jwdeb_purge() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_purge <package_name> [package2] [package3] ..."
         echo "Examples:"
         echo "  jwdeb_purge nginx"
@@ -566,7 +566,7 @@ jwdeb_purge() {
         echo "Packages with remaining config files:"
         dpkg -l | grep "^rc" | awk '{print "- " $2}'
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     echo "🗑️  Purging packages (including config files): $*"
@@ -656,7 +656,7 @@ jwdeb_purge() {
 
 
 jwdeb_reinstall() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_reinstall <package_name> [package2] ..."
         echo "Examples:"
         echo "  jwdeb_reinstall nginx        # Re-install nginx (repair its files)"
@@ -665,7 +665,7 @@ jwdeb_reinstall() {
         echo "Re-downloads and reinstalls already-installed packages at the same"
         echo "version — useful to repair corrupted or deleted files."
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     echo "♻️  Reinstalling packages: $*"
@@ -705,7 +705,7 @@ jwdeb_reinstall() {
 
 
 jwdeb_download() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_download <package_name> [package2] ..."
         echo "Examples:"
         echo "  jwdeb_download nginx         # Fetch nginx's .deb into the current dir"
@@ -714,7 +714,7 @@ jwdeb_download() {
         echo "Downloads the .deb file(s) into \$PWD without installing — no sudo"
         echo "needed. Install a local file later with: jwdeb_install ./<file>.deb"
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     echo "⬇️  Downloading .deb package(s) into: $PWD"
@@ -830,7 +830,7 @@ jwdeb_unhold() {
             echo "  (none)"
         fi
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     echo "🔓 Releasing hold: $*"
@@ -880,6 +880,11 @@ jwdeb_unhold() {
 # ---------------------------------------------------------------------------------
 
 jwdeb_update() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_update"
+        echo "Refresh the local package index (apt update)."
+        return 0
+    fi
     echo "🔄 Updating package lists..."
     echo "=================================================="
     echo
@@ -931,8 +936,13 @@ jwdeb_update() {
 
 
 jwdeb_upgrade() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_upgrade [--dist]"
+        echo "Upgrade installed packages; --dist runs a full dist-upgrade."
+        return 0
+    fi
     if [ "$1" = "--dist" ]; then
-        jwdeb_dist-upgrade
+        __jwdeb_dist-upgrade__
         return
     fi
     
@@ -1018,6 +1028,16 @@ jwdeb_upgrade() {
 
 
 jwdeb_dist-upgrade() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_dist-upgrade"
+        echo "Full dist-upgrade (may add/remove packages). Prompts before running."
+        return 0
+    fi
+    __jwdeb_dist-upgrade__
+}
+
+# internal: the dist-upgrade body (no flag parsing); also called by jwdeb_upgrade --dist.
+__jwdeb_dist-upgrade__() {
     echo "🚀 Performing distribution upgrade..."
     echo "=================================================="
     echo
@@ -1112,6 +1132,11 @@ jwdeb_dist-upgrade() {
 # ---------------------------------------------------------------------------------
 
 jwdeb_autoremove() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_autoremove"
+        echo "Remove automatically-installed packages no longer needed."
+        return 0
+    fi
     echo "🧹 Removing automatically installed unused packages..."
     echo "=================================================="
     echo
@@ -1178,6 +1203,11 @@ jwdeb_autoremove() {
 
 
 jwdeb_autoclean() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_autoclean"
+        echo "Delete stale .deb archives from the apt cache (keeps current)."
+        return 0
+    fi
     echo "🧹 Cleaning package cache..."
     echo "=================================================="
     echo
@@ -1261,6 +1291,11 @@ jwdeb_autoclean() {
 
 
 jwdeb_clean() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_clean"
+        echo "Delete ALL cached .deb archives from the apt cache."
+        return 0
+    fi
     echo "🧹 Cleaning ALL package cache files..."
     echo "=================================================="
     echo
@@ -1485,7 +1520,7 @@ jwdeb_installed() {
 
 
 jwdeb_size() {
-    if [ $# -eq 0 ]; then
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwdeb_size <package_name> | --top [N]"
         echo "Examples:"
         echo "  jwdeb_size nginx              # Show size of a specific package"
@@ -1494,7 +1529,7 @@ jwdeb_size() {
         echo
         echo "Note: --top ranks every installed package by on-disk size."
         echo
-        return 1
+        [ $# -eq 0 ] && return 1 || return 0
     fi
 
     if [ "$1" = "--top" ]; then
@@ -1606,6 +1641,11 @@ jwdeb_size() {
 
 
 jwdeb_orphans() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_orphans"
+        echo "List orphaned library packages (deborphan)."
+        return 0
+    fi
     echo "🔍 Finding orphaned packages..."
     echo "=================================================="
     echo
@@ -1738,6 +1778,11 @@ jwdeb_history() {
 # ---------------------------------------------------------------------------------
 
 jwdeb_broken() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_broken"
+        echo "Check for broken / unmet package dependencies."
+        return 0
+    fi
     echo "🔧 Checking for broken packages..."
     echo "=================================================="
     echo
@@ -1836,6 +1881,11 @@ jwdeb_broken() {
 
 
 jwdeb_fix() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_fix"
+        echo "Repair broken dependencies (apt --fix-broken install)."
+        return 0
+    fi
     echo "🔧 Attempting to fix package system issues..."
     echo "=================================================="
     echo
@@ -1918,6 +1968,11 @@ jwdeb_fix() {
 
 
 jwdeb_diag() {
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwdeb_diag"
+        echo "apt subsystem health report: sources, versions, cache, package stats."
+        return 0
+    fi
     echo "🔍 System Package Diagnostics"
     echo "=================================================="
     echo

@@ -12,9 +12,6 @@
 # anything blindly. perms / owners / type are READ-ONLY here by design.
 #
 # Built incrementally (greenfield, demand-driven). Planned next:
-#   posture : jwfiles_stat       🟢  rich stat of one path
-#             jwfiles_perms      🟢  odd-perms scan (world-writable, setuid, ...)
-#             jwfiles_owners     🟢  ownership breakdown
 #   hygiene : jwfiles_symlinks   🟢  symlinks + targets; flags broken
 #             jwfiles_empty      🟢  empty files & dirs
 #             jwfiles_dupes      🟢  duplicate files by hash
@@ -52,6 +49,11 @@ jwfiles_toc() {
     __jwfiles_toc_row__ 🟢 jwfiles_find "name search, highlighted"
     __jwfiles_toc_row__ 🟢 jwfiles_grep "content search (rg→grep)"
     __jwfiles_toc_row__ 🟢 jwfiles_ext  "extension inventory + counts"
+    echo
+    echo " -----------------------------  posture / attributes (read-only)"
+    __jwfiles_toc_row__ 🟢 jwfiles_stat   "rich stat of one path"
+    __jwfiles_toc_row__ 🟢 jwfiles_perms  "odd-perms scan (RO)"
+    __jwfiles_toc_row__ 🟢 jwfiles_owners "ownership breakdown"
     echo
 }
 
@@ -415,4 +417,102 @@ jwfiles_ext() {
     fi
     find "$dir" -type f 2>/dev/null | sed -n 's/.*\.\([^./]\{1,\}\)$/\1/p' \
         | sort | uniq -c | sort -rn
+}
+
+
+# ---------------------------------------------------------------------------------
+# posture / attributes (read-only — mutating these is the agent's job)
+# ---------------------------------------------------------------------------------
+
+# Rich, read-only metadata for one path (a single stat call, parsed field-wise):
+# type, symbolic+octal perms, owner/group (names + numeric), size, hard links,
+# inode, and access/modify/change times. Symlinks report the LINK itself (its
+# target is shown in the header), so a broken symlink still resolves.
+jwfiles_stat() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwfiles_stat <path>"
+        echo "  Rich read-only metadata for one path: type, perms (symbolic + octal),"
+        echo "  owner/group, size, links, inode, and access/modify/change times."
+        echo "Examples:"
+        echo "  jwfiles_stat ./report.pdf"
+        echo "  jwfiles_stat /etc/passwd"
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    local p="$1"
+    if [ ! -e "$p" ] && [ ! -L "$p" ]; then
+        echo "❌ no such path: $p" >&2
+        return 1
+    fi
+    local ftype perms operm owner group uid gid size links inode atime mtime ctime
+    IFS='|' read -r ftype perms operm owner group uid gid size links inode atime mtime ctime \
+        < <(stat -c '%F|%A|%a|%U|%G|%u|%g|%s|%h|%i|%x|%y|%z' -- "$p" 2>/dev/null)
+    echo
+    echo "---[ $(stat -c '%N' -- "$p" 2>/dev/null) ]---"
+    __jwfiles_kv__ "Type"   "$ftype"
+    __jwfiles_kv__ "Perms"  "$perms  ($operm)"
+    __jwfiles_kv__ "Owner"  "$owner:$group  ($uid:$gid)"
+    __jwfiles_kv__ "Size"   "$size bytes  ($(numfmt --to=iec "$size" 2>/dev/null || echo "$size"))"
+    __jwfiles_kv__ "Links"  "$links"
+    __jwfiles_kv__ "Inode"  "$inode"
+    __jwfiles_kv__ "Access" "$atime"
+    __jwfiles_kv__ "Modify" "$mtime"
+    __jwfiles_kv__ "Change" "$ctime"
+    echo
+}
+
+# Read-only scan for security-relevant permissions in the subtree. Reports only
+# (each row: symbolic perms, owner:group, path) — it never chmods anything; fixing
+# perms is the agent's lane. Sections: world-writable files, world-writable dirs
+# missing the sticky bit, setuid, setgid.
+jwfiles_perms() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_perms [dir]"
+            echo "  Read-only scan for risky permissions under [dir] (default: .):"
+            echo "  world-writable files, world-writable dirs w/o sticky bit, setuid, setgid."
+            echo "  Reports only — never changes anything (chmod is the agent's job)."
+            echo "Examples:"
+            echo "  jwfiles_perms"
+            echo "  jwfiles_perms /var/www"
+            return 0 ;;
+    esac
+    local dir="${1:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    echo
+    echo "---[ World-writable files ]---"
+    find "$dir" -type f -perm -o+w -printf '%M  %u:%g  %p\n' 2>/dev/null
+    echo
+    echo "---[ World-writable dirs without sticky bit ]---"
+    find "$dir" -type d -perm -o+w ! -perm -1000 -printf '%M  %u:%g  %p\n' 2>/dev/null
+    echo
+    echo "---[ setuid ]---"
+    find "$dir" -type f -perm -4000 -printf '%M  %u:%g  %p\n' 2>/dev/null
+    echo
+    echo "---[ setgid ]---"
+    find "$dir" -type f -perm -2000 -printf '%M  %u:%g  %p\n' 2>/dev/null
+    echo
+}
+
+# Ownership breakdown of the subtree: item count per user:group, most-first.
+# The "whose files are these?" glance. Uncapped, read-only.
+jwfiles_owners() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_owners [dir]"
+            echo "  Ownership breakdown of the subtree under [dir] (default: .):"
+            echo "  item count per user:group, most-first. Reports only."
+            echo "Examples:"
+            echo "  jwfiles_owners"
+            echo "  jwfiles_owners /srv"
+            return 0 ;;
+    esac
+    local dir="${1:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    find "$dir" -printf '%u:%g\n' 2>/dev/null | sort | uniq -c | sort -rn
 }

@@ -101,6 +101,11 @@ B=(
   "jwfiles_disk '$FIX'"
   "jwfiles_oldest '$FIX'"
   "jwfiles_oldest 2 '$FIX'"
+  "jwfiles_stat '$FIX/a.txt'"
+  "jwfiles_stat '$FIX/link_broken'"         # broken symlink -> reports the link
+  "jwfiles_stat '$FIX'"                      # a directory
+  "jwfiles_perms '$FIX'"
+  "jwfiles_owners '$FIX'"
   "jwfiles_profile /nonexistent_xyz"        # not-a-dir error path
   "jwfiles_size /nonexistent_xyz"
   "jwfiles_recent 5 /nonexistent_xyz"
@@ -110,6 +115,9 @@ B=(
   "jwfiles_tree '$FIX' notanint"            # bad-depth error path
   "jwfiles_disk /nonexistent_xyz"
   "jwfiles_oldest 2 /nonexistent_xyz"
+  "jwfiles_stat /nonexistent_xyz"
+  "jwfiles_perms /nonexistent_xyz"
+  "jwfiles_owners /nonexistent_xyz"
 )
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -142,6 +150,8 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwfiles_bigfiles '$FIX'"
     "jwfiles_bigfiles 3 '$FIX'"
     "jwfiles_oldest '$FIX'"
+    "jwfiles_perms '$FIX'"
+    "jwfiles_owners '$FIX'"
   )
   n=0
   for inv in "${RO[@]}"; do

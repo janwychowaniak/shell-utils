@@ -4,17 +4,15 @@
 # table of contents
 # ---------------------------------------------------------------------------------
 #
-# Oversight-first area — the read-only cockpit for the local filesystem. Where
-# jwweb_* answers "what's the state of this endpoint?" without touching it,
-# jwfiles_* answers "what's the state of this directory tree?" before (and after)
-# you let an agent loose on it. Mutating the tree — chmod / chown / mv / rm /
-# sync — is deliberately the AGENT's lane, so this file stays a place you can run
-# anything blindly. perms / owners / type are READ-ONLY here by design.
+# Oversight-first area — the read-only cockpit for the local filesystem: quick
+# tools that answer "what's the state of this directory tree?" without changing
+# anything. The whole file is 🟢 read-only — perms / owners / stat only report,
+# and even jwfiles_backup just PRINTS the cp -a command for you to run. No
+# delete/trash tool on purpose — it must work on headless servers (no desktop
+# Trash), where deletion is plain `rm`.
 #
 # Built incrementally (greenfield). The map is complete — jwfiles_toc() is the
-# live index. The whole file is 🟢 read-only: even jwfiles_backup only PRINTS the
-# cp -a command for you to run. No delete/trash tool on purpose — it must work on
-# headless servers (no desktop Trash); deletion there is plain `rm` or the agent.
+# live index.
 
 # One TOC row: blast-radius marker, padded function name, one-line "soul" tagline.
 # printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
@@ -26,7 +24,7 @@ __jwfiles_toc_row__() {
 jwfiles_toc() {
     echo
     echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
-    echo "   (oversight-first: mutating perms / owners / content is the agent's job)"
+    echo "   (oversight-first — this whole area is read-only; nothing here changes state)"
     echo
     echo " -----------------------------  orientation (the cockpit)"
     __jwfiles_toc_row__ 🟢 jwfiles_profile "one-shot dir X-ray"
@@ -93,10 +91,10 @@ __jwfiles_cap__() {
 # orientation (the cockpit)
 # ---------------------------------------------------------------------------------
 
-# One-shot, read-only X-ray of a directory tree. The jwweb_diag of the local FS.
-# The bounded "top N" lists below are the documented diag-style exception to the
-# repo's no-silent-caps rule (like jwweb_diag's "last 20") — a profile is a
-# summary, not a viewer; the dedicated viewers (jwfiles_size / _recent) are uncapped.
+# One-shot, read-only X-ray of a directory tree — the aggregate profiler of this area.
+# The bounded "top N" lists below are the deliberate exception to the repo's
+# no-silent-caps rule — a profile is a summary, not a viewer; the dedicated viewers
+# (jwfiles_size / _recent) are uncapped.
 jwfiles_profile() {
     case "${1:-}" in
         -h|--help)
@@ -426,7 +424,7 @@ jwfiles_ext() {
 
 
 # ---------------------------------------------------------------------------------
-# posture / attributes (read-only — mutating these is the agent's job)
+# posture / attributes (read-only — these only report, never change anything)
 # ---------------------------------------------------------------------------------
 
 # Rich, read-only metadata for one path (a single stat call, parsed field-wise):
@@ -466,16 +464,15 @@ jwfiles_stat() {
 }
 
 # Read-only scan for security-relevant permissions in the subtree. Reports only
-# (each row: symbolic perms, owner:group, path) — it never chmods anything; fixing
-# perms is the agent's lane. Sections: world-writable files, world-writable dirs
-# missing the sticky bit, setuid, setgid.
+# (each row: symbolic perms, owner:group, path) — it never chmods anything. Sections:
+# world-writable files, world-writable dirs missing the sticky bit, setuid, setgid.
 jwfiles_perms() {
     case "${1:-}" in
         -h|--help)
             echo "Usage: jwfiles_perms [dir]"
             echo "  Read-only scan for risky permissions under [dir] (default: .):"
             echo "  world-writable files, world-writable dirs w/o sticky bit, setuid, setgid."
-            echo "  Reports only — never changes anything (chmod is the agent's job)."
+            echo "  Reports only — never changes anything."
             echo "Examples:"
             echo "  jwfiles_perms"
             echo "  jwfiles_perms /var/www"
@@ -554,8 +551,8 @@ jwfiles_symlinks() {
     echo
 }
 
-# Empty files and empty directories in the subtree — the clutter both agents and
-# `find -delete` care about. Read-only (listing only). Uncapped.
+# Empty files and empty directories in the subtree — the usual `find -delete`
+# clutter, listed. Read-only (listing only). Uncapped.
 jwfiles_empty() {
     case "${1:-}" in
         -h|--help)
@@ -622,14 +619,14 @@ jwfiles_dupes() {
 
 # Names that will bite later: with spaces, with shell/glob-special ASCII, or with
 # non-ASCII bytes — three labeled subtree scans (grep on the path, so no fragile
-# find-glob escaping). Read-only; renaming is the agent's job (or fs.sh's batch tools).
+# find-glob escaping). Read-only — reports only.
 jwfiles_weirdnames() {
     case "${1:-}" in
         -h|--help)
             echo "Usage: jwfiles_weirdnames [dir]"
             echo "  Scan the subtree under [dir] (default: .) for problematic names:"
             echo "  names with spaces, shell/glob-special characters, or non-ASCII bytes."
-            echo "  Reports only — renaming is the agent's job (or fs.sh's batch tools)."
+            echo "  Reports only."
             echo "Examples:"
             echo "  jwfiles_weirdnames"
             echo "  jwfiles_weirdnames ~/Music"
@@ -660,9 +657,9 @@ jwfiles_weirdnames() {
 
 # 🟢 Print (do NOT run) the `cp -a` command that would snapshot each path alongside
 # itself as <path>.<YYYYMMDD-HHMMSS>.JWBAK. Read-only by design: you see exactly what
-# would happen and run it yourself — eyeball it, or pipe to a shell. Mirrors the legacy
-# jwbackupfile (show the command, don't execute); missing paths are flagged on stderr
-# so stdout stays a clean, runnable command list.
+# would happen and run it yourself — eyeball it, or pipe to a shell. Print-the-command,
+# don't-execute is intentional; missing paths are flagged on stderr so stdout stays a
+# clean, runnable command list.
 jwfiles_backup() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwfiles_backup <path> [path...]"

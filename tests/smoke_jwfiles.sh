@@ -52,8 +52,6 @@ printf 'y\n'              > "$FIX/sub/deep/data.json"
 printf '#\n'             > "$FIX/.hidden"
 : > "$FIX/empty.txt"                              # empty file
 printf 'spaced\n'          > "$FIX/with space.txt"
-printf 'twin\n'            > "$FIX/dup1.txt"        # duplicate content pair...
-printf 'twin\n'            > "$FIX/sub/dup2.txt"    # ...for jwfiles_dupes
 printf 'z\n'               > "$FIX/weird\$name.txt" # shell-special char in name
 printf 'z\n'               > "$FIX/ąę.txt"          # non-ASCII name
 ln -s a.txt                  "$FIX/link_ok"        # valid symlink
@@ -112,7 +110,6 @@ B=(
   "jwfiles_owners '$FIX'"
   "jwfiles_symlinks '$FIX'"
   "jwfiles_empty '$FIX'"
-  "jwfiles_dupes '$FIX'"
   "jwfiles_weirdnames '$FIX'"
   "jwfiles_backup '$FIX/a.txt'"             # 🟢 prints the cp -a command (no side effect)
   "jwfiles_backup '$FIX/empty_dir'"         # prints the command for a directory too
@@ -130,7 +127,6 @@ B=(
   "jwfiles_owners /nonexistent_xyz"
   "jwfiles_symlinks /nonexistent_xyz"
   "jwfiles_empty /nonexistent_xyz"
-  "jwfiles_dupes /nonexistent_xyz"
   "jwfiles_weirdnames /nonexistent_xyz"
   "jwfiles_backup /nonexistent_xyz"         # missing path -> warns, still prints cmd
 )
@@ -169,7 +165,6 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwfiles_owners '$FIX'"
     "jwfiles_symlinks '$FIX'"
     "jwfiles_empty '$FIX'"
-    "jwfiles_dupes '$FIX'"
     "jwfiles_weirdnames '$FIX'"
   )
   n=0

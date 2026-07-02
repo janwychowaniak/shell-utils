@@ -52,7 +52,6 @@ jwfiles_toc() {
     echo " -----------------------------  hygiene / anomalies"
     __jwfiles_toc_row__ 🟢 jwfiles_symlinks   "symlinks + targets, broken"
     __jwfiles_toc_row__ 🟢 jwfiles_empty      "empty files & dirs"
-    __jwfiles_toc_row__ 🟢 jwfiles_dupes      "duplicate files by hash"
     __jwfiles_toc_row__ 🟢 jwfiles_weirdnames "spaces/special/non-ASCII"
     echo
     echo " -----------------------------  backup (prints the command)"
@@ -575,46 +574,6 @@ jwfiles_empty() {
     echo "---[ Empty dirs ]---"
     find "$dir" -mindepth 1 -type d -empty 2>/dev/null | sort
     echo
-}
-
-# Duplicate files by CONTENT hash: groups of ≥2 files with identical bytes.
-# sha256sum (md5sum fallback); grouped first-seen on hash-sorted input, so the
-# output is deterministic. Read-only. Heavy on large trees (hashes every file).
-jwfiles_dupes() {
-    case "${1:-}" in
-        -h|--help)
-            echo "Usage: jwfiles_dupes [dir]"
-            echo "  Groups of files under [dir] (default: .) with identical content,"
-            echo "  matched by hash. Read-only; hashes every file, so heavy on big trees."
-            echo "Examples:"
-            echo "  jwfiles_dupes"
-            echo "  jwfiles_dupes ~/Pictures"
-            return 0 ;;
-    esac
-    local dir="${1:-.}"
-    if [ ! -d "$dir" ]; then
-        echo "❌ not a directory: $dir" >&2
-        return 1
-    fi
-    local hasher=""
-    if command -v sha256sum >/dev/null 2>&1; then
-        hasher=sha256sum
-    elif command -v md5sum >/dev/null 2>&1; then
-        hasher=md5sum
-    else
-        echo "❌ need sha256sum or md5sum" >&2
-        return 1
-    fi
-    find "$dir" -type f -exec "$hasher" {} + 2>/dev/null | sort | awk '
-        { idx = index($0, "  "); h = substr($0, 1, idx - 1); f = substr($0, idx + 2)
-          if (!(h in seen)) { seen[h] = 1; order[++k] = h }
-          files[h] = files[h] "    " f "\n"; count[h]++ }
-        END {
-          n = 0
-          for (i = 1; i <= k; i++) { h = order[i]
-              if (count[h] > 1) { n++; printf "── %s (%d copies)\n%s", h, count[h], files[h] } }
-          if (n == 0) print "(no duplicate content found)"
-        }'
 }
 
 # Names that will bite later: with spaces, with shell/glob-special ASCII, or with

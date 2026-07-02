@@ -12,10 +12,6 @@
 # anything blindly. perms / owners / type are READ-ONLY here by design.
 #
 # Built incrementally (greenfield, demand-driven). Planned next:
-#   size    : jwfiles_bigfiles   🟢  largest individual files in subtree
-#             jwfiles_disk       🟢  df + inode usage for cwd's mount
-#   change  : jwfiles_oldest     🟢  least-recently-modified files
-#   tree    : jwfiles_tree       🟢  depth-limited tree (tree→find fallback)
 #   posture : jwfiles_stat       🟢  rich stat of one path
 #             jwfiles_perms      🟢  odd-perms scan (world-writable, setuid, ...)
 #             jwfiles_owners     🟢  ownership breakdown
@@ -41,12 +37,16 @@ jwfiles_toc() {
     echo
     echo " -----------------------------  orientation (the cockpit)"
     __jwfiles_toc_row__ 🟢 jwfiles_profile "one-shot dir X-ray"
+    __jwfiles_toc_row__ 🟢 jwfiles_tree    "depth-limited tree view"
     echo
     echo " -----------------------------  size / disk pressure"
-    __jwfiles_toc_row__ 🟢 jwfiles_size "du, sorted, human — this dir"
+    __jwfiles_toc_row__ 🟢 jwfiles_size     "du, sorted, human — this dir"
+    __jwfiles_toc_row__ 🟢 jwfiles_bigfiles "largest files, subtree"
+    __jwfiles_toc_row__ 🟢 jwfiles_disk     "df + inodes for the mount"
     echo
     echo " -----------------------------  recency / change"
     __jwfiles_toc_row__ 🟢 jwfiles_recent "newest files, subtree"
+    __jwfiles_toc_row__ 🟢 jwfiles_oldest "oldest files, subtree"
     echo
     echo " -----------------------------  search / inventory"
     __jwfiles_toc_row__ 🟢 jwfiles_find "name search, highlighted"
@@ -73,6 +73,12 @@ __jwfiles_flag__() {
     case "$n" in ''|*[!0-9]*) n=0 ;; esac
     [ "$n" -gt 0 ] && mark="⚠️"
     printf "%-20s%-7s%s\n" "$1" "$n" "$mark"
+}
+
+# Emit the whole stream, or only its first N lines when N is a non-empty integer.
+# The opt-in cap behind jwfiles_recent / _oldest / _bigfiles' [count] argument.
+__jwfiles_cap__() {
+    if [ -n "$1" ]; then head -n "$1"; else cat; fi
 }
 
 
@@ -156,6 +162,43 @@ jwfiles_profile() {
 }
 
 
+# Depth-limited directory tree. Uses tree(1) when installed; otherwise a
+# find-based fallback that indents each entry by its depth below the root
+# (awk, so a path with regex-special characters stays inert).
+jwfiles_tree() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_tree [dir] [depth]"
+            echo "  Directory tree of [dir] (default: .), limited to [depth] levels"
+            echo "  (default: 2). Uses tree(1) if installed, else a find-based fallback."
+            echo "Examples:"
+            echo "  jwfiles_tree"
+            echo "  jwfiles_tree ./src 3"
+            return 0 ;;
+    esac
+    local dir="${1:-.}" depth="${2:-2}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    case "$depth" in
+        ''|*[!0-9]*) echo "❌ depth must be an integer: $depth" >&2; return 1 ;;
+    esac
+    if command -v tree >/dev/null 2>&1; then
+        tree -L "$depth" -- "$dir"
+    else
+        echo "$dir"
+        find "$dir" -mindepth 1 -maxdepth "$depth" 2>/dev/null | sort \
+            | awk -v base="$dir" '
+                { rel = substr($0, length(base) + 2)
+                  n = gsub(/\//, "/", rel)
+                  ind = ""; for (i = 0; i < n; i++) ind = ind "  "
+                  sub(/.*\//, "", rel)
+                  print ind "  " rel }'
+    fi
+}
+
+
 # ---------------------------------------------------------------------------------
 # size / disk pressure
 # ---------------------------------------------------------------------------------
@@ -181,6 +224,61 @@ jwfiles_size() {
     find "$dir" -mindepth 1 -maxdepth 1 -exec du -sh {} + 2>/dev/null | sort -rh
     echo "-------"
     du -sh -- "$dir" 2>/dev/null
+}
+
+
+# Largest individual FILES in the subtree, biggest-first, human-readable sizes.
+# Uncapped by default (pipe to head yourself); an optional leading integer caps it.
+jwfiles_bigfiles() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_bigfiles [count] [dir]"
+            echo "  Individual files under [dir] (default: .), largest-first by size."
+            echo "  No count → full list; a leading [count] caps it."
+            echo "Examples:"
+            echo "  jwfiles_bigfiles"
+            echo "  jwfiles_bigfiles 20 /var"
+            return 0 ;;
+    esac
+    local n="" dir="."
+    if [ $# -ge 1 ]; then
+        case "$1" in
+            *[!0-9]*|'') dir="$1" ;;
+            *)           n="$1"; [ $# -ge 2 ] && dir="$2" ;;
+        esac
+    fi
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    find "$dir" -type f -printf '%s\t%p\n' 2>/dev/null | sort -rn | __jwfiles_cap__ "$n" \
+        | while IFS="$(printf '\t')" read -r sz p; do
+              printf '%8s  %s\n' "$(numfmt --to=iec "$sz" 2>/dev/null || echo "${sz}B")" "$p"
+          done
+}
+
+# Disk space + inode usage for the filesystem holding a path. The quick "am I
+# about to run out of room / inodes?" glance.
+jwfiles_disk() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_disk [dir]"
+            echo "  Disk space and inode usage for the filesystem holding [dir] (default: .)."
+            echo "Examples:"
+            echo "  jwfiles_disk"
+            echo "  jwfiles_disk /var/lib/docker"
+            return 0 ;;
+    esac
+    local dir="${1:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    echo "---[ Space ]---"
+    df -h  -- "$dir" 2>/dev/null
+    echo
+    echo "---[ Inodes ]---"
+    df -ih -- "$dir" 2>/dev/null
 }
 
 
@@ -214,8 +312,36 @@ jwfiles_recent() {
         return 1
     fi
     find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
-        | sort -t'|' -k1,1 -rn | cut -d'|' -f2- \
-        | { if [ -n "$n" ]; then head -n "$n"; else cat; fi; }
+        | sort -t'|' -k1,1 -rn | cut -d'|' -f2- | __jwfiles_cap__ "$n"
+}
+
+
+# Files under a tree, OLDEST-first by mtime — the stale/forgotten end of the
+# timeline. Mirror of jwfiles_recent; uncapped by default, optional leading count.
+jwfiles_oldest() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_oldest [count] [dir]"
+            echo "  Files under [dir] (default: .), oldest-first by mtime."
+            echo "  No count → full list; a leading [count] caps it."
+            echo "Examples:"
+            echo "  jwfiles_oldest"
+            echo "  jwfiles_oldest 20 /var/log"
+            return 0 ;;
+    esac
+    local n="" dir="."
+    if [ $# -ge 1 ]; then
+        case "$1" in
+            *[!0-9]*|'') dir="$1" ;;
+            *)           n="$1"; [ $# -ge 2 ] && dir="$2" ;;
+        esac
+    fi
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
+        | sort -t'|' -k1,1 -n | cut -d'|' -f2- | __jwfiles_cap__ "$n"
 }
 
 

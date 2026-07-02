@@ -94,11 +94,22 @@ B=(
   "jwfiles_grep spaced '$FIX'"              # content hit
   "jwfiles_grep no_such_content_xyz '$FIX'" # zero hits (exit 1, not an error)
   "jwfiles_ext '$FIX'"
+  "jwfiles_tree '$FIX'"
+  "jwfiles_tree '$FIX' 1"
+  "jwfiles_bigfiles '$FIX'"
+  "jwfiles_bigfiles 3 '$FIX'"
+  "jwfiles_disk '$FIX'"
+  "jwfiles_oldest '$FIX'"
+  "jwfiles_oldest 2 '$FIX'"
   "jwfiles_profile /nonexistent_xyz"        # not-a-dir error path
   "jwfiles_size /nonexistent_xyz"
   "jwfiles_recent 5 /nonexistent_xyz"
   "jwfiles_find x /nonexistent_xyz"
   "jwfiles_ext /nonexistent_xyz"
+  "jwfiles_tree /nonexistent_xyz"
+  "jwfiles_tree '$FIX' notanint"            # bad-depth error path
+  "jwfiles_disk /nonexistent_xyz"
+  "jwfiles_oldest 2 /nonexistent_xyz"
 )
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -126,6 +137,11 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwfiles_ext '$FIX'"
     "jwfiles_find txt '$FIX'"
     "jwfiles_grep spaced '$FIX'"
+    "jwfiles_tree '$FIX'"
+    "jwfiles_tree '$FIX' 1"
+    "jwfiles_bigfiles '$FIX'"
+    "jwfiles_bigfiles 3 '$FIX'"
+    "jwfiles_oldest '$FIX'"
   )
   n=0
   for inv in "${RO[@]}"; do

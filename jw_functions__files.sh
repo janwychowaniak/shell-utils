@@ -12,11 +12,7 @@
 # anything blindly. perms / owners / type are READ-ONLY here by design.
 #
 # Built incrementally (greenfield, demand-driven). Planned next:
-#   hygiene : jwfiles_symlinks   🟢  symlinks + targets; flags broken
-#             jwfiles_empty      🟢  empty files & dirs
-#             jwfiles_dupes      🟢  duplicate files by hash
-#             jwfiles_weirdnames 🟢  spaces / special / non-ASCII names
-#   mutators (agent-overkill exceptions, pending sign-off):
+#   mutators (agent-overkill exceptions):
 #             jwfiles_backup     🔵  timestamped copy of a path (snapshot-before)
 #             jwfiles_trash      ⚪  move to XDG Trash, not rm (reversible)
 
@@ -54,6 +50,12 @@ jwfiles_toc() {
     __jwfiles_toc_row__ 🟢 jwfiles_stat   "rich stat of one path"
     __jwfiles_toc_row__ 🟢 jwfiles_perms  "odd-perms scan (RO)"
     __jwfiles_toc_row__ 🟢 jwfiles_owners "ownership breakdown"
+    echo
+    echo " -----------------------------  hygiene / anomalies"
+    __jwfiles_toc_row__ 🟢 jwfiles_symlinks   "symlinks + targets, broken"
+    __jwfiles_toc_row__ 🟢 jwfiles_empty      "empty files & dirs"
+    __jwfiles_toc_row__ 🟢 jwfiles_dupes      "duplicate files by hash"
+    __jwfiles_toc_row__ 🟢 jwfiles_weirdnames "spaces/special/non-ASCII"
     echo
 }
 
@@ -515,4 +517,135 @@ jwfiles_owners() {
         return 1
     fi
     find "$dir" -printf '%u:%g\n' 2>/dev/null | sort | uniq -c | sort -rn
+}
+
+
+# ---------------------------------------------------------------------------------
+# hygiene / anomalies
+# ---------------------------------------------------------------------------------
+
+# Every symlink in the subtree with its target, then the broken (dangling) subset
+# called out separately — the actionable ones. Read-only.
+jwfiles_symlinks() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_symlinks [dir]"
+            echo "  List every symlink under [dir] (default: .) with its target,"
+            echo "  then the broken (dangling) subset on its own."
+            echo "Examples:"
+            echo "  jwfiles_symlinks"
+            echo "  jwfiles_symlinks /etc"
+            return 0 ;;
+    esac
+    local dir="${1:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    echo
+    echo "---[ All symlinks ]---"
+    find "$dir" -type l -printf '%p -> %l\n' 2>/dev/null | sort
+    echo
+    echo "---[ Broken (dangling) ]---"
+    find "$dir" -xtype l -printf '%p -> %l\n' 2>/dev/null | sort
+    echo
+}
+
+# Empty files and empty directories in the subtree — the clutter both agents and
+# `find -delete` care about. Read-only (listing only). Uncapped.
+jwfiles_empty() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_empty [dir]"
+            echo "  Zero-byte files and empty directories under [dir] (default: .)."
+            echo "Examples:"
+            echo "  jwfiles_empty"
+            echo "  jwfiles_empty ~/Downloads"
+            return 0 ;;
+    esac
+    local dir="${1:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    echo
+    echo "---[ Empty files ]---"
+    find "$dir" -type f -empty 2>/dev/null | sort
+    echo
+    echo "---[ Empty dirs ]---"
+    find "$dir" -mindepth 1 -type d -empty 2>/dev/null | sort
+    echo
+}
+
+# Duplicate files by CONTENT hash: groups of ≥2 files with identical bytes.
+# sha256sum (md5sum fallback); grouped first-seen on hash-sorted input, so the
+# output is deterministic. Read-only. Heavy on large trees (hashes every file).
+jwfiles_dupes() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_dupes [dir]"
+            echo "  Groups of files under [dir] (default: .) with identical content,"
+            echo "  matched by hash. Read-only; hashes every file, so heavy on big trees."
+            echo "Examples:"
+            echo "  jwfiles_dupes"
+            echo "  jwfiles_dupes ~/Pictures"
+            return 0 ;;
+    esac
+    local dir="${1:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    local hasher=""
+    if command -v sha256sum >/dev/null 2>&1; then
+        hasher=sha256sum
+    elif command -v md5sum >/dev/null 2>&1; then
+        hasher=md5sum
+    else
+        echo "❌ need sha256sum or md5sum" >&2
+        return 1
+    fi
+    find "$dir" -type f -exec "$hasher" {} + 2>/dev/null | sort | awk '
+        { idx = index($0, "  "); h = substr($0, 1, idx - 1); f = substr($0, idx + 2)
+          if (!(h in seen)) { seen[h] = 1; order[++k] = h }
+          files[h] = files[h] "    " f "\n"; count[h]++ }
+        END {
+          n = 0
+          for (i = 1; i <= k; i++) { h = order[i]
+              if (count[h] > 1) { n++; printf "── %s (%d copies)\n%s", h, count[h], files[h] } }
+          if (n == 0) print "(no duplicate content found)"
+        }'
+}
+
+# Names that will bite later: with spaces, with shell/glob-special ASCII, or with
+# non-ASCII bytes — three labeled subtree scans (grep on the path, so no fragile
+# find-glob escaping). Read-only; renaming is the agent's job (or fs.sh's batch tools).
+jwfiles_weirdnames() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_weirdnames [dir]"
+            echo "  Scan the subtree under [dir] (default: .) for problematic names:"
+            echo "  names with spaces, shell/glob-special characters, or non-ASCII bytes."
+            echo "  Reports only — renaming is the agent's job (or fs.sh's batch tools)."
+            echo "Examples:"
+            echo "  jwfiles_weirdnames"
+            echo "  jwfiles_weirdnames ~/Music"
+            return 0 ;;
+    esac
+    local dir="${1:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    echo
+    echo "---[ Names with spaces ]---"
+    find "$dir" -mindepth 1 2>/dev/null | grep ' ' | sort
+    echo
+    echo "---[ Names with shell/glob-special characters ]---"
+    find "$dir" -mindepth 1 2>/dev/null \
+        | LC_ALL=C grep -E '[]!"#$%&'\''()*+,:;<=>?@[\\^`{|}~]' | sort
+    echo
+    echo "---[ Names with non-ASCII characters ]---"
+    find "$dir" -mindepth 1 2>/dev/null | LC_ALL=C grep '[^ -~]' | sort
+    echo
 }

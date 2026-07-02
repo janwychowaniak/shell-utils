@@ -48,10 +48,10 @@
 ```bash
 echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
 ```
-- Per-entry format places the marker between the dash and the function name:
+- Per-entry format places the marker between the dash and the function name — rendered via the per-area `__<area>_toc_row__` helper (see *TOC entry taglines* below), so the marker sits in a fixed slot ahead of the padded name + tagline:
 ```bash
-echo " - 🟢 jwdocker_psall"
-echo " - 🔴 jwdocker_image-rm"
+__jwdocker_toc_row__ 🟢 jwdocker_psall   "all containers (run + stopped)"
+__jwdocker_toc_row__ 🔴 jwdocker_image-rm "remove an image (in-use gate)"
 ```
 - When a function's class is ambiguous, classify conservatively — assign the higher-impact marker (e.g. a tool that opens an interactive shell is ⚪, not 🟢, because of what can be done inside it).
 
@@ -63,7 +63,7 @@ echo " - 🔴 jwdocker_image-rm"
 __jwweb_toc_row__() { printf " - %s %-22s%s\n" "$1" "$2" "$3"; }   # marker, name, tagline
 ```
 - **Alignment is static and hardcoded.** The tagline column starts **five spaces after the longest function name in that file**: `width = len(longest name) + 5` (web: `jwweb_cert-expiry` = 17 → `%-22s`). Compute it once per file and hardcode the width — the marker sits in a fixed `" - %s "` slot so it never shifts the column, and `printf` is byte-width so bash and zsh render identically (the bash↔zsh TOC parity check in the smoke test guards this).
-- Pioneered in `jw_functions__web.sh`; **being backported** to the earlier `<area>_toc()` functions (deb/docker/git/python), each with its own statically-computed width.
+- Pioneered in `jw_functions__web.sh`; now **backported to every** `<area>_toc()` function, each with its own statically-computed width — git `%-22s`, deb `%-23s`, python `%-25s`, docker `%-32s`.
 
 ### Cross-shell Portability (bash + zsh)
 - Files are sourced into both bash and zsh, so code must behave identically in both. The key trap: **zsh does not word-split unquoted parameter expansions** by default (no `SH_WORD_SPLIT`), whereas bash does — so `cmd $scalar` passes one argument in zsh but several in bash.
@@ -94,6 +94,22 @@ fi
 ### Parameter Handling
 - Functions with a **required** parameter, called without it, print helpful usage examples and `return 1`.
 - **Read-only functions with a sensible default** (e.g. `jwgit_status`, `jwgit_log`, `jwgit_diff`, `jwgit_reflog`) must instead **run that default on no-args** — and expose the usage block via `-h`/`--help` (returning 0). Do NOT blanket the usage-on-no-args guard onto a defaulting function: it makes the help contradict itself ("`jwgit_log` # Show recent commits" while no-args actually printed help). Required-arg functions (`jwgit_clone`, `jwgit_merge`, `jwgit_blame`, `jwgit_branch create`, …) keep usage-on-no-args.
+- **The shared help block (canonical idiom).** `-h`/`--help` prints the *same* usage block as no-args and `return 0` — never treated as data, never duplicated into a second block. Share one block, keyed by the function's shape:
+```bash
+# required-arg: no-args → 1, -h → 0
+if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    echo "Usage: ..."; echo "Examples:"; echo "  ..."
+    [ $# -eq 0 ] && return 1 || return 0
+fi
+# N required args (e.g. 2): too-few-args → 1, -h → 0
+if [ $# -lt 2 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    echo "Usage: ..."
+    { [ "$1" = "-h" ] || [ "$1" = "--help" ]; } && return 0 || return 1
+fi
+# defaulting read-only: -h → 0 up top; no-args runs the default below
+case "${1:-}" in -h|--help) echo "Usage: ..."; return 0 ;; esac
+```
+- **Footgun — a public command that is also an internal callee.** If a function references `$1` (e.g. for `-h`) *and* is called elsewhere in the file with no args, shellcheck flags SC2120/SC2119. This repo is zero-disable, so fix it structurally: move the body into an internal `__<area>_<name>__` worker, have the public function parse `-h` and delegate to it, and repoint the internal call sites at the worker. (Applied to `jwgit_status`, `jwdeb_dist-upgrade`, `jwdocker_volume-prune`/`network-prune`.)
 - Display available options (running containers, installed packages, etc.)
 - Provide multiple example use cases with different parameter combinations
 - Two styles for no-args help:

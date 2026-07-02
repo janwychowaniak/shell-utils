@@ -16,9 +16,6 @@
 #             jwfiles_disk       🟢  df + inode usage for cwd's mount
 #   change  : jwfiles_oldest     🟢  least-recently-modified files
 #   tree    : jwfiles_tree       🟢  depth-limited tree (tree→find fallback)
-#   search  : jwfiles_find       🟢  name search, case-insensitive + highlight
-#             jwfiles_grep       🟢  content search (rg→grep fallback)
-#             jwfiles_ext        🟢  extension inventory of the subtree
 #   posture : jwfiles_stat       🟢  rich stat of one path
 #             jwfiles_perms      🟢  odd-perms scan (world-writable, setuid, ...)
 #             jwfiles_owners     🟢  ownership breakdown
@@ -50,6 +47,11 @@ jwfiles_toc() {
     echo
     echo " -----------------------------  recency / change"
     __jwfiles_toc_row__ 🟢 jwfiles_recent "newest files, subtree"
+    echo
+    echo " -----------------------------  search / inventory"
+    __jwfiles_toc_row__ 🟢 jwfiles_find "name search, highlighted"
+    __jwfiles_toc_row__ 🟢 jwfiles_grep "content search (rg→grep)"
+    __jwfiles_toc_row__ 🟢 jwfiles_ext  "extension inventory + counts"
     echo
 }
 
@@ -214,4 +216,77 @@ jwfiles_recent() {
     find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
         | sort -t'|' -k1,1 -rn | cut -d'|' -f2- \
         | { if [ -n "$n" ]; then head -n "$n"; else cat; fi; }
+}
+
+
+# ---------------------------------------------------------------------------------
+# search / inventory
+# ---------------------------------------------------------------------------------
+
+# Case-insensitive recursive NAME search, matches highlighted. The phrase is a
+# literal substring (matched by find -iname and re-highlighted with grep -F), so
+# metacharacters are inert. Uncapped.
+jwfiles_find() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwfiles_find <phrase> [dir]"
+        echo "  Case-insensitive recursive name search under [dir] (default: .),"
+        echo "  with the matched phrase highlighted. Phrase is a literal substring."
+        echo "Examples:"
+        echo "  jwfiles_find report"
+        echo "  jwfiles_find .conf /etc"
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    local phrase="$1" dir="${2:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    find "$dir" -iname "*$phrase*" 2>/dev/null | grep -i -F --color=always -- "$phrase"
+}
+
+# Recursive CONTENT search — ripgrep if present (fast, .gitignore-aware), else
+# grep -rIn (skips binaries). Pattern passed via -e so a leading '-' is inert.
+# Uncapped; a no-match exit (1) is normal, not an error.
+jwfiles_grep() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwfiles_grep <pattern> [dir]"
+        echo "  Recursive content search under [dir] (default: .)."
+        echo "  Uses ripgrep (rg) when available, else grep -rIn."
+        echo "Examples:"
+        echo "  jwfiles_grep TODO"
+        echo "  jwfiles_grep 'def main' ./src"
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    local pat="$1" dir="${2:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    if command -v rg >/dev/null 2>&1; then
+        rg --color=always -n -e "$pat" -- "$dir"
+    else
+        grep -rIn --color=always -e "$pat" -- "$dir"
+    fi
+}
+
+# Extension inventory of the subtree: per-extension file counts, most-common
+# first. Answers "what kinds of files live here?". Uncapped.
+jwfiles_ext() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwfiles_ext [dir]"
+            echo "  Inventory of file extensions under [dir] (default: .),"
+            echo "  with per-extension counts, most-common first."
+            echo "Examples:"
+            echo "  jwfiles_ext"
+            echo "  jwfiles_ext ~/Downloads"
+            return 0 ;;
+    esac
+    local dir="${1:-.}"
+    if [ ! -d "$dir" ]; then
+        echo "❌ not a directory: $dir" >&2
+        return 1
+    fi
+    find "$dir" -type f 2>/dev/null | sed -n 's/.*\.\([^./]\{1,\}\)$/\1/p' \
+        | sort | uniq -c | sort -rn
 }

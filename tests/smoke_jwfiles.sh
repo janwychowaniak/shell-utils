@@ -89,9 +89,16 @@ B=(
   "jwfiles_recent '$FIX'"
   "jwfiles_recent 3 '$FIX'"
   "jwfiles_recent '$FIX/sub'"
+  "jwfiles_find txt '$FIX'"                  # multiple hits
+  "jwfiles_find no_such_phrase '$FIX'"       # zero hits
+  "jwfiles_grep spaced '$FIX'"              # content hit
+  "jwfiles_grep no_such_content_xyz '$FIX'" # zero hits (exit 1, not an error)
+  "jwfiles_ext '$FIX'"
   "jwfiles_profile /nonexistent_xyz"        # not-a-dir error path
   "jwfiles_size /nonexistent_xyz"
   "jwfiles_recent 5 /nonexistent_xyz"
+  "jwfiles_find x /nonexistent_xyz"
+  "jwfiles_ext /nonexistent_xyz"
 )
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -116,6 +123,9 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwfiles_size '$FIX'"
     "jwfiles_recent '$FIX'"
     "jwfiles_recent 3 '$FIX'"
+    "jwfiles_ext '$FIX'"
+    "jwfiles_find txt '$FIX'"
+    "jwfiles_grep spaced '$FIX'"
   )
   n=0
   for inv in "${RO[@]}"; do

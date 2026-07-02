@@ -114,8 +114,8 @@ B=(
   "jwfiles_empty '$FIX'"
   "jwfiles_dupes '$FIX'"
   "jwfiles_weirdnames '$FIX'"
-  "jwfiles_backup '$FIX/a.txt'"             # 🔵 real copy into the throwaway fixture
-  "jwfiles_backup '$FIX/empty_dir'"         # backup of a directory (cp -a)
+  "jwfiles_backup '$FIX/a.txt'"             # 🟢 prints the cp -a command (no side effect)
+  "jwfiles_backup '$FIX/empty_dir'"         # prints the command for a directory too
   "jwfiles_profile /nonexistent_xyz"        # not-a-dir error path
   "jwfiles_size /nonexistent_xyz"
   "jwfiles_recent 5 /nonexistent_xyz"
@@ -132,11 +132,8 @@ B=(
   "jwfiles_empty /nonexistent_xyz"
   "jwfiles_dupes /nonexistent_xyz"
   "jwfiles_weirdnames /nonexistent_xyz"
-  "jwfiles_backup /nonexistent_xyz"         # no-such-path error path
-  "jwfiles_trash /nonexistent_xyz"          # trash error path only — a real
-)                                            # move would touch the user's Trash;
-                                             # gio/XDG move behavior is verified
-                                             # interactively, not in the smoke.
+  "jwfiles_backup /nonexistent_xyz"         # missing path -> warns, still prints cmd
+)
 for sh in "${SHELLS[@]}"; do
   n=0
   for inv in "${B[@]}"; do

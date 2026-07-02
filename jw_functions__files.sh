@@ -12,8 +12,9 @@
 # anything blindly. perms / owners / type are READ-ONLY here by design.
 #
 # Built incrementally (greenfield). The map is complete — jwfiles_toc() is the
-# live index. Everything is 🟢 read-only except the two agent-overkill mutators
-# (jwfiles_backup 🔵, jwfiles_trash ⚪), both non-destructive / reversible.
+# live index. The whole file is 🟢 read-only: even jwfiles_backup only PRINTS the
+# cp -a command for you to run. No delete/trash tool on purpose — it must work on
+# headless servers (no desktop Trash); deletion there is plain `rm` or the agent.
 
 # One TOC row: blast-radius marker, padded function name, one-line "soul" tagline.
 # printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
@@ -56,9 +57,8 @@ jwfiles_toc() {
     __jwfiles_toc_row__ 🟢 jwfiles_dupes      "duplicate files by hash"
     __jwfiles_toc_row__ 🟢 jwfiles_weirdnames "spaces/special/non-ASCII"
     echo
-    echo " -----------------------------  mutators (agent-overkill exceptions)"
-    __jwfiles_toc_row__ 🔵 jwfiles_backup "timestamped copy (snapshot)"
-    __jwfiles_toc_row__ ⚪ jwfiles_trash  "rm → Trash, reversible"
+    echo " -----------------------------  backup (prints the command)"
+    __jwfiles_toc_row__ 🟢 jwfiles_backup "prints the cp -a command"
     echo
 }
 
@@ -655,87 +655,30 @@ jwfiles_weirdnames() {
 
 
 # ---------------------------------------------------------------------------------
-# mutators (agent-overkill exceptions) — the only non-🟢 tools in this file
+# backup (prints the command — you run it)
 # ---------------------------------------------------------------------------------
 
-# 🔵 Snapshot a path before you let an agent edit it: a timestamped copy (cp -a,
-# so dirs and attributes come along) placed alongside the original as
-# <path>.<YYYYMMDD-HHMMSS>.JWBAK. NON-destructive — never touches the source.
+# 🟢 Print (do NOT run) the `cp -a` command that would snapshot each path alongside
+# itself as <path>.<YYYYMMDD-HHMMSS>.JWBAK. Read-only by design: you see exactly what
+# would happen and run it yourself — eyeball it, or pipe to a shell. Mirrors the legacy
+# jwbackupfile (show the command, don't execute); missing paths are flagged on stderr
+# so stdout stays a clean, runnable command list.
 jwfiles_backup() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwfiles_backup <path> [path...]"
-        echo "  Timestamped copy (cp -a) of each path alongside it:"
+        echo "  Print (does NOT run) the 'cp -a' command to snapshot each path as:"
         echo "    <path>.<YYYYMMDD-HHMMSS>.JWBAK"
-        echo "  Never touches the original — a snapshot before an agent edits it."
+        echo "  You inspect it, then run it yourself (or pipe:  jwfiles_backup x | sh)."
         echo "Examples:"
         echo "  jwfiles_backup ./config.yml"
         echo "  jwfiles_backup ./src ./notes.md"
         [ $# -eq 0 ] && return 1 || return 0
     fi
-    local ts p dest rc=0
+    local ts p dest
     ts=$(date +%Y%m%d-%H%M%S)
     for p in "$@"; do
-        if [ ! -e "$p" ] && [ ! -L "$p" ]; then
-            echo "❌ no such path: $p" >&2; rc=1; continue
-        fi
+        [ -e "$p" ] || [ -L "$p" ] || echo "⚠️  no such path (command still printed): $p" >&2
         dest="${p%/}.${ts}.JWBAK"
-        if [ -e "$dest" ]; then
-            echo "❌ backup already exists: $dest" >&2; rc=1; continue
-        fi
-        if cp -a -- "$p" "$dest"; then
-            printf "✅ %s  →  %s\n" "$p" "$dest"
-        else
-            echo "❌ backup failed: $p" >&2; rc=1
-        fi
+        printf 'cp -a -- "%s" "%s"\n' "$p" "$dest"
     done
-    return "$rc"
-}
-
-# ⚪ Reversible delete: move paths to the Trash instead of rm. Prefers `gio trash`
-# (restorable from your file manager, with proper trashinfo); falls back to moving
-# them under $XDG_DATA_HOME/Trash/files/. REVERSIBLE — hence ⚪, not 🔴.
-jwfiles_trash() {
-    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo "Usage: jwfiles_trash <path> [path...]"
-        echo "  Move paths to the Trash (reversible) instead of rm."
-        echo "  Uses 'gio trash' when available (restore from your file manager),"
-        echo "  else moves them under \$XDG_DATA_HOME/Trash/files/."
-        echo "Examples:"
-        echo "  jwfiles_trash ./scratch.log"
-        echo "  jwfiles_trash ./tmp1 ./tmp2"
-        [ $# -eq 0 ] && return 1 || return 0
-    fi
-    local p rc=0 trashdir="" base="" dest=""
-    if command -v gio >/dev/null 2>&1; then
-        for p in "$@"; do
-            if [ ! -e "$p" ] && [ ! -L "$p" ]; then
-                echo "❌ no such path: $p" >&2; rc=1; continue
-            fi
-            if gio trash -- "$p" 2>/dev/null; then
-                printf "🗑  trashed: %s  (restore from your file manager's Trash)\n" "$p"
-            else
-                echo "❌ trash failed: $p" >&2; rc=1
-            fi
-        done
-        return "$rc"
-    fi
-    trashdir="${XDG_DATA_HOME:-$HOME/.local/share}/Trash/files"
-    if ! mkdir -p "$trashdir" 2>/dev/null; then
-        echo "❌ cannot create trash dir: $trashdir" >&2
-        return 1
-    fi
-    for p in "$@"; do
-        if [ ! -e "$p" ] && [ ! -L "$p" ]; then
-            echo "❌ no such path: $p" >&2; rc=1; continue
-        fi
-        base=$(basename -- "$p")
-        dest="$trashdir/$base"
-        [ -e "$dest" ] && dest="$trashdir/$base.$(date +%Y%m%d-%H%M%S)"
-        if mv -- "$p" "$dest"; then
-            printf "🗑  trashed: %s  →  %s\n" "$p" "$dest"
-        else
-            echo "❌ trash failed: $p" >&2; rc=1
-        fi
-    done
-    return "$rc"
 }

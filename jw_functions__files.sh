@@ -11,10 +11,9 @@
 # sync — is deliberately the AGENT's lane, so this file stays a place you can run
 # anything blindly. perms / owners / type are READ-ONLY here by design.
 #
-# Built incrementally (greenfield, demand-driven). Planned next:
-#   mutators (agent-overkill exceptions):
-#             jwfiles_backup     🔵  timestamped copy of a path (snapshot-before)
-#             jwfiles_trash      ⚪  move to XDG Trash, not rm (reversible)
+# Built incrementally (greenfield). The map is complete — jwfiles_toc() is the
+# live index. Everything is 🟢 read-only except the two agent-overkill mutators
+# (jwfiles_backup 🔵, jwfiles_trash ⚪), both non-destructive / reversible.
 
 # One TOC row: blast-radius marker, padded function name, one-line "soul" tagline.
 # printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
@@ -56,6 +55,10 @@ jwfiles_toc() {
     __jwfiles_toc_row__ 🟢 jwfiles_empty      "empty files & dirs"
     __jwfiles_toc_row__ 🟢 jwfiles_dupes      "duplicate files by hash"
     __jwfiles_toc_row__ 🟢 jwfiles_weirdnames "spaces/special/non-ASCII"
+    echo
+    echo " -----------------------------  mutators (agent-overkill exceptions)"
+    __jwfiles_toc_row__ 🔵 jwfiles_backup "timestamped copy (snapshot)"
+    __jwfiles_toc_row__ ⚪ jwfiles_trash  "rm → Trash, reversible"
     echo
 }
 
@@ -648,4 +651,91 @@ jwfiles_weirdnames() {
     echo "---[ Names with non-ASCII characters ]---"
     find "$dir" -mindepth 1 2>/dev/null | LC_ALL=C grep '[^ -~]' | sort
     echo
+}
+
+
+# ---------------------------------------------------------------------------------
+# mutators (agent-overkill exceptions) — the only non-🟢 tools in this file
+# ---------------------------------------------------------------------------------
+
+# 🔵 Snapshot a path before you let an agent edit it: a timestamped copy (cp -a,
+# so dirs and attributes come along) placed alongside the original as
+# <path>.<YYYYMMDD-HHMMSS>.JWBAK. NON-destructive — never touches the source.
+jwfiles_backup() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwfiles_backup <path> [path...]"
+        echo "  Timestamped copy (cp -a) of each path alongside it:"
+        echo "    <path>.<YYYYMMDD-HHMMSS>.JWBAK"
+        echo "  Never touches the original — a snapshot before an agent edits it."
+        echo "Examples:"
+        echo "  jwfiles_backup ./config.yml"
+        echo "  jwfiles_backup ./src ./notes.md"
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    local ts p dest rc=0
+    ts=$(date +%Y%m%d-%H%M%S)
+    for p in "$@"; do
+        if [ ! -e "$p" ] && [ ! -L "$p" ]; then
+            echo "❌ no such path: $p" >&2; rc=1; continue
+        fi
+        dest="${p%/}.${ts}.JWBAK"
+        if [ -e "$dest" ]; then
+            echo "❌ backup already exists: $dest" >&2; rc=1; continue
+        fi
+        if cp -a -- "$p" "$dest"; then
+            printf "✅ %s  →  %s\n" "$p" "$dest"
+        else
+            echo "❌ backup failed: $p" >&2; rc=1
+        fi
+    done
+    return "$rc"
+}
+
+# ⚪ Reversible delete: move paths to the Trash instead of rm. Prefers `gio trash`
+# (restorable from your file manager, with proper trashinfo); falls back to moving
+# them under $XDG_DATA_HOME/Trash/files/. REVERSIBLE — hence ⚪, not 🔴.
+jwfiles_trash() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwfiles_trash <path> [path...]"
+        echo "  Move paths to the Trash (reversible) instead of rm."
+        echo "  Uses 'gio trash' when available (restore from your file manager),"
+        echo "  else moves them under \$XDG_DATA_HOME/Trash/files/."
+        echo "Examples:"
+        echo "  jwfiles_trash ./scratch.log"
+        echo "  jwfiles_trash ./tmp1 ./tmp2"
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    local p rc=0 trashdir="" base="" dest=""
+    if command -v gio >/dev/null 2>&1; then
+        for p in "$@"; do
+            if [ ! -e "$p" ] && [ ! -L "$p" ]; then
+                echo "❌ no such path: $p" >&2; rc=1; continue
+            fi
+            if gio trash -- "$p" 2>/dev/null; then
+                printf "🗑  trashed: %s  (restore from your file manager's Trash)\n" "$p"
+            else
+                echo "❌ trash failed: $p" >&2; rc=1
+            fi
+        done
+        return "$rc"
+    fi
+    trashdir="${XDG_DATA_HOME:-$HOME/.local/share}/Trash/files"
+    if ! mkdir -p "$trashdir" 2>/dev/null; then
+        echo "❌ cannot create trash dir: $trashdir" >&2
+        return 1
+    fi
+    for p in "$@"; do
+        if [ ! -e "$p" ] && [ ! -L "$p" ]; then
+            echo "❌ no such path: $p" >&2; rc=1; continue
+        fi
+        base=$(basename -- "$p")
+        dest="$trashdir/$base"
+        [ -e "$dest" ] && dest="$trashdir/$base.$(date +%Y%m%d-%H%M%S)"
+        if mv -- "$p" "$dest"; then
+            printf "🗑  trashed: %s  →  %s\n" "$p" "$dest"
+        else
+            echo "❌ trash failed: $p" >&2; rc=1
+        fi
+    done
+    return "$rc"
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Smoke test for jw_functions__files.sh
+# Smoke test for jw_functions__fs.sh
 # =====================================
-# Runs every jwfiles_* function under BOTH bash and zsh, failing if any zsh/bash
+# Runs every jwfs_* function under BOTH bash and zsh, failing if any zsh/bash
 # RUNTIME-error signature appears — e.g. "read-only variable" (a reserved name
 # like `status`/`path`), "bad substitution", or "no matches found". These
 # surface only when a function RUNS, so we execute them (`-n`/`type` miss them).
@@ -16,16 +16,16 @@
 # Part B: real-arg invocations against the fixture + error paths.
 # Part C: bash-vs-zsh stdout parity of the deterministic paths (toc, -h, and the
 #         two uncapped viewers on the fixture — a diff here is a shell OUTPUT bug,
-#         e.g. a stale `local` reprint). jwfiles_profile is scanned but NOT
+#         e.g. a stale `local` reprint). jwfs_profile is scanned but NOT
 #         parity-checked: it prints live `df`, which can shift between the runs.
 #
-# Run:  bash tests/smoke_jwfiles.sh   (or ./tests/smoke_jwfiles.sh)
+# Run:  bash tests/smoke_jwfs.sh   (or ./tests/smoke_jwfs.sh)
 # Exit: 0 = clean, 1 = runtime-error signature / parity diff, 2 = setup problem.
 
 set -u
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-LIB="$SCRIPT_DIR/../jw_functions__files.sh"
+LIB="$SCRIPT_DIR/../jw_functions__fs.sh"
 
 [ -f "$LIB" ] || { echo "❌ cannot find library: $LIB"; exit 2; }
 
@@ -67,7 +67,7 @@ run() {
 }
 
 # Part A — every function, no-args path
-mapfile -t FNS < <(grep -oE '^jwfiles_[a-z-]+' "$LIB" | sort -u)
+mapfile -t FNS < <(grep -oE '^jwfs_[a-z-]+' "$LIB" | sort -u)
 echo "=== Part A: no-args / -h path of ${#FNS[@]} functions ==="
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -86,61 +86,61 @@ done
 # Part B — real-arg invocations against the fixture + error paths
 echo "=== Part B: real-arg invocations (fixture: $FIX) ==="
 B=(
-  "jwfiles_profile '$FIX'"
-  "jwfiles_profile '$FIX/sub'"
-  "jwfiles_size '$FIX'"
-  "jwfiles_size '$FIX/empty_dir'"           # empty dir -> nothing but total
-  "jwfiles_newest '$FIX'"
-  "jwfiles_newest 3 '$FIX'"
-  "jwfiles_newest '$FIX/sub'"
-  "jwfiles_newest -a '$FIX'"                # -a -> include noise dirs (.git, node_modules)
-  "jwfiles_newest -a 3 '$FIX'"
-  "jwfiles_find txt '$FIX'"                  # multiple hits
-  "jwfiles_find no_such_phrase '$FIX'"       # zero hits
-  "jwfiles_grep spaced '$FIX'"              # content hit
-  "jwfiles_grep no_such_content_xyz '$FIX'" # zero hits (exit 1, not an error)
-  "jwfiles_ext '$FIX'"
-  "jwfiles_tree '$FIX'"
-  "jwfiles_tree '$FIX' 1"
-  "jwfiles_bigfiles '$FIX'"
-  "jwfiles_bigfiles 3 '$FIX'"
-  "jwfiles_bigfiles -a '$FIX'"              # -a -> include noise dirs (.git, node_modules)
-  "jwfiles_oldest '$FIX'"
-  "jwfiles_oldest 2 '$FIX'"
-  "jwfiles_oldest -a '$FIX'"
-  "jwfiles_stat '$FIX/a.txt'"
-  "jwfiles_stat '$FIX/link_broken'"         # broken symlink -> reports the link
-  "jwfiles_stat '$FIX'"                      # a directory
-  "jwfiles_perms '$FIX'"
-  "jwfiles_owners '$FIX'"
-  "jwfiles_symlinks '$FIX'"
-  "jwfiles_empty '$FIX'"
-  "jwfiles_weirdnames '$FIX'"
-  "jwfiles_backup '$FIX/a.txt'"             # 🟢 prints the cp -a command (no side effect)
-  "jwfiles_backup '$FIX/empty_dir'"         # prints the command for a directory too
-  "jwfiles_profile /nonexistent_xyz"        # not-a-dir error path
-  "jwfiles_size /nonexistent_xyz"
-  "jwfiles_newest 5 /nonexistent_xyz"
-  "jwfiles_find x /nonexistent_xyz"
-  "jwfiles_ext /nonexistent_xyz"
-  "jwfiles_tree /nonexistent_xyz"
-  "jwfiles_tree '$FIX' notanint"            # bad-depth error path
-  "jwfiles_oldest 2 /nonexistent_xyz"
-  "jwfiles_stat /nonexistent_xyz"
-  "jwfiles_perms /nonexistent_xyz"
-  "jwfiles_owners /nonexistent_xyz"
-  "jwfiles_symlinks /nonexistent_xyz"
-  "jwfiles_empty /nonexistent_xyz"
-  "jwfiles_weirdnames /nonexistent_xyz"
-  "jwfiles_backup /nonexistent_xyz"         # missing path -> warns, still prints cmd
-  "( cd '$FIX' && jwfiles_rename --despace )"   # ⚪ dry-run (NO mutation): plan only
-  "( cd '$FIX' && jwfiles_rename --ascii )"     # dry-run: transliterate plan
-  "( cd '$FIX' && jwfiles_rename txt )"         # dry-run: substring plan
-  "( cd '$FIX' && jwfiles_flatten )"            # dry-run: flatten plan
-  "jwfiles_rename"                          # no <from> -> error path
-  "jwfiles_rename --despace extra"          # mode + phrase -> error path
-  "jwfiles_rename --bogus"                  # unknown flag -> error path
-  "jwfiles_flatten pos"                     # positional -> error path
+  "jwfs_profile '$FIX'"
+  "jwfs_profile '$FIX/sub'"
+  "jwfs_size '$FIX'"
+  "jwfs_size '$FIX/empty_dir'"           # empty dir -> nothing but total
+  "jwfs_newest '$FIX'"
+  "jwfs_newest 3 '$FIX'"
+  "jwfs_newest '$FIX/sub'"
+  "jwfs_newest -a '$FIX'"                # -a -> include noise dirs (.git, node_modules)
+  "jwfs_newest -a 3 '$FIX'"
+  "jwfs_find txt '$FIX'"                  # multiple hits
+  "jwfs_find no_such_phrase '$FIX'"       # zero hits
+  "jwfs_grep spaced '$FIX'"              # content hit
+  "jwfs_grep no_such_content_xyz '$FIX'" # zero hits (exit 1, not an error)
+  "jwfs_ext '$FIX'"
+  "jwfs_tree '$FIX'"
+  "jwfs_tree '$FIX' 1"
+  "jwfs_bigfiles '$FIX'"
+  "jwfs_bigfiles 3 '$FIX'"
+  "jwfs_bigfiles -a '$FIX'"              # -a -> include noise dirs (.git, node_modules)
+  "jwfs_oldest '$FIX'"
+  "jwfs_oldest 2 '$FIX'"
+  "jwfs_oldest -a '$FIX'"
+  "jwfs_stat '$FIX/a.txt'"
+  "jwfs_stat '$FIX/link_broken'"         # broken symlink -> reports the link
+  "jwfs_stat '$FIX'"                      # a directory
+  "jwfs_perms '$FIX'"
+  "jwfs_owners '$FIX'"
+  "jwfs_symlinks '$FIX'"
+  "jwfs_empty '$FIX'"
+  "jwfs_weirdnames '$FIX'"
+  "jwfs_backup '$FIX/a.txt'"             # 🟢 prints the cp -a command (no side effect)
+  "jwfs_backup '$FIX/empty_dir'"         # prints the command for a directory too
+  "jwfs_profile /nonexistent_xyz"        # not-a-dir error path
+  "jwfs_size /nonexistent_xyz"
+  "jwfs_newest 5 /nonexistent_xyz"
+  "jwfs_find x /nonexistent_xyz"
+  "jwfs_ext /nonexistent_xyz"
+  "jwfs_tree /nonexistent_xyz"
+  "jwfs_tree '$FIX' notanint"            # bad-depth error path
+  "jwfs_oldest 2 /nonexistent_xyz"
+  "jwfs_stat /nonexistent_xyz"
+  "jwfs_perms /nonexistent_xyz"
+  "jwfs_owners /nonexistent_xyz"
+  "jwfs_symlinks /nonexistent_xyz"
+  "jwfs_empty /nonexistent_xyz"
+  "jwfs_weirdnames /nonexistent_xyz"
+  "jwfs_backup /nonexistent_xyz"         # missing path -> warns, still prints cmd
+  "( cd '$FIX' && jwfs_rename --despace )"   # ⚪ dry-run (NO mutation): plan only
+  "( cd '$FIX' && jwfs_rename --ascii )"     # dry-run: transliterate plan
+  "( cd '$FIX' && jwfs_rename txt )"         # dry-run: substring plan
+  "( cd '$FIX' && jwfs_flatten )"            # dry-run: flatten plan
+  "jwfs_rename"                          # no <from> -> error path
+  "jwfs_rename --despace extra"          # mode + phrase -> error path
+  "jwfs_rename --bogus"                  # unknown flag -> error path
+  "jwfs_flatten pos"                     # positional -> error path
 )
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -158,32 +158,32 @@ done
 echo "=== Part C: bash-vs-zsh stdout parity (toc + -h + uncapped viewers) ==="
 if [ "${#SHELLS[@]}" -ge 2 ]; then
   RO=(
-    'jwfiles_toc'
-    'jwfiles_profile -h'
-    'jwfiles_size -h'
-    'jwfiles_newest -h'
-    "jwfiles_size '$FIX'"
-    "jwfiles_newest '$FIX'"
-    "jwfiles_newest 3 '$FIX'"
-    "jwfiles_newest -a '$FIX'"
-    "jwfiles_ext '$FIX'"
-    "jwfiles_find txt '$FIX'"
-    "jwfiles_grep spaced '$FIX'"
-    "jwfiles_tree '$FIX'"
-    "jwfiles_tree '$FIX' 1"
-    "jwfiles_bigfiles '$FIX'"
-    "jwfiles_bigfiles 3 '$FIX'"
-    "jwfiles_bigfiles -a '$FIX'"
-    "jwfiles_oldest '$FIX'"
-    "jwfiles_oldest -a '$FIX'"
-    "jwfiles_perms '$FIX'"
-    "jwfiles_owners '$FIX'"
-    "jwfiles_symlinks '$FIX'"
-    "jwfiles_empty '$FIX'"
-    "jwfiles_weirdnames '$FIX'"
-    "( cd '$FIX' && jwfiles_rename --despace )"
-    "( cd '$FIX' && jwfiles_rename --ascii )"
-    "( cd '$FIX' && jwfiles_flatten )"
+    'jwfs_toc'
+    'jwfs_profile -h'
+    'jwfs_size -h'
+    'jwfs_newest -h'
+    "jwfs_size '$FIX'"
+    "jwfs_newest '$FIX'"
+    "jwfs_newest 3 '$FIX'"
+    "jwfs_newest -a '$FIX'"
+    "jwfs_ext '$FIX'"
+    "jwfs_find txt '$FIX'"
+    "jwfs_grep spaced '$FIX'"
+    "jwfs_tree '$FIX'"
+    "jwfs_tree '$FIX' 1"
+    "jwfs_bigfiles '$FIX'"
+    "jwfs_bigfiles 3 '$FIX'"
+    "jwfs_bigfiles -a '$FIX'"
+    "jwfs_oldest '$FIX'"
+    "jwfs_oldest -a '$FIX'"
+    "jwfs_perms '$FIX'"
+    "jwfs_owners '$FIX'"
+    "jwfs_symlinks '$FIX'"
+    "jwfs_empty '$FIX'"
+    "jwfs_weirdnames '$FIX'"
+    "( cd '$FIX' && jwfs_rename --despace )"
+    "( cd '$FIX' && jwfs_rename --ascii )"
+    "( cd '$FIX' && jwfs_flatten )"
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -209,9 +209,9 @@ for sh in "${SHELLS[@]}"; do
   out=$( "$sh" -c "source '$LIB'
     cd '$T' || exit 3
     : > 'a b.txt'; : > 'łódź.md'; mkdir sub; : > sub/x
-    jwfiles_rename --despace --execute >/dev/null 2>&1
-    jwfiles_rename --ascii   --execute >/dev/null 2>&1
-    jwfiles_flatten          --execute >/dev/null 2>&1
+    jwfs_rename --despace --execute >/dev/null 2>&1
+    jwfs_rename --ascii   --execute >/dev/null 2>&1
+    jwfs_flatten          --execute >/dev/null 2>&1
     if [ -e 'a_b.txt' ] && [ -e 'lodz.md' ] && [ -e 'x' ] && [ ! -e 'sub' ]; then
         echo PASS; else echo FAIL; ls -1A; fi" 2>&1 )
   rm -rf "$T"

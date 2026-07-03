@@ -6,58 +6,58 @@
 #
 # Oversight-first area — the cockpit for the local filesystem: quick tools that
 # answer "what's the state of this directory tree?". Almost everything is 🟢
-# read-only (perms / owners / stat only report; jwfiles_backup only PRINTS its cp
-# command). The two exceptions are cwd-scoped mutators — jwfiles_rename and
-# jwfiles_flatten (⚪) — and even those DRY-RUN by default, applying only with
+# read-only (perms / owners / stat only report; jwfs_backup only PRINTS its cp
+# command). The two exceptions are cwd-scoped mutators — jwfs_rename and
+# jwfs_flatten (⚪) — and even those DRY-RUN by default, applying only with
 # --execute. No delete/trash tool on purpose — it must work on headless servers.
 #
-# Built incrementally (greenfield). jwfiles_toc() is the live index.
+# Built incrementally (greenfield). jwfs_toc() is the live index.
 
 # One TOC row: blast-radius marker, padded function name, one-line "soul" tagline.
 # printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
 # every row, so the tagline column aligns regardless of emoji width.
-__jwfiles_toc_row__() {
+__jwfs_toc_row__() {
     printf " - %s %-23s%s\n" "$1" "$2" "$3"
 }
 
-jwfiles_toc() {
+jwfs_toc() {
     echo
     echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
     echo "   (oversight-first: 🟢 tools are read-only; the two ⚪ cwd mutators dry-run by default)"
     echo
     echo " -----------------------------  orientation (the cockpit)"
-    __jwfiles_toc_row__ 🟢 jwfiles_profile "one-shot dir X-ray"
-    __jwfiles_toc_row__ 🟢 jwfiles_tree    "depth-limited tree view"
+    __jwfs_toc_row__ 🟢 jwfs_profile "one-shot dir X-ray"
+    __jwfs_toc_row__ 🟢 jwfs_tree    "depth-limited tree view"
     echo
     echo " -----------------------------  size / disk pressure"
-    __jwfiles_toc_row__ 🟢 jwfiles_size     "du, sorted, human — this dir"
-    __jwfiles_toc_row__ 🟢 jwfiles_bigfiles "largest files, subtree"
+    __jwfs_toc_row__ 🟢 jwfs_size     "du, sorted, human — this dir"
+    __jwfs_toc_row__ 🟢 jwfs_bigfiles "largest files, subtree"
     echo
     echo " -----------------------------  recency / change"
-    __jwfiles_toc_row__ 🟢 jwfiles_newest "newest files, subtree"
-    __jwfiles_toc_row__ 🟢 jwfiles_oldest "oldest files, subtree"
+    __jwfs_toc_row__ 🟢 jwfs_newest "newest files, subtree"
+    __jwfs_toc_row__ 🟢 jwfs_oldest "oldest files, subtree"
     echo
     echo " -----------------------------  search / inventory"
-    __jwfiles_toc_row__ 🟢 jwfiles_find "name search, highlighted"
-    __jwfiles_toc_row__ 🟢 jwfiles_grep "content search (rg→grep)"
-    __jwfiles_toc_row__ 🟢 jwfiles_ext  "extension inventory + counts"
+    __jwfs_toc_row__ 🟢 jwfs_find "name search, highlighted"
+    __jwfs_toc_row__ 🟢 jwfs_grep "content search (rg→grep)"
+    __jwfs_toc_row__ 🟢 jwfs_ext  "extension inventory + counts"
     echo
     echo " -----------------------------  posture / attributes (read-only)"
-    __jwfiles_toc_row__ 🟢 jwfiles_stat   "rich stat of one path"
-    __jwfiles_toc_row__ 🟢 jwfiles_perms  "odd-perms scan (RO)"
-    __jwfiles_toc_row__ 🟢 jwfiles_owners "ownership breakdown"
+    __jwfs_toc_row__ 🟢 jwfs_stat   "rich stat of one path"
+    __jwfs_toc_row__ 🟢 jwfs_perms  "odd-perms scan (RO)"
+    __jwfs_toc_row__ 🟢 jwfs_owners "ownership breakdown"
     echo
     echo " -----------------------------  hygiene / anomalies"
-    __jwfiles_toc_row__ 🟢 jwfiles_symlinks   "symlinks + targets, broken"
-    __jwfiles_toc_row__ 🟢 jwfiles_empty      "empty files & dirs"
-    __jwfiles_toc_row__ 🟢 jwfiles_weirdnames "spaces/special/non-ASCII"
+    __jwfs_toc_row__ 🟢 jwfs_symlinks   "symlinks + targets, broken"
+    __jwfs_toc_row__ 🟢 jwfs_empty      "empty files & dirs"
+    __jwfs_toc_row__ 🟢 jwfs_weirdnames "spaces/special/non-ASCII"
     echo
     echo " -----------------------------  backup (prints the command)"
-    __jwfiles_toc_row__ 🟢 jwfiles_backup "prints the cp -a command"
+    __jwfs_toc_row__ 🟢 jwfs_backup "prints the cp -a command"
     echo
     echo " -----------------------------  rename / restructure (cwd; dry-run by default)"
-    __jwfiles_toc_row__ ⚪ jwfiles_rename  "batch rename: substr/despace/ascii"
-    __jwfiles_toc_row__ ⚪ jwfiles_flatten "lift subdirs up one level"
+    __jwfs_toc_row__ ⚪ jwfs_rename  "batch rename: substr/despace/ascii"
+    __jwfs_toc_row__ ⚪ jwfs_flatten "lift subdirs up one level"
     echo
 }
 
@@ -68,15 +68,15 @@ jwfiles_toc() {
 
 # Column-align "Label  value" rows in grouped info blocks. Optional 3rd arg
 # overrides the column width (default 14). Labels ASCII (printf is byte-width).
-__jwfiles_kv__() {
+__jwfs_kv__() {
     printf "%-${3:-14}s%s\n" "$1" "$2"
 }
 
 # A section header "---[ Title ]---", rendered bold + yellow via jw_colors.sh's
 # jwpaintfg* helpers when that file is sourced; plain otherwise — so
-# jw_functions__files.sh works sourced standalone (no raw ANSI here, no hard
+# jw_functions__fs.sh works sourced standalone (no raw ANSI here, no hard
 # dependency on jw_colors.sh).
-__jwfiles_h__() {
+__jwfs_h__() {
     if command -v jwpaintfgBold >/dev/null 2>&1 && command -v jwpaintfgYellow >/dev/null 2>&1; then
         jwpaintfgBold "$(jwpaintfgYellow "---[ $1 ]---")"
     else
@@ -86,7 +86,7 @@ __jwfiles_h__() {
 
 # One anomaly row: "Label  count  mark". The mark (✅/⚠️) sits in the TRAILING,
 # unpadded slot so a ✅↔⚠️ byte-width difference never shifts the label column.
-__jwfiles_flag__() {
+__jwfs_flag__() {
     local n="${2:-0}" mark="✅"
     case "$n" in ''|*[!0-9]*) n=0 ;; esac
     [ "$n" -gt 0 ] && mark="⚠️"
@@ -94,16 +94,16 @@ __jwfiles_flag__() {
 }
 
 # Emit the whole stream, or only its first N lines when N is a non-empty integer.
-# The opt-in cap behind jwfiles_newest / _oldest / _bigfiles' [count] argument.
-__jwfiles_cap__() {
+# The opt-in cap behind jwfs_newest / _oldest / _bigfiles' [count] argument.
+__jwfs_cap__() {
     if [ -n "$1" ]; then head -n "$1"; else cat; fi
 }
 
 # Run `find` under $1 PRUNING the curated noise dirs, emitting -printf format $2.
 # The single home of the noise-dir list + prune mechanics — shared by the mtime
-# listers (jwfiles_newest/_oldest) and jwfiles_bigfiles. Each caller's -a/--all
+# listers (jwfs_newest/_oldest) and jwfs_bigfiles. Each caller's -a/--all
 # branch is a plain unpruned `find` instead. Edit the noise list here, once.
-__jwfiles_prune_find__() {
+__jwfs_prune_find__() {
     local dir="$1" fmt="$2"
     local d first=1
     local -a prune
@@ -124,16 +124,16 @@ __jwfiles_prune_find__() {
 # One-shot, read-only X-ray of a directory tree — the aggregate profiler of this area.
 # The bounded "top N" lists below are the deliberate exception to the repo's
 # no-silent-caps rule — a profile is a summary, not a viewer; the dedicated viewers
-# (jwfiles_size / _newest) are uncapped.
-jwfiles_profile() {
+# (jwfs_size / _newest) are uncapped.
+jwfs_profile() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_profile [dir]"
+            echo "Usage: jwfs_profile [dir]"
             echo "  One-shot read-only X-ray of a directory tree (default: .):"
             echo "  location, disk pressure, counts, size, biggest/newest, extensions, flags."
             echo "Examples:"
-            echo "  jwfiles_profile"
-            echo "  jwfiles_profile /var/log"
+            echo "  jwfs_profile"
+            echo "  jwfs_profile /var/log"
             return 0 ;;
     esac
     local dir="${1:-.}"
@@ -145,54 +145,54 @@ jwfiles_profile() {
     local top=8   # bounded top-N (diag-style summary exception to no-caps)
 
     echo
-    __jwfiles_h__ "Location"
+    __jwfs_h__ "Location"
     local abs; abs=$(cd "$dir" 2>/dev/null && pwd)
-    __jwfiles_kv__ "Path"       "${abs:-$dir}"
-    __jwfiles_kv__ "Mount"      "$(df -P  -- "$dir" 2>/dev/null | awk 'NR==2{print $6}')"
-    __jwfiles_kv__ "Filesystem" "$(df -PT -- "$dir" 2>/dev/null | awk 'NR==2{print $2" on "$1}')"
+    __jwfs_kv__ "Path"       "${abs:-$dir}"
+    __jwfs_kv__ "Mount"      "$(df -P  -- "$dir" 2>/dev/null | awk 'NR==2{print $6}')"
+    __jwfs_kv__ "Filesystem" "$(df -PT -- "$dir" 2>/dev/null | awk 'NR==2{print $2" on "$1}')"
 
     echo
-    __jwfiles_h__ "Disk (holding mount)"
+    __jwfs_h__ "Disk (holding mount)"
     df -h  -- "$dir" 2>/dev/null | awk 'NR==1 || NR==2'
     echo
     df -ih -- "$dir" 2>/dev/null | awk 'NR==1 || NR==2'
 
     echo
-    __jwfiles_h__ "Counts (subtree)"
-    __jwfiles_kv__ "Files"      "$(find "$dir" -type f 2>/dev/null | wc -l)"
-    __jwfiles_kv__ "Dirs"       "$(find "$dir" -mindepth 1 -type d 2>/dev/null | wc -l)"
-    __jwfiles_kv__ "Symlinks"   "$(find "$dir" -mindepth 1 -type l 2>/dev/null | wc -l)"
-    __jwfiles_kv__ "Hidden"     "$(find "$dir" -mindepth 1 -name '.*' 2>/dev/null | wc -l)"
-    __jwfiles_kv__ "Total size" "$(du -sh -- "$dir" 2>/dev/null | cut -f1)"
+    __jwfs_h__ "Counts (subtree)"
+    __jwfs_kv__ "Files"      "$(find "$dir" -type f 2>/dev/null | wc -l)"
+    __jwfs_kv__ "Dirs"       "$(find "$dir" -mindepth 1 -type d 2>/dev/null | wc -l)"
+    __jwfs_kv__ "Symlinks"   "$(find "$dir" -mindepth 1 -type l 2>/dev/null | wc -l)"
+    __jwfs_kv__ "Hidden"     "$(find "$dir" -mindepth 1 -name '.*' 2>/dev/null | wc -l)"
+    __jwfs_kv__ "Total size" "$(du -sh -- "$dir" 2>/dev/null | cut -f1)"
 
     echo
-    __jwfiles_h__ "Biggest entries (top $top, depth 1)"
+    __jwfs_h__ "Biggest entries (top $top, depth 1)"
     find "$dir" -mindepth 1 -maxdepth 1 -exec du -sh {} + 2>/dev/null | sort -rh | head -n "$top"
 
     echo
-    __jwfiles_h__ "Biggest files (top $top, subtree)"
+    __jwfs_h__ "Biggest files (top $top, subtree)"
     find "$dir" -type f -printf '%s\t%p\n' 2>/dev/null | sort -rn | head -n "$top" \
         | while IFS="$(printf '\t')" read -r sz p; do
               printf '%8s  %s\n' "$(numfmt --to=iec "$sz" 2>/dev/null || echo "${sz}B")" "$p"
           done
 
     echo
-    __jwfiles_h__ "Newest files (top $top, subtree)"
+    __jwfs_h__ "Newest files (top $top, subtree)"
     find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
         | sort -t'|' -k1,1 -rn | head -n "$top" | cut -d'|' -f2-
 
     echo
-    __jwfiles_h__ "Extensions (top $top by count)"
+    __jwfs_h__ "Extensions (top $top by count)"
     find "$dir" -type f 2>/dev/null | sed -n 's/.*\.\([^./]\{1,\}\)$/\1/p' \
         | sort | uniq -c | sort -rn | head -n "$top"
 
     echo
-    __jwfiles_h__ "Flags"
-    __jwfiles_flag__ "Broken symlinks"   "$(find "$dir" -xtype l 2>/dev/null | wc -l)"
-    __jwfiles_flag__ "Empty files"       "$(find "$dir" -type f -empty 2>/dev/null | wc -l)"
-    __jwfiles_flag__ "Empty dirs"        "$(find "$dir" -mindepth 1 -type d -empty 2>/dev/null | wc -l)"
-    __jwfiles_flag__ "World-writable"    "$(find "$dir" -type f -perm -o+w 2>/dev/null | wc -l)"
-    __jwfiles_flag__ "Names with spaces" "$(find "$dir" -mindepth 1 -name '* *' 2>/dev/null | wc -l)"
+    __jwfs_h__ "Flags"
+    __jwfs_flag__ "Broken symlinks"   "$(find "$dir" -xtype l 2>/dev/null | wc -l)"
+    __jwfs_flag__ "Empty files"       "$(find "$dir" -type f -empty 2>/dev/null | wc -l)"
+    __jwfs_flag__ "Empty dirs"        "$(find "$dir" -mindepth 1 -type d -empty 2>/dev/null | wc -l)"
+    __jwfs_flag__ "World-writable"    "$(find "$dir" -type f -perm -o+w 2>/dev/null | wc -l)"
+    __jwfs_flag__ "Names with spaces" "$(find "$dir" -mindepth 1 -name '* *' 2>/dev/null | wc -l)"
     echo
 }
 
@@ -200,15 +200,15 @@ jwfiles_profile() {
 # Depth-limited directory tree. Uses tree(1) when installed; otherwise a
 # find-based fallback that indents each entry by its depth below the root
 # (awk, so a path with regex-special characters stays inert).
-jwfiles_tree() {
+jwfs_tree() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_tree [dir] [depth]"
+            echo "Usage: jwfs_tree [dir] [depth]"
             echo "  Directory tree of [dir] (default: .), limited to [depth] levels"
             echo "  (default: 2). Uses tree(1) if installed, else a find-based fallback."
             echo "Examples:"
-            echo "  jwfiles_tree"
-            echo "  jwfiles_tree ./src 3"
+            echo "  jwfs_tree"
+            echo "  jwfs_tree ./src 3"
             return 0 ;;
     esac
     local dir="${1:-.}" depth="${2:-2}"
@@ -247,15 +247,15 @@ jwfiles_tree() {
 
 # Disk usage of every top-level entry, largest-first, with the tree total.
 # Uncapped viewer — shows every entry; narrow with your own `head`.
-jwfiles_size() {
+jwfs_size() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_size [dir]"
+            echo "Usage: jwfs_size [dir]"
             echo "  Disk usage of each top-level entry in [dir] (default: .),"
             echo "  human-readable, largest-first, then the whole-tree total."
             echo "Examples:"
-            echo "  jwfiles_size"
-            echo "  jwfiles_size ~/Downloads"
+            echo "  jwfs_size"
+            echo "  jwfs_size ~/Downloads"
             return 0 ;;
     esac
     local dir="${1:-.}"
@@ -272,19 +272,19 @@ jwfiles_size() {
 # Largest individual FILES in the subtree, biggest-first, human-readable sizes.
 # Skips common noise dirs by default (.git / node_modules / …); pass -a/--all to
 # include them. Uncapped unless a leading [count] is given.
-jwfiles_bigfiles() {
+jwfs_bigfiles() {
     local all=0 a
     local -a rest
     for a in "$@"; do
         case "$a" in
             -h|--help)
-                echo "Usage: jwfiles_bigfiles [count] [dir] [-a|--all]"
+                echo "Usage: jwfs_bigfiles [count] [dir] [-a|--all]"
                 echo "  Individual files under [dir] (default: .), largest-first by size."
                 echo "  Skips common noise dirs (.git, .venv, node_modules, caches, ...);"
                 echo "  pass -a / --all to include them. No count → full list; [count] caps it."
                 echo "Examples:"
-                echo "  jwfiles_bigfiles"
-                echo "  jwfiles_bigfiles -a 20 /var"
+                echo "  jwfs_bigfiles"
+                echo "  jwfs_bigfiles -a 20 /var"
                 return 0 ;;
             -a|--all) all=1 ;;
             *)        rest+=("$a") ;;
@@ -305,8 +305,8 @@ jwfiles_bigfiles() {
     if [ "$all" -eq 1 ]; then
         find "$dir" -type f -printf '%s\t%p\n' 2>/dev/null
     else
-        __jwfiles_prune_find__ "$dir" '%s\t%p\n'
-    fi | sort -rn | __jwfiles_cap__ "$n" \
+        __jwfs_prune_find__ "$dir" '%s\t%p\n'
+    fi | sort -rn | __jwfs_cap__ "$n" \
         | while IFS="$(printf '\t')" read -r sz p; do
               printf '%8s  %s\n' "$(numfmt --to=iec "$sz" 2>/dev/null || echo "${sz}B")" "$p"
           done
@@ -317,12 +317,12 @@ jwfiles_bigfiles() {
 # recency / change
 # ---------------------------------------------------------------------------------
 
-# Shared engine for jwfiles_newest / _oldest — mirrors that differ only in sort
+# Shared engine for jwfs_newest / _oldest — mirrors that differ only in sort
 # direction. Lists files under a dir by mtime, one per line "[date] path". By
 # default it prunes a curated set of noise dirs (VCS / venvs / caches /
 # node_modules) that otherwise swamp the output; -a/--all keeps them. The noise
 # list lives here, once. Args: <fn-name> <sort-flag: -rn|-n> <order-word> [args...]
-__jwfiles_mtime_list__() {
+__jwfs_mtime_list__() {
     local fn="$1" sortflag="$2" word="$3"; shift 3
     local all=0 a
     local -a rest
@@ -356,21 +356,21 @@ __jwfiles_mtime_list__() {
     fi
     if [ "$all" -eq 1 ]; then
         find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
-            | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfiles_cap__ "$n"
+            | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfs_cap__ "$n"
         return 0
     fi
-    # default: prune common noise dirs (list + mechanics in __jwfiles_prune_find__)
-    __jwfiles_prune_find__ "$dir" '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' \
-        | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfiles_cap__ "$n"
+    # default: prune common noise dirs (list + mechanics in __jwfs_prune_find__)
+    __jwfs_prune_find__ "$dir" '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' \
+        | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfs_cap__ "$n"
 }
 
 # Files under a tree, newest-first by mtime. Skips common noise dirs by default
 # (.git / .venv / node_modules / …); pass -a/--all to include them. Uncapped
 # unless a leading [count] is given.
-jwfiles_newest() { __jwfiles_mtime_list__ jwfiles_newest -rn newest "$@"; }
+jwfs_newest() { __jwfs_mtime_list__ jwfs_newest -rn newest "$@"; }
 
-# Mirror of jwfiles_newest, oldest-first — the stale/forgotten end of the timeline.
-jwfiles_oldest() { __jwfiles_mtime_list__ jwfiles_oldest -n oldest "$@"; }
+# Mirror of jwfs_newest, oldest-first — the stale/forgotten end of the timeline.
+jwfs_oldest() { __jwfs_mtime_list__ jwfs_oldest -n oldest "$@"; }
 
 
 # ---------------------------------------------------------------------------------
@@ -380,14 +380,14 @@ jwfiles_oldest() { __jwfiles_mtime_list__ jwfiles_oldest -n oldest "$@"; }
 # Case-insensitive recursive NAME search, matches highlighted. The phrase is a
 # literal substring (matched by find -iname and re-highlighted with grep -F), so
 # metacharacters are inert. Uncapped.
-jwfiles_find() {
+jwfs_find() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo "Usage: jwfiles_find <phrase> [dir]"
+        echo "Usage: jwfs_find <phrase> [dir]"
         echo "  Case-insensitive recursive name search under [dir] (default: .),"
         echo "  with the matched phrase highlighted. Phrase is a literal substring."
         echo "Examples:"
-        echo "  jwfiles_find report"
-        echo "  jwfiles_find .conf /etc"
+        echo "  jwfs_find report"
+        echo "  jwfs_find .conf /etc"
         [ $# -eq 0 ] && return 1 || return 0
     fi
     local phrase="$1" dir="${2:-.}"
@@ -401,14 +401,14 @@ jwfiles_find() {
 # Recursive CONTENT search — ripgrep if present (fast, .gitignore-aware), else
 # grep -rIn (skips binaries). Pattern passed via -e so a leading '-' is inert.
 # Uncapped; a no-match exit (1) is normal, not an error.
-jwfiles_grep() {
+jwfs_grep() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo "Usage: jwfiles_grep <pattern> [dir]"
+        echo "Usage: jwfs_grep <pattern> [dir]"
         echo "  Recursive content search under [dir] (default: .)."
         echo "  Uses ripgrep (rg) when available, else grep -rIn."
         echo "Examples:"
-        echo "  jwfiles_grep TODO"
-        echo "  jwfiles_grep 'def main' ./src"
+        echo "  jwfs_grep TODO"
+        echo "  jwfs_grep 'def main' ./src"
         [ $# -eq 0 ] && return 1 || return 0
     fi
     local pat="$1" dir="${2:-.}"
@@ -425,15 +425,15 @@ jwfiles_grep() {
 
 # Extension inventory of the subtree: per-extension file counts, most-common
 # first. Answers "what kinds of files live here?". Uncapped.
-jwfiles_ext() {
+jwfs_ext() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_ext [dir]"
+            echo "Usage: jwfs_ext [dir]"
             echo "  Inventory of file extensions under [dir] (default: .),"
             echo "  with per-extension counts, most-common first."
             echo "Examples:"
-            echo "  jwfiles_ext"
-            echo "  jwfiles_ext ~/Downloads"
+            echo "  jwfs_ext"
+            echo "  jwfs_ext ~/Downloads"
             return 0 ;;
     esac
     local dir="${1:-.}"
@@ -454,14 +454,14 @@ jwfiles_ext() {
 # type, symbolic+octal perms, owner/group (names + numeric), size, hard links,
 # inode, and access/modify/change times. Symlinks report the LINK itself (its
 # target is shown in the header), so a broken symlink still resolves.
-jwfiles_stat() {
+jwfs_stat() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo "Usage: jwfiles_stat <path>"
+        echo "Usage: jwfs_stat <path>"
         echo "  Rich read-only metadata for one path: type, perms (symbolic + octal),"
         echo "  owner/group, size, links, inode, and access/modify/change times."
         echo "Examples:"
-        echo "  jwfiles_stat ./report.pdf"
-        echo "  jwfiles_stat /etc/passwd"
+        echo "  jwfs_stat ./report.pdf"
+        echo "  jwfs_stat /etc/passwd"
         [ $# -eq 0 ] && return 1 || return 0
     fi
     local p="$1"
@@ -473,32 +473,32 @@ jwfiles_stat() {
     IFS='|' read -r ftype perms operm owner group uid gid size links inode atime mtime ctime \
         < <(stat -c '%F|%A|%a|%U|%G|%u|%g|%s|%h|%i|%x|%y|%z' -- "$p" 2>/dev/null)
     echo
-    __jwfiles_h__ "$(stat -c '%N' -- "$p" 2>/dev/null)"
-    __jwfiles_kv__ "Type"   "$ftype"
-    __jwfiles_kv__ "Perms"  "$perms  ($operm)"
-    __jwfiles_kv__ "Owner"  "$owner:$group  ($uid:$gid)"
-    __jwfiles_kv__ "Size"   "$size bytes  ($(numfmt --to=iec "$size" 2>/dev/null || echo "$size"))"
-    __jwfiles_kv__ "Links"  "$links"
-    __jwfiles_kv__ "Inode"  "$inode"
-    __jwfiles_kv__ "Access" "$atime"
-    __jwfiles_kv__ "Modify" "$mtime"
-    __jwfiles_kv__ "Change" "$ctime"
+    __jwfs_h__ "$(stat -c '%N' -- "$p" 2>/dev/null)"
+    __jwfs_kv__ "Type"   "$ftype"
+    __jwfs_kv__ "Perms"  "$perms  ($operm)"
+    __jwfs_kv__ "Owner"  "$owner:$group  ($uid:$gid)"
+    __jwfs_kv__ "Size"   "$size bytes  ($(numfmt --to=iec "$size" 2>/dev/null || echo "$size"))"
+    __jwfs_kv__ "Links"  "$links"
+    __jwfs_kv__ "Inode"  "$inode"
+    __jwfs_kv__ "Access" "$atime"
+    __jwfs_kv__ "Modify" "$mtime"
+    __jwfs_kv__ "Change" "$ctime"
     echo
 }
 
 # Read-only scan for security-relevant permissions in the subtree. Reports only
 # (each row: symbolic perms, owner:group, path) — it never chmods anything. Sections:
 # world-writable files, world-writable dirs missing the sticky bit, setuid, setgid.
-jwfiles_perms() {
+jwfs_perms() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_perms [dir]"
+            echo "Usage: jwfs_perms [dir]"
             echo "  Read-only scan for risky permissions under [dir] (default: .):"
             echo "  world-writable files, world-writable dirs w/o sticky bit, setuid, setgid."
             echo "  Reports only — never changes anything."
             echo "Examples:"
-            echo "  jwfiles_perms"
-            echo "  jwfiles_perms /var/www"
+            echo "  jwfs_perms"
+            echo "  jwfs_perms /var/www"
             return 0 ;;
     esac
     local dir="${1:-.}"
@@ -507,31 +507,31 @@ jwfiles_perms() {
         return 1
     fi
     echo
-    __jwfiles_h__ "World-writable files"
+    __jwfs_h__ "World-writable files"
     find "$dir" -type f -perm -o+w -printf '%M  %u:%g  %p\n' 2>/dev/null
     echo
-    __jwfiles_h__ "World-writable dirs without sticky bit"
+    __jwfs_h__ "World-writable dirs without sticky bit"
     find "$dir" -type d -perm -o+w ! -perm -1000 -printf '%M  %u:%g  %p\n' 2>/dev/null
     echo
-    __jwfiles_h__ "setuid"
+    __jwfs_h__ "setuid"
     find "$dir" -type f -perm -4000 -printf '%M  %u:%g  %p\n' 2>/dev/null
     echo
-    __jwfiles_h__ "setgid"
+    __jwfs_h__ "setgid"
     find "$dir" -type f -perm -2000 -printf '%M  %u:%g  %p\n' 2>/dev/null
     echo
 }
 
 # Ownership breakdown of the subtree: item count per user:group, most-first.
 # The "whose files are these?" glance. Uncapped, read-only.
-jwfiles_owners() {
+jwfs_owners() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_owners [dir]"
+            echo "Usage: jwfs_owners [dir]"
             echo "  Ownership breakdown of the subtree under [dir] (default: .):"
             echo "  item count per user:group, most-first. Reports only."
             echo "Examples:"
-            echo "  jwfiles_owners"
-            echo "  jwfiles_owners /srv"
+            echo "  jwfs_owners"
+            echo "  jwfs_owners /srv"
             return 0 ;;
     esac
     local dir="${1:-.}"
@@ -549,15 +549,15 @@ jwfiles_owners() {
 
 # Every symlink in the subtree with its target, then the broken (dangling) subset
 # called out separately — the actionable ones. Read-only.
-jwfiles_symlinks() {
+jwfs_symlinks() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_symlinks [dir]"
+            echo "Usage: jwfs_symlinks [dir]"
             echo "  List every symlink under [dir] (default: .) with its target,"
             echo "  then the broken (dangling) subset on its own."
             echo "Examples:"
-            echo "  jwfiles_symlinks"
-            echo "  jwfiles_symlinks /etc"
+            echo "  jwfs_symlinks"
+            echo "  jwfs_symlinks /etc"
             return 0 ;;
     esac
     local dir="${1:-.}"
@@ -566,24 +566,24 @@ jwfiles_symlinks() {
         return 1
     fi
     echo
-    __jwfiles_h__ "All symlinks"
+    __jwfs_h__ "All symlinks"
     find "$dir" -type l -printf '%p -> %l\n' 2>/dev/null | sort
     echo
-    __jwfiles_h__ "Broken (dangling)"
+    __jwfs_h__ "Broken (dangling)"
     find "$dir" -xtype l -printf '%p -> %l\n' 2>/dev/null | sort
     echo
 }
 
 # Empty files and empty directories in the subtree — the usual `find -delete`
 # clutter, listed. Read-only (listing only). Uncapped.
-jwfiles_empty() {
+jwfs_empty() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_empty [dir]"
+            echo "Usage: jwfs_empty [dir]"
             echo "  Zero-byte files and empty directories under [dir] (default: .)."
             echo "Examples:"
-            echo "  jwfiles_empty"
-            echo "  jwfiles_empty ~/Downloads"
+            echo "  jwfs_empty"
+            echo "  jwfs_empty ~/Downloads"
             return 0 ;;
     esac
     local dir="${1:-.}"
@@ -592,10 +592,10 @@ jwfiles_empty() {
         return 1
     fi
     echo
-    __jwfiles_h__ "Empty files"
+    __jwfs_h__ "Empty files"
     find "$dir" -type f -empty 2>/dev/null | sort
     echo
-    __jwfiles_h__ "Empty dirs"
+    __jwfs_h__ "Empty dirs"
     find "$dir" -mindepth 1 -type d -empty 2>/dev/null | sort
     echo
 }
@@ -603,16 +603,16 @@ jwfiles_empty() {
 # Names that will bite later: with spaces, with shell/glob-special ASCII, or with
 # non-ASCII bytes — three labeled subtree scans (grep on the path, so no fragile
 # find-glob escaping). Read-only — reports only.
-jwfiles_weirdnames() {
+jwfs_weirdnames() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_weirdnames [dir]"
+            echo "Usage: jwfs_weirdnames [dir]"
             echo "  Scan the subtree under [dir] (default: .) for problematic names:"
             echo "  names with spaces, shell/glob-special characters, or non-ASCII bytes."
             echo "  Reports only."
             echo "Examples:"
-            echo "  jwfiles_weirdnames"
-            echo "  jwfiles_weirdnames ~/Music"
+            echo "  jwfs_weirdnames"
+            echo "  jwfs_weirdnames ~/Music"
             return 0 ;;
     esac
     local dir="${1:-.}"
@@ -621,14 +621,14 @@ jwfiles_weirdnames() {
         return 1
     fi
     echo
-    __jwfiles_h__ "Names with spaces"
+    __jwfs_h__ "Names with spaces"
     find "$dir" -mindepth 1 2>/dev/null | grep ' ' | sort
     echo
-    __jwfiles_h__ "Names with shell/glob-special characters"
+    __jwfs_h__ "Names with shell/glob-special characters"
     find "$dir" -mindepth 1 2>/dev/null \
         | LC_ALL=C grep -E '[]!"#$%&'\''()*+,:;<=>?@[\\^`{|}~]' | sort
     echo
-    __jwfiles_h__ "Names with non-ASCII characters"
+    __jwfs_h__ "Names with non-ASCII characters"
     find "$dir" -mindepth 1 2>/dev/null | LC_ALL=C grep '[^ -~]' | sort
     echo
 }
@@ -643,15 +643,15 @@ jwfiles_weirdnames() {
 # would happen and run it yourself — eyeball it, or pipe to a shell. Print-the-command,
 # don't-execute is intentional; missing paths are flagged on stderr so stdout stays a
 # clean, runnable command list.
-jwfiles_backup() {
+jwfs_backup() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo "Usage: jwfiles_backup <path> [path...]"
+        echo "Usage: jwfs_backup <path> [path...]"
         echo "  Print (does NOT run) the 'cp -a' command to snapshot each path as:"
         echo "    <path>.<YYYYMMDD-HHMMSS>.JWBAK"
-        echo "  You inspect it, then run it yourself (or pipe:  jwfiles_backup x | sh)."
+        echo "  You inspect it, then run it yourself (or pipe:  jwfs_backup x | sh)."
         echo "Examples:"
-        echo "  jwfiles_backup ./config.yml"
-        echo "  jwfiles_backup ./src ./notes.md"
+        echo "  jwfs_backup ./config.yml"
+        echo "  jwfs_backup ./src ./notes.md"
         [ $# -eq 0 ] && return 1 || return 0
     fi
     local ts p dest
@@ -671,26 +671,26 @@ jwfiles_backup() {
 # ⚪ Batch-rename non-hidden items in the CURRENT directory by one of three rewrites.
 # DRY-RUN by default — prints the `mv -i -v` commands it would run; add --execute
 # (-x) to perform them. cwd only, no [dir] argument (by design — matches the old
-# habit). The "doing" half of the read-only jwfiles_weirdnames.
-#   jwfiles_rename <from> [to]   substring: remove <from>, or replace <from> with <to>
-#   jwfiles_rename --despace     spaces → underscores
-#   jwfiles_rename --ascii       transliterate diacritics to ASCII (ą→a, ł→l, é→e, …)
-jwfiles_rename() {
+# habit). The "doing" half of the read-only jwfs_weirdnames.
+#   jwfs_rename <from> [to]   substring: remove <from>, or replace <from> with <to>
+#   jwfs_rename --despace     spaces → underscores
+#   jwfs_rename --ascii       transliterate diacritics to ASCII (ą→a, ł→l, é→e, …)
+jwfs_rename() {
     local execute=0 mode="subst" a
     local -a pos
     for a in "$@"; do
         case "$a" in
             -h|--help)
-                echo "Usage: jwfiles_rename <from> [to] | --despace | --ascii  [--execute]"
+                echo "Usage: jwfs_rename <from> [to] | --despace | --ascii  [--execute]"
                 echo "  Batch-rename non-hidden items in the CURRENT directory (no [dir] arg)."
                 echo "    <from> [to]   remove <from> from names, or replace <from> with <to>"
                 echo "    --despace     replace spaces with underscores"
                 echo "    --ascii       transliterate diacritics to ASCII (iconv //TRANSLIT)"
                 echo "  DRY-RUN by default (prints the mv commands); --execute / -x applies them."
                 echo "Examples:"
-                echo "  jwfiles_rename ' - copy'             # preview removing ' - copy'"
-                echo "  jwfiles_rename --despace --execute   # spaces → _ , for real"
-                echo "  jwfiles_rename draft final -x"
+                echo "  jwfs_rename ' - copy'             # preview removing ' - copy'"
+                echo "  jwfs_rename --despace --execute   # spaces → _ , for real"
+                echo "  jwfs_rename draft final -x"
                 return 0 ;;
             -x|--execute) execute=1 ;;
             --despace)    mode="despace" ;;
@@ -743,22 +743,22 @@ jwfiles_rename() {
 # subdir's internal structure is preserved, only raised one level. DRY-RUN by
 # default; --execute / -x applies. cwd only (no [dir] arg). Refuses in $HOME;
 # rmdir (never rm -r) can't delete a non-empty dir, so nothing is ever lost.
-jwfiles_flatten() {
+jwfs_flatten() {
     local execute=0 a
     for a in "$@"; do
         case "$a" in
             -h|--help)
-                echo "Usage: jwfiles_flatten [--execute]"
+                echo "Usage: jwfs_flatten [--execute]"
                 echo "  Lift each non-hidden subdir's contents up one level into the current"
                 echo "  directory, then rmdir the emptied subdir. ONE level only, no recursion."
                 echo "  cwd only (no [dir] arg). DRY-RUN by default; --execute / -x applies."
                 echo "Examples:"
-                echo "  jwfiles_flatten            # preview"
-                echo "  jwfiles_flatten --execute"
+                echo "  jwfs_flatten            # preview"
+                echo "  jwfs_flatten --execute"
                 return 0 ;;
             -x|--execute) execute=1 ;;
             -*) echo "❌ unknown flag: $a" >&2; return 1 ;;
-            *)  echo "❌ jwfiles_flatten takes no positional args (cwd only)" >&2; return 1 ;;
+            *)  echo "❌ jwfs_flatten takes no positional args (cwd only)" >&2; return 1 ;;
         esac
     done
     if [ "$(pwd)" = "$HOME" ]; then

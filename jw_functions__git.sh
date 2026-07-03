@@ -169,7 +169,7 @@ jwgit_clone() {
         if [ -d "$DIR" ]; then
             echo "📁 Location: $DIR"
             echo
-            echo "---[ Repository Info ]------------------------------"
+            __jwgit_h__ "Repository Info"
             __jwgit_kv__ "Remote origin:" "$(git -C "$DIR" remote get-url origin 2>/dev/null || echo 'Not set')"
             __jwgit_kv__ "Current branch:" "$(git -C "$DIR" branch --show-current 2>/dev/null || echo 'Unknown')"
             __jwgit_kv__ "Latest commit:" "$(git -C "$DIR" log -1 --oneline 2>/dev/null || echo 'No commits')"
@@ -294,7 +294,7 @@ jwgit_remote() {
             
             local remote fetch_url push_url branch_count
             while IFS= read -r remote; do
-                echo "---[ Remote: $remote ]------------------------------"
+                __jwgit_h__ "Remote: $remote"
                 fetch_url=$(git remote get-url "$remote" 2>/dev/null)
                 push_url=$(git remote get-url --push "$remote" 2>/dev/null)
                 
@@ -371,7 +371,7 @@ jwgit_config() {
             echo "=================================================="
             echo
 
-            echo "---[ Repository ]-----------------------------------"
+            __jwgit_h__ "Repository"
             local repo_root
             repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
             if [ -n "$repo_root" ]; then
@@ -415,7 +415,7 @@ jwgit_config() {
                 loc_note="not in a repo"; wt_note="not in a repo"
             fi
 
-            echo "---[ Layers (low -> high precedence; higher wins) ]-"
+            __jwgit_h__ "Layers (low -> high precedence; higher wins)"
             __jwgit_config_layerline__ "🖥" "system  " "$sys_file"  "$s_cnt" "none"
             __jwgit_config_layerline__ "👤" "global  " "$glob_file" "$g_cnt" "none"
             __jwgit_config_layerline__ "📁" "local   " "$loc_file"  "$l_cnt" "$loc_note"
@@ -438,7 +438,7 @@ jwgit_config() {
                 | sort)
 
             if [ -n "$overrides" ]; then
-                echo "---[ ⚠️  Overridden keys (shadowed -> effective) ]----"
+                __jwgit_h__ "⚠️  Overridden keys (shadowed -> effective)"
                 # locals declared once up-front: a bare in-loop 'local' re-prints in zsh
                 local okey oscopes effscope sc val
                 okey=""; oscopes=""; effscope=""; sc=""; val=""
@@ -464,7 +464,7 @@ jwgit_config() {
                 done <<< "$overrides"
                 echo
             else
-                echo "---[ Overrides ]------------------------------------"
+                __jwgit_h__ "Overrides"
                 echo "  (no key is set in more than one layer)"
                 echo
             fi
@@ -703,7 +703,7 @@ __jwgit_config_dump__() {
         body=$(printf '%s\n' "$body" | grep -iF -- "$filter")
         [ -n "$body" ] || return 0
     fi
-    echo "---[ $emoji $name  $file ]--------------------"
+    __jwgit_h__ "$emoji $name  $file"
     # split each 'key=value' on its FIRST '=' only (values may themselves contain '=')
     printf '%s\n' "$body" | sed -e 's/^/  /' -e 's/=/ = /'
     echo
@@ -750,16 +750,16 @@ jwgit_branch() {
             echo
             
             if [ "$BRANCH_NAME" = "--remote" ] || [ "$BRANCH_NAME" = "-r" ]; then
-                echo "---[ Remote Branches ]------------------------------"
+                __jwgit_h__ "Remote Branches"
                 git branch -r --format="  %(refname:short)%(if)%(upstream)%(then) -> %(upstream:short)%(end)"
             elif [ "$BRANCH_NAME" = "--all" ] || [ "$BRANCH_NAME" = "-a" ]; then
-                echo "---[ Local Branches ]-------------------------------"
+                __jwgit_h__ "Local Branches"
                 git branch --format="%(if)%(HEAD)%(then)* %(else)  %(end)%(refname:short)"
                 echo
-                echo "---[ Remote Branches ]------------------------------"
+                __jwgit_h__ "Remote Branches"
                 git branch -r --format="  %(refname:short)"
             else
-                echo "---[ Local Branches ]-------------------------------"
+                __jwgit_h__ "Local Branches"
                 git branch --format="%(if)%(HEAD)%(then)* %(else)  %(end)%(refname:short)%(if)%(upstream)%(then) -> %(upstream:short)%(end)"
                 
                 local current_branch
@@ -1167,7 +1167,7 @@ jwgit_merge() {
     echo
     
     # Show what will be merged
-    echo "---[ Commits to be merged ]-------------------------"
+    __jwgit_h__ "Commits to be merged"
     git log --oneline "$current_branch..$BRANCH" | head -5 | sed 's/^/  /'
     local commit_count
     commit_count=$(git rev-list --count "$current_branch..$BRANCH" 2>/dev/null || echo "0")
@@ -1203,7 +1203,7 @@ jwgit_merge() {
         echo
         echo "✅ Merge completed successfully!"
         echo
-        echo "---[ Merge Summary ]--------------------------------"
+        __jwgit_h__ "Merge Summary"
         __jwgit_kv__ "Merged:" "$BRANCH -> $current_branch"
         __jwgit_kv__ "Latest commit:" "$(git log -1 --oneline)"
         
@@ -1211,7 +1211,7 @@ jwgit_merge() {
         echo
         echo "❌ Merge failed due to conflicts!"
         echo
-        echo "---[ Conflicted Files ]-----------------------------"
+        __jwgit_h__ "Conflicted Files"
         git diff --name-only --diff-filter=U | sed 's/^/  /'
         echo
         echo "💡 To resolve conflicts:"
@@ -1334,7 +1334,7 @@ jwgit_rebase() {
     
     # Show what will be rebased
     if git merge-base --is-ancestor "$TARGET" HEAD 2>/dev/null; then
-        echo "---[ Commits to be rebased ]------------------------"
+        __jwgit_h__ "Commits to be rebased"
         git log --oneline "$TARGET..HEAD" | head -10 | sed 's/^/  /'
         local commit_count
         commit_count=$(git rev-list --count "$TARGET..HEAD" 2>/dev/null || echo "0")
@@ -1344,7 +1344,7 @@ jwgit_rebase() {
             echo "  ... and $((commit_count - 10)) more commits"
         fi
     else
-        echo "---[ Rebase Information ]---------------------------"
+        __jwgit_h__ "Rebase Information"
         __jwgit_kv__ "Target:" "$TARGET"
         __jwgit_kv__ "Current branch:" "$current_branch"
         echo "⚠️  This will rewrite commit history!"
@@ -1381,7 +1381,7 @@ jwgit_rebase() {
         echo
         echo "✅ Rebase completed successfully!"
         echo
-        echo "---[ Rebase Summary ]-------------------------------"
+        __jwgit_h__ "Rebase Summary"
         __jwgit_kv__ "Rebased:" "$current_branch onto $TARGET"
         __jwgit_kv__ "Latest commit:" "$(git log -1 --oneline)"
         
@@ -1389,7 +1389,7 @@ jwgit_rebase() {
         echo
         echo "❌ Rebase failed due to conflicts!"
         echo
-        echo "---[ Conflicted Files ]-----------------------------"
+        __jwgit_h__ "Conflicted Files"
         git diff --name-only --diff-filter=U | sed 's/^/  /' 2>/dev/null || echo "  (checking conflicts...)"
         echo
         echo "💡 To resolve conflicts:"
@@ -1585,11 +1585,11 @@ jwgit_add() {
 
     # Preview: single existing regular file, or the whole tree ('.')
     if [ $# -eq 1 ] && [ "$1" != "." ] && [[ "$1" != *"*"* ]] && [ -f "$1" ]; then
-        echo "---[ File Status ]----------------------------------"
+        __jwgit_h__ "File Status"
         git status --porcelain "$1" | sed 's/^/  /'
         echo
     elif [ "$1" = "." ]; then
-        echo "---[ Changes to be added ]--------------------------"
+        __jwgit_h__ "Changes to be added"
         local modified_count untracked_count
         modified_count=$(git status --porcelain | grep -c "^ M\|^M \|^MM")
         untracked_count=$(git status --porcelain | grep -c "^??")
@@ -1602,7 +1602,7 @@ jwgit_add() {
     if git add "$@"; then
         echo "✅ Files added to staging area successfully!"
         echo
-        echo "---[ Staging Area Status ]-------------------------"
+        __jwgit_h__ "Staging Area Status"
         git status --porcelain | grep "^A\|^M\|^D" | sed 's/^/  /' | head -10
         local staged_count
         staged_count=$(git status --porcelain | grep -c "^A\|^M\|^D")
@@ -1754,7 +1754,7 @@ jwgit_commit() {
     echo
     
     # Show commit summary
-    echo "---[ Commit Summary ]-------------------------------"
+    __jwgit_h__ "Commit Summary"
     if [ -n "$ALL" ]; then
         echo "Type: Commit all modified files"
         git diff --name-status | sed 's/^/  /'
@@ -1779,7 +1779,7 @@ jwgit_commit() {
         echo
         echo "✅ Commit created successfully!"
         echo
-        echo "---[ Commit Information ]---------------------------"
+        __jwgit_h__ "Commit Information"
         __jwgit_kv__ "Commit:" "$(git log -1 --oneline)"
         __jwgit_kv__ "Author:" "$(git log -1 --format='%an <%ae>')"
         __jwgit_kv__ "Date:" "$(git log -1 --format='%ad' --date=format:'%Y-%m-%d %H:%M:%S')"
@@ -1993,15 +1993,15 @@ jwgit_stash() {
             fi
             
             # Show stash information
-            echo "---[ Stash Info ]-----------------------------------"
+            __jwgit_h__ "Stash Info"
             git stash list | grep -F "$STASH_REF" | sed 's/^/  /'
             echo
             
-            echo "---[ Changed Files ]--------------------------------"
+            __jwgit_h__ "Changed Files"
             git stash show --name-status "$STASH_REF" | sed 's/^/  /'
             echo
             
-            echo "---[ Diff Summary ]---------------------------------"
+            __jwgit_h__ "Diff Summary"
             git stash show --stat "$STASH_REF"
             echo
             
@@ -2190,7 +2190,7 @@ jwgit_reset() {
     fi
     
     # Show what will happen
-    echo "---[ Reset Information ]----------------------------"
+    __jwgit_h__ "Reset Information"
     __jwgit_kv__ "Current HEAD:" "$(git rev-parse --short HEAD) ($(git log -1 --oneline))"
     __jwgit_kv__ "Reset target:" "$(git rev-parse --short "$TARGET") ($(git log -1 --oneline "$TARGET"))"
     echo
@@ -2262,7 +2262,7 @@ jwgit_reset() {
         echo
         echo "✅ Reset completed successfully!"
         echo
-        echo "---[ Reset Summary ]--------------------------------"
+        __jwgit_h__ "Reset Summary"
         echo "HEAD is now at: $(git rev-parse --short HEAD) ($(git log -1 --oneline))"
         
         case $RESET_TYPE in
@@ -2497,7 +2497,7 @@ jwgit_push() {
     
     # Show what will be pushed
     if [ -n "$BRANCH" ] && [ -z "$HAS_ALL_TAGS" ]; then
-        echo "---[ Commits to Push ]------------------------------"
+        __jwgit_h__ "Commits to Push"
         
         # Check if remote branch exists
         if git show-ref --verify --quiet "refs/remotes/$REMOTE/$BRANCH"; then
@@ -2558,7 +2558,7 @@ jwgit_push() {
         echo
         echo "✅ Push completed successfully!"
         echo
-        echo "---[ Push Summary ]---------------------------------"
+        __jwgit_h__ "Push Summary"
         __jwgit_kv__ "Remote:" "$REMOTE"
         if [ -n "$BRANCH" ]; then
             __jwgit_kv__ "Branch:" "$BRANCH"
@@ -2743,7 +2743,7 @@ jwgit_pull() {
     
     if [ -n "$BRANCH" ] && [ -z "$HAS_ALL" ]; then
         echo
-        echo "---[ Changes to Pull ]------------------------------"
+        __jwgit_h__ "Changes to Pull"
         
         if git show-ref --verify --quiet "refs/remotes/$REMOTE/$BRANCH"; then
             local commits_to_pull
@@ -2796,7 +2796,7 @@ jwgit_pull() {
         echo
         echo "✅ Pull completed successfully!"
         echo
-        echo "---[ Pull Summary ]---------------------------------"
+        __jwgit_h__ "Pull Summary"
         __jwgit_kv__ "Remote:" "$REMOTE"
         if [ -n "$BRANCH" ]; then
             __jwgit_kv__ "Branch:" "$BRANCH"
@@ -2932,7 +2932,7 @@ jwgit_fetch() {
     fi
     
     # Show current remote branch status before fetch
-    echo "---[ Before Fetch ]---------------------------------"
+    __jwgit_h__ "Before Fetch"
     local current_branch
     current_branch=$(git branch --show-current 2>/dev/null)
     
@@ -2977,7 +2977,7 @@ jwgit_fetch() {
         echo
         echo "✅ Fetch completed successfully!"
         echo
-        echo "---[ After Fetch ]----------------------------------"
+        __jwgit_h__ "After Fetch"
         
         # Show updated status for current branch
         if [ -n "$current_branch" ]; then
@@ -3014,7 +3014,7 @@ jwgit_fetch() {
         
         # Show summary of fetched branches
         echo
-        echo "---[ Remote Branches ]------------------------------"
+        __jwgit_h__ "Remote Branches"
         if [ -n "$REMOTE" ]; then
             git branch -r | grep "^  $REMOTE/" | head -10 | sed 's/^/  /'
             local remote_branch_count
@@ -3145,7 +3145,7 @@ jwgit_log() {
     echo
     
     # Show repository info
-    echo "---[ Repository Info ]------------------------------"
+    __jwgit_h__ "Repository Info"
     local current_branch
     current_branch=$(git branch --show-current 2>/dev/null)
     if [ -n "$current_branch" ]; then
@@ -3184,7 +3184,7 @@ jwgit_log() {
     [ ${#FILES[@]} -gt 0 ] && CMD+=(-- "${FILES[@]}")
 
     # Execute the log command
-    echo "---[ Commit History ]-------------------------------"
+    __jwgit_h__ "Commit History"
     git "${CMD[@]}" 2>/dev/null || {
         echo "❌ Failed to show log"
         if [ -n "$BRANCH" ]; then
@@ -3209,6 +3209,18 @@ __jwgit_kv__() {
     printf "%-${3:-18}s%s\n" "$1" "$2"
 }
 
+# A section header "---[ Title ]---", rendered bold + yellow via jw_colors.sh's
+# jwpaintfg* helpers when that file is sourced; plain otherwise — so
+# jw_functions__git.sh works sourced standalone (no raw ANSI here, no hard
+# dependency on jw_colors.sh).
+__jwgit_h__() {
+    if command -v jwpaintfgBold >/dev/null 2>&1 && command -v jwpaintfgYellow >/dev/null 2>&1; then
+        jwpaintfgBold "$(jwpaintfgYellow "---[ $1 ]---")"
+    else
+        echo "---[ $1 ]---"
+    fi
+}
+
 jwgit_status() {
     if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_status"
@@ -3225,7 +3237,7 @@ __jwgit_status__() {
     echo
     
     # Repository info
-    echo "---[ Repository Info ]------------------------------"
+    __jwgit_h__ "Repository Info"
     local repo_root
     repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
     if [ -n "$repo_root" ]; then
@@ -3285,7 +3297,7 @@ __jwgit_status__() {
     echo
     
     # Working directory status
-    echo "---[ Working Directory ]----------------------------"
+    __jwgit_h__ "Working Directory"
     
     # Get status counts
     local staged_count
@@ -3310,7 +3322,7 @@ __jwgit_status__() {
         
         # Staged files
         if [ "$staged_count" -gt 0 ]; then
-            echo "---[ Staged Files ]---------------------------------"
+            __jwgit_h__ "Staged Files"
             git status --porcelain | grep "^[MADRC]" | head -10 | while IFS= read -r line; do
                 st=$(echo "$line" | cut -c1-2)
                 file=$(echo "$line" | cut -c4-)
@@ -3332,7 +3344,7 @@ __jwgit_status__() {
         
         # Modified files
         if [ "$modified_count" -gt 0 ]; then
-            echo "---[ Modified Files ]-------------------------------"
+            __jwgit_h__ "Modified Files"
             git status --porcelain | grep "^ [MD]" | head -10 | while IFS= read -r line; do
                 st=$(echo "$line" | cut -c1-2)
                 file=$(echo "$line" | cut -c4-)
@@ -3351,7 +3363,7 @@ __jwgit_status__() {
         
         # Untracked files
         if [ "$untracked_count" -gt 0 ]; then
-            echo "---[ Untracked Files ]------------------------------"
+            __jwgit_h__ "Untracked Files"
             git status --porcelain | grep "^??" | head -10 | while IFS= read -r line; do
                 file=$(echo "$line" | cut -c4-)
                 echo "  ❓ $file"
@@ -3372,7 +3384,7 @@ __jwgit_status__() {
     local stash_count
     stash_count=$(git stash list | wc -l 2>/dev/null || echo "0")
     if [ "$stash_count" -gt 0 ]; then
-        echo "---[ Stashes ]--------------------------------------"
+        __jwgit_h__ "Stashes"
         __jwgit_kv__ "Stashed changes:" "$stash_count"
         git stash list | head -3 | sed 's/^/  /'
         if [ "$stash_count" -gt 3 ]; then
@@ -3382,13 +3394,13 @@ __jwgit_status__() {
     fi
     
     # Recent activity
-    echo "---[ Recent Activity ]------------------------------"
+    __jwgit_h__ "Recent Activity"
     echo "Recent commits (last 5):"
     git log --oneline -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
     echo
     
     # Remotes
-    echo "---[ Remotes ]--------------------------------------"
+    __jwgit_h__ "Remotes"
     if git remote | grep -q .; then
         git remote -v | sed 's/^/  /'
     else
@@ -3397,7 +3409,7 @@ __jwgit_status__() {
     echo
     
     # Quick actions
-    echo "---[ Quick Actions ]--------------------------------"
+    __jwgit_h__ "Quick Actions"
     if [ "$staged_count" -gt 0 ]; then
         echo "💡 Ready to commit: jwgit_commit"
     elif [ "$modified_count" -gt 0 ] || [ "$untracked_count" -gt 0 ]; then
@@ -3515,7 +3527,7 @@ jwgit_diff() {
         diff_description="Unstaged changes in working directory"
     fi
     
-    echo "---[ Diff Info ]------------------------------------"
+    __jwgit_h__ "Diff Info"
     __jwgit_kv__ "Comparing:" "$diff_description"
     if [ ${#FILES[@]} -gt 0 ]; then
         __jwgit_kv__ "File filter:" "${FILES[*]}"
@@ -3536,7 +3548,7 @@ jwgit_diff() {
     [ ${#FILES[@]} -gt 0 ] && DIFF+=(-- "${FILES[@]}")
 
     # Show summary first
-    echo "---[ Summary ]--------------------------------------"
+    __jwgit_h__ "Summary"
     local -a SUM=(diff)
     [ -n "$CACHED" ] && SUM+=(--cached)
     [ -n "$COMMIT1" ] && SUM+=("$COMMIT1")
@@ -3562,7 +3574,7 @@ jwgit_diff() {
         echo
         
         # Show file list with changes
-        echo "---[ Changed Files ]--------------------------------"
+        __jwgit_h__ "Changed Files"
         git "${SUM[@]}" --name-status | while read -r st file; do
             case $st in
                 A) echo "  ✅ $file (added)" ;;
@@ -3581,7 +3593,7 @@ jwgit_diff() {
     
     # Show the actual diff
     if [ -z "$STAT_ONLY" ] && [ -z "$NAME_ONLY" ]; then
-        echo "---[ Diff Content ]---------------------------------"
+        __jwgit_h__ "Diff Content"
         git "${DIFF[@]}" 2>/dev/null || {
             echo "❌ Failed to show diff"
             if [ -n "$COMMIT1" ]; then
@@ -3594,7 +3606,7 @@ jwgit_diff() {
         }
     else
         # For stat or name-only, show the output
-        echo "---[ Diff Output ]----------------------------------"
+        __jwgit_h__ "Diff Output"
         git "${DIFF[@]}"
     fi
     
@@ -3653,7 +3665,7 @@ jwgit_blame() {
     echo
     
     # Show file info
-    echo "---[ File Info ]------------------------------------"
+    __jwgit_h__ "File Info"
     __jwgit_kv__ "File:" "$FILE" 8
     __jwgit_kv__ "Size:" "$(wc -l < "$FILE") lines" 8
     
@@ -3663,7 +3675,7 @@ jwgit_blame() {
     echo
     
     # Show blame with enhanced formatting
-    echo "---[ Blame Output ]---------------------------------"
+    __jwgit_h__ "Blame Output"
     echo "Format: [commit] (author date) line_number: content"
     echo
     
@@ -3684,7 +3696,7 @@ jwgit_blame() {
     }
     
     echo
-    echo "---[ Blame Summary ]--------------------------------"
+    __jwgit_h__ "Blame Summary"
     
     # Show author statistics
     echo "Authors contributing to this file:"
@@ -3793,7 +3805,7 @@ jwgit_clean() {
     echo
     
     # Show what will be cleaned
-    echo "---[ Clean Preview ]--------------------------------"
+    __jwgit_h__ "Clean Preview"
     
     # Preview is ALWAYS a dry run (-n) so the file list shows even in force
     # mode; building argv as an array avoids eval.
@@ -3819,7 +3831,7 @@ jwgit_clean() {
     
     # Explain what each option does
     echo
-    echo "---[ Clean Options ]--------------------------------"
+    __jwgit_h__ "Clean Options"
     if [ -n "$DIRECTORIES" ]; then
         echo "✅ Will remove untracked directories"
     else
@@ -3839,7 +3851,7 @@ jwgit_clean() {
     # If this is a dry run, show how to actually clean
     if [ -n "$DRY_RUN" ]; then
         echo
-        echo "---[ To Actually Clean ]----------------------------"
+        __jwgit_h__ "To Actually Clean"
         echo "This was a dry run. To actually remove files:"
         
         local actual_cmd="jwgit_clean -f"
@@ -3872,7 +3884,7 @@ jwgit_clean() {
     
     # Perform the clean
     echo
-    echo "---[ Cleaning ]-------------------------------------"
+    __jwgit_h__ "Cleaning"
     
     local -a FINAL=(clean)
     [ -n "$FORCE" ] && FINAL+=(-f)
@@ -3887,7 +3899,7 @@ jwgit_clean() {
         echo
         echo "✅ Clean completed successfully!"
         echo
-        echo "---[ Final Status ]---------------------------------"
+        __jwgit_h__ "Final Status"
         local remaining_untracked
         remaining_untracked=$(git status --porcelain | grep -c "^??")
         echo "Remaining untracked files: $remaining_untracked"
@@ -3932,13 +3944,13 @@ jwgit_prune() {
     fi
     
     echo
-    echo "---[ Repository Size Before ]----------------------"
+    __jwgit_h__ "Repository Size Before"
     local size_before
     size_before=$(du -sh .git 2>/dev/null | cut -f1 || echo "unknown")
     echo "Repository size: $size_before"
     echo
     
-    echo "---[ Pruning Remote Branches ]---------------------"
+    __jwgit_h__ "Pruning Remote Branches"
     echo "Removing stale remote tracking branches..."
     git remote prune origin 2>/dev/null || echo "No origin remote or nothing to prune"
     
@@ -3951,25 +3963,25 @@ jwgit_prune() {
     done
     echo
     
-    echo "---[ Cleaning Reflog ]------------------------------"
+    __jwgit_h__ "Cleaning Reflog"
     echo "Expiring reflog entries for unreachable commits..."
     # Only drop reflog for unreachable commits (keeps your branches' normal
     # reflog window intact, unlike --expire=<date> --all which also trims it)
     git reflog expire --expire-unreachable=now --all
     echo
     
-    echo "---[ Garbage Collection ]---------------------------"
+    __jwgit_h__ "Garbage Collection"
     echo "Running garbage collection..."
     git gc --prune=now --aggressive
     echo
     
-    echo "---[ Repository Size After ]-----------------------"
+    __jwgit_h__ "Repository Size After"
     local size_after
     size_after=$(du -sh .git 2>/dev/null | cut -f1 || echo "unknown")
     echo "Repository size: $size_after"
     echo
     
-    echo "---[ Maintenance Summary ]--------------------------"
+    __jwgit_h__ "Maintenance Summary"
     __jwgit_kv__ "Before:" "$size_before" 10
     __jwgit_kv__ "After:" "$size_after" 10
 
@@ -4007,7 +4019,7 @@ jwgit_gc() {
     echo
     
     # Show repository info before cleanup
-    echo "---[ Before Cleanup ]-------------------------------"
+    __jwgit_h__ "Before Cleanup"
     echo "Repository statistics:"
     git count-objects -v | while read -r line; do
         echo "  $line"
@@ -4040,7 +4052,7 @@ jwgit_gc() {
     fi
     
     echo
-    echo "---[ Running Garbage Collection ]-------------------"
+    __jwgit_h__ "Running Garbage Collection"
     
     if [ -n "$DEEP" ]; then
         echo "Deep optimization (aggressive, pruning unreachable objects now)..."
@@ -4051,7 +4063,7 @@ jwgit_gc() {
     fi
     
     echo
-    echo "---[ After Cleanup ]--------------------------------"
+    __jwgit_h__ "After Cleanup"
     echo "Repository statistics:"
     git count-objects -v | while read -r line; do
         echo "  $line"
@@ -4063,7 +4075,7 @@ jwgit_gc() {
     echo "Repository size: $repo_size_after"
     echo
     
-    echo "---[ Cleanup Summary ]------------------------------"
+    __jwgit_h__ "Cleanup Summary"
     __jwgit_kv__ "Size before:" "$repo_size_before" 16
     __jwgit_kv__ "Size after:" "$repo_size_after" 16
 
@@ -4197,7 +4209,7 @@ jwgit_cherry-pick() {
     echo
     
     # Show commit information
-    echo "---[ Commit to Cherry-pick ]------------------------"
+    __jwgit_h__ "Commit to Cherry-pick"
     git show --stat --oneline "$COMMIT" | head -10
     echo
     
@@ -4212,7 +4224,7 @@ jwgit_cherry-pick() {
         fi
     fi
     
-    echo "---[ Cherry-pick Operation ]------------------------"
+    __jwgit_h__ "Cherry-pick Operation"
     __jwgit_kv__ "Target branch:" "$current_branch"
     __jwgit_kv__ "Commit:" "$(git log -1 --oneline "$COMMIT")"
     echo
@@ -4234,7 +4246,7 @@ jwgit_cherry-pick() {
         echo
         echo "✅ Cherry-pick completed successfully!"
         echo
-        echo "---[ Cherry-pick Summary ]--------------------------"
+        __jwgit_h__ "Cherry-pick Summary"
         __jwgit_kv__ "Branch:" "$current_branch"
         __jwgit_kv__ "Cherry-picked:" "$(git log -1 --oneline "$COMMIT")"
         __jwgit_kv__ "New commit:" "$(git log -1 --oneline)"
@@ -4243,7 +4255,7 @@ jwgit_cherry-pick() {
         echo
         echo "❌ Cherry-pick failed due to conflicts!"
         echo
-        echo "---[ Conflicted Files ]-----------------------------"
+        __jwgit_h__ "Conflicted Files"
         git diff --name-only --diff-filter=U | sed 's/^/  /'
         echo
         echo "💡 To resolve conflicts:"
@@ -4449,7 +4461,7 @@ __jwgit_bisect_status__() {
     fi
     
     echo
-    echo "---[ Bisect Status ]--------------------------------"
+    __jwgit_h__ "Bisect Status"
     
     # Show current commit being tested
     local current_commit
@@ -4543,7 +4555,7 @@ jwgit_reflog() {
     echo
     
     if [ -n "$SHOW_ALL" ]; then
-        echo "---[ All Reflogs ]----------------------------------"
+        __jwgit_h__ "All Reflogs"
         
         # Show available reflogs
         echo "Available reflogs:"
@@ -4557,7 +4569,7 @@ jwgit_reflog() {
         echo
         
         # Show combined reflog
-        echo "---[ Combined Reflog Entries ]---------------------"
+        __jwgit_h__ "Combined Reflog Entries"
         local -a CMD=(reflog --all)
         [ -n "$LIMIT" ] && CMD+=("$LIMIT")   # no default cap; pass -N to limit
         CMD+=("${OPTS[@]}")
@@ -4576,7 +4588,7 @@ jwgit_reflog() {
             fi
         fi
         
-        echo "---[ Reflog for: $REF ]-----------------------------"
+        __jwgit_h__ "Reflog for: $REF"
         
         # Show reflog statistics
         local total_entries
@@ -4606,7 +4618,7 @@ jwgit_reflog() {
         CMD+=("${OPTS[@]}")
         
         # Show reflog with enhanced formatting
-        echo "---[ Reflog Entries ]-------------------------------"
+        __jwgit_h__ "Reflog Entries"
         echo "Format: [ref] (time) action commit_hash commit_message"
         echo
         
@@ -4614,7 +4626,7 @@ jwgit_reflog() {
     fi
     
     echo
-    echo "---[ Reflog Help ]----------------------------------"
+    __jwgit_h__ "Reflog Help"
     echo "Reflog entries show:"
     echo "  - Branch switches (checkout)"
     echo "  - Commits and amends"

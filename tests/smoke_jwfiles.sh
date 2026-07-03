@@ -43,7 +43,9 @@ FAILED=0
 # --- throwaway fixture tree --------------------------------------------------
 FIX=$(mktemp -d 2>/dev/null) || { echo "❌ cannot mktemp"; exit 2; }
 trap 'rm -rf "$FIX"' EXIT
-mkdir -p "$FIX/sub/deep" "$FIX/empty_dir"
+mkdir -p "$FIX/sub/deep" "$FIX/empty_dir" "$FIX/.git" "$FIX/node_modules"
+printf 'ref\n'  > "$FIX/.git/HEAD"          # noise dirs: pruned by newest/_oldest...
+printf 'pkg\n'  > "$FIX/node_modules/m.js"  # ...by default, shown with -a
 printf 'aaaa\n'              > "$FIX/a.txt"
 head -c 4096 /dev/zero       > "$FIX/big.log"  2>/dev/null
 printf 'note\n'             > "$FIX/readme.md"
@@ -91,6 +93,8 @@ B=(
   "jwfiles_newest '$FIX'"
   "jwfiles_newest 3 '$FIX'"
   "jwfiles_newest '$FIX/sub'"
+  "jwfiles_newest -a '$FIX'"                # -a -> include noise dirs (.git, node_modules)
+  "jwfiles_newest -a 3 '$FIX'"
   "jwfiles_find txt '$FIX'"                  # multiple hits
   "jwfiles_find no_such_phrase '$FIX'"       # zero hits
   "jwfiles_grep spaced '$FIX'"              # content hit
@@ -103,6 +107,7 @@ B=(
   "jwfiles_disk '$FIX'"
   "jwfiles_oldest '$FIX'"
   "jwfiles_oldest 2 '$FIX'"
+  "jwfiles_oldest -a '$FIX'"
   "jwfiles_stat '$FIX/a.txt'"
   "jwfiles_stat '$FIX/link_broken'"         # broken symlink -> reports the link
   "jwfiles_stat '$FIX'"                      # a directory
@@ -153,6 +158,7 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwfiles_size '$FIX'"
     "jwfiles_newest '$FIX'"
     "jwfiles_newest 3 '$FIX'"
+    "jwfiles_newest -a '$FIX'"
     "jwfiles_ext '$FIX'"
     "jwfiles_find txt '$FIX'"
     "jwfiles_grep spaced '$FIX'"
@@ -161,6 +167,7 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwfiles_bigfiles '$FIX'"
     "jwfiles_bigfiles 3 '$FIX'"
     "jwfiles_oldest '$FIX'"
+    "jwfiles_oldest -a '$FIX'"
     "jwfiles_perms '$FIX'"
     "jwfiles_owners '$FIX'"
     "jwfiles_symlinks '$FIX'"

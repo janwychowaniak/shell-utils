@@ -290,20 +290,32 @@ jwfiles_disk() {
 # recency / change
 # ---------------------------------------------------------------------------------
 
-# Files under a tree, newest-first by mtime. Uncapped by default (pipe to head
-# yourself); an optional leading integer caps the list.
-jwfiles_newest() {
-    case "${1:-}" in
-        -h|--help)
-            echo "Usage: jwfiles_newest [count] [dir]"
-            echo "  Files under [dir] (default: .), newest-first by mtime."
-            echo "  No count → full list; a leading [count] caps it."
-            echo "Examples:"
-            echo "  jwfiles_newest"
-            echo "  jwfiles_newest 20"
-            echo "  jwfiles_newest 20 /var/log"
-            return 0 ;;
-    esac
+# Shared engine for jwfiles_newest / _oldest — mirrors that differ only in sort
+# direction. Lists files under a dir by mtime, one per line "[date] path". By
+# default it prunes a curated set of noise dirs (VCS / venvs / caches /
+# node_modules) that otherwise swamp the output; -a/--all keeps them. The noise
+# list lives here, once. Args: <fn-name> <sort-flag: -rn|-n> <order-word> [args...]
+__jwfiles_mtime_list__() {
+    local fn="$1" sortflag="$2" word="$3"; shift 3
+    local all=0 a
+    local -a rest
+    for a in "$@"; do
+        case "$a" in
+            -h|--help)
+                echo "Usage: $fn [count] [dir] [-a|--all]"
+                echo "  Files under [dir] (default: .), $word-first by mtime."
+                echo "  Skips common noise dirs (.git, .venv, node_modules, caches, ...);"
+                echo "  pass -a / --all to include them. No count → full list; [count] caps it."
+                echo "Examples:"
+                echo "  $fn"
+                echo "  $fn 20"
+                echo "  $fn -a 20 /var/log"
+                return 0 ;;
+            -a|--all) all=1 ;;
+            *)        rest+=("$a") ;;
+        esac
+    done
+    set -- "${rest[@]}"
     local n="" dir="."
     if [ $# -ge 1 ]; then
         case "$1" in
@@ -315,38 +327,31 @@ jwfiles_newest() {
         echo "❌ not a directory: $dir" >&2
         return 1
     fi
-    find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
-        | sort -t'|' -k1,1 -rn | cut -d'|' -f2- | __jwfiles_cap__ "$n"
+    if [ "$all" -eq 1 ]; then
+        find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
+            | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfiles_cap__ "$n"
+        return 0
+    fi
+    # default: prune common noise dirs (matched by basename, anywhere in the tree)
+    local d first=1
+    local -a prune
+    for d in .git .svn .hg .venv venv node_modules __pycache__ \
+             .mypy_cache .pytest_cache .tox .ruff_cache .cache .idea .vscode; do
+        if [ "$first" -eq 1 ]; then prune=(-name "$d"); first=0
+        else                        prune+=(-o -name "$d"); fi
+    done
+    find "$dir" \( -type d \( "${prune[@]}" \) -prune \) -o \
+         -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
+        | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfiles_cap__ "$n"
 }
 
+# Files under a tree, newest-first by mtime. Skips common noise dirs by default
+# (.git / .venv / node_modules / …); pass -a/--all to include them. Uncapped
+# unless a leading [count] is given.
+jwfiles_newest() { __jwfiles_mtime_list__ jwfiles_newest -rn newest "$@"; }
 
-# Files under a tree, OLDEST-first by mtime — the stale/forgotten end of the
-# timeline. Mirror of jwfiles_newest; uncapped by default, optional leading count.
-jwfiles_oldest() {
-    case "${1:-}" in
-        -h|--help)
-            echo "Usage: jwfiles_oldest [count] [dir]"
-            echo "  Files under [dir] (default: .), oldest-first by mtime."
-            echo "  No count → full list; a leading [count] caps it."
-            echo "Examples:"
-            echo "  jwfiles_oldest"
-            echo "  jwfiles_oldest 20 /var/log"
-            return 0 ;;
-    esac
-    local n="" dir="."
-    if [ $# -ge 1 ]; then
-        case "$1" in
-            *[!0-9]*|'') dir="$1" ;;
-            *)           n="$1"; [ $# -ge 2 ] && dir="$2" ;;
-        esac
-    fi
-    if [ ! -d "$dir" ]; then
-        echo "❌ not a directory: $dir" >&2
-        return 1
-    fi
-    find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
-        | sort -t'|' -k1,1 -n | cut -d'|' -f2- | __jwfiles_cap__ "$n"
-}
+# Mirror of jwfiles_newest, oldest-first — the stale/forgotten end of the timeline.
+jwfiles_oldest() { __jwfiles_mtime_list__ jwfiles_oldest -n oldest "$@"; }
 
 
 # ---------------------------------------------------------------------------------

@@ -104,6 +104,7 @@ B=(
   "jwfiles_tree '$FIX' 1"
   "jwfiles_bigfiles '$FIX'"
   "jwfiles_bigfiles 3 '$FIX'"
+  "jwfiles_bigfiles -a '$FIX'"              # -a -> include noise dirs (.git, node_modules)
   "jwfiles_disk '$FIX'"
   "jwfiles_oldest '$FIX'"
   "jwfiles_oldest 2 '$FIX'"
@@ -166,6 +167,7 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwfiles_tree '$FIX' 1"
     "jwfiles_bigfiles '$FIX'"
     "jwfiles_bigfiles 3 '$FIX'"
+    "jwfiles_bigfiles -a '$FIX'"
     "jwfiles_oldest '$FIX'"
     "jwfiles_oldest -a '$FIX'"
     "jwfiles_perms '$FIX'"

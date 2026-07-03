@@ -85,6 +85,23 @@ __jwfiles_cap__() {
     if [ -n "$1" ]; then head -n "$1"; else cat; fi
 }
 
+# Run `find` under $1 PRUNING the curated noise dirs, emitting -printf format $2.
+# The single home of the noise-dir list + prune mechanics — shared by the mtime
+# listers (jwfiles_newest/_oldest) and jwfiles_bigfiles. Each caller's -a/--all
+# branch is a plain unpruned `find` instead. Edit the noise list here, once.
+__jwfiles_prune_find__() {
+    local dir="$1" fmt="$2"
+    local d first=1
+    local -a prune
+    for d in .git .svn .hg .venv venv node_modules __pycache__ \
+             .mypy_cache .pytest_cache .tox .ruff_cache .cache .idea .vscode; do
+        if [ "$first" -eq 1 ]; then prune=(-name "$d"); first=0
+        else                        prune+=(-o -name "$d"); fi
+    done
+    find "$dir" \( -type d \( "${prune[@]}" \) -prune \) -o \
+         -type f -printf "$fmt" 2>/dev/null
+}
+
 
 # ---------------------------------------------------------------------------------
 # orientation (the cockpit)
@@ -232,18 +249,27 @@ jwfiles_size() {
 
 
 # Largest individual FILES in the subtree, biggest-first, human-readable sizes.
-# Uncapped by default (pipe to head yourself); an optional leading integer caps it.
+# Skips common noise dirs by default (.git / node_modules / …); pass -a/--all to
+# include them. Uncapped unless a leading [count] is given.
 jwfiles_bigfiles() {
-    case "${1:-}" in
-        -h|--help)
-            echo "Usage: jwfiles_bigfiles [count] [dir]"
-            echo "  Individual files under [dir] (default: .), largest-first by size."
-            echo "  No count → full list; a leading [count] caps it."
-            echo "Examples:"
-            echo "  jwfiles_bigfiles"
-            echo "  jwfiles_bigfiles 20 /var"
-            return 0 ;;
-    esac
+    local all=0 a
+    local -a rest
+    for a in "$@"; do
+        case "$a" in
+            -h|--help)
+                echo "Usage: jwfiles_bigfiles [count] [dir] [-a|--all]"
+                echo "  Individual files under [dir] (default: .), largest-first by size."
+                echo "  Skips common noise dirs (.git, .venv, node_modules, caches, ...);"
+                echo "  pass -a / --all to include them. No count → full list; [count] caps it."
+                echo "Examples:"
+                echo "  jwfiles_bigfiles"
+                echo "  jwfiles_bigfiles -a 20 /var"
+                return 0 ;;
+            -a|--all) all=1 ;;
+            *)        rest+=("$a") ;;
+        esac
+    done
+    set -- "${rest[@]}"
     local n="" dir="."
     if [ $# -ge 1 ]; then
         case "$1" in
@@ -255,7 +281,11 @@ jwfiles_bigfiles() {
         echo "❌ not a directory: $dir" >&2
         return 1
     fi
-    find "$dir" -type f -printf '%s\t%p\n' 2>/dev/null | sort -rn | __jwfiles_cap__ "$n" \
+    if [ "$all" -eq 1 ]; then
+        find "$dir" -type f -printf '%s\t%p\n' 2>/dev/null
+    else
+        __jwfiles_prune_find__ "$dir" '%s\t%p\n'
+    fi | sort -rn | __jwfiles_cap__ "$n" \
         | while IFS="$(printf '\t')" read -r sz p; do
               printf '%8s  %s\n' "$(numfmt --to=iec "$sz" 2>/dev/null || echo "${sz}B")" "$p"
           done
@@ -332,16 +362,8 @@ __jwfiles_mtime_list__() {
             | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfiles_cap__ "$n"
         return 0
     fi
-    # default: prune common noise dirs (matched by basename, anywhere in the tree)
-    local d first=1
-    local -a prune
-    for d in .git .svn .hg .venv venv node_modules __pycache__ \
-             .mypy_cache .pytest_cache .tox .ruff_cache .cache .idea .vscode; do
-        if [ "$first" -eq 1 ]; then prune=(-name "$d"); first=0
-        else                        prune+=(-o -name "$d"); fi
-    done
-    find "$dir" \( -type d \( "${prune[@]}" \) -prune \) -o \
-         -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
+    # default: prune common noise dirs (list + mechanics in __jwfiles_prune_find__)
+    __jwfiles_prune_find__ "$dir" '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' \
         | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfiles_cap__ "$n"
 }
 

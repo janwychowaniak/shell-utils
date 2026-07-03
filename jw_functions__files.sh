@@ -69,12 +69,13 @@ __jwfiles_kv__() {
     printf "%-${3:-14}s%s\n" "$1" "$2"
 }
 
-# A section header "---[ Title ]---", bold via jw_colors.sh's jwpaintfgBold when
-# that file is sourced; plain otherwise — so jw_functions__files.sh works sourced
-# standalone (no raw ANSI here, no hard dependency on jw_colors.sh).
+# A section header "---[ Title ]---", rendered bold + yellow via jw_colors.sh's
+# jwpaintfg* helpers when that file is sourced; plain otherwise — so
+# jw_functions__files.sh works sourced standalone (no raw ANSI here, no hard
+# dependency on jw_colors.sh).
 __jwfiles_h__() {
-    if command -v jwpaintfgBold >/dev/null 2>&1; then
-        jwpaintfgBold "---[ $1 ]---"
+    if command -v jwpaintfgBold >/dev/null 2>&1 && command -v jwpaintfgYellow >/dev/null 2>&1; then
+        jwpaintfgBold "$(jwpaintfgYellow "---[ $1 ]---")"
     else
         echo "---[ $1 ]---"
     fi

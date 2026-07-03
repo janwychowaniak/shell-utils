@@ -55,8 +55,7 @@ Config is `.gitleaks.toml` (extends the default ruleset; add false positives to
 | `jw_functions__docker.sh` | Docker operations (`jwdocker*`) |
 | `jw_functions__python.sh` | Python virtualenvs, packages, projects & tooling — uv/pip/pipx (`jwpy_*`) |
 | `jw_functions__web.sh` | Web/API diagnostics — HTTP/TLS/DNS/connectivity, oversight-first/diag-first (`jwweb_*`) |
-| `jw_functions__files.sh` | Filesystem oversight cockpit — read-only orientation/profiling (size, recency, tree, search, posture, hygiene) + a print-only backup helper; fully 🟢, server-safe, oversight-first (`jwfiles_*`) |
-| `jw_functions__fs.sh` | File-naming manipulation — batch rename/despace/unpolish, etc. (`jwodspacjacz*`, `jwbatchmv`, legacy) |
+| `jw_functions__files.sh` | Filesystem cockpit — read-only orientation/profiling (size, recency, tree, search, posture, hygiene) + print-only backup + two ⚪ cwd mutators (rename/flatten, dry-run by default); oversight-first, server-safe (`jwfiles_*`) |
 | `jw_functions__media.sh` | Media notes/templates (sox, etc.) |
 | `jw_functions__mediaff.sh` | FFmpeg/ffprobe functions (`jwff*`) |
 | `jw_functions__mediaim.sh` | ImageMagick functions (`jwim*`) |

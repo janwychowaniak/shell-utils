@@ -136,7 +136,18 @@ echo "  jwdocker_image-build myapp:v1.0 ./Dockerfile ."
 - Fallback behaviors when tools are unavailable
 
 ### Enhanced Output
-- Consistent formatting with headers, separators, and sections using `---[ Title ]---` pattern
+- Consistent formatting with headers, separators, and sections using the `---[ Title ]---` pattern
+- **Section headers render bold + yellow** via a tiny per-area helper `__jw<area>_h__ "Title"`, so `---[ Title ]---` blocks stand out at a glance. It degrades gracefully — uses `jw_colors.sh` when sourced, else plain text (so the tool file still works sourced standalone, and the smoke harness — which sources only the one file — hits no undefined command; no raw ANSI is hardcoded):
+  ```bash
+  __jwfs_h__() {
+      if command -v jwpaintfgBold >/dev/null 2>&1 && command -v jwpaintfgYellow >/dev/null 2>&1; then
+          jwpaintfgBold "$(jwpaintfgYellow "---[ $1 ]---")"   # nested = bold + yellow, explicit intent
+      else
+          echo "---[ $1 ]---"
+      fi
+  }
+  ```
+  - Route **every** `---[ ]---` header in the file through it (uniform look). Nesting `bold(yellow(…))` states "bold + yellow" explicitly and survives a palette change (the extra reset is invisible). Reference: `__jwfs_h__` in `jw_functions__fs.sh`.
 - Color output via the `jw_colors.sh` helpers (`jwpaintfgRed`, `jwpaintfgGreen`, …) rather than raw ANSI codes; emoji for status indicators (✅ ❌ ⚠️ 💡)
 - Structured information display with clear labels
 - **Column-align `Label: value` rows** in info/summary blocks via a tiny per-area helper `__jw<area>_kv__` instead of ragged `echo "Label: $val"`, so values line up in a column:

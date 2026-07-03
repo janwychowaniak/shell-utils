@@ -216,7 +216,13 @@ jwfiles_tree() {
                   sub(/.*\//, "", rel)
                   print ind "  " rel }'
     fi
-    echo "/depth: $depth/"
+    # cheap "is there anything below the cutoff?" — -print -quit stops at the first
+    # such entry, so this is O(1)-ish regardless of the full tree's size.
+    if [ -n "$(find "$dir" -mindepth $((depth + 1)) -maxdepth $((depth + 1)) -print -quit 2>/dev/null)" ]; then
+        echo "/depth: $depth (+deeper)/"
+    else
+        echo "/depth: $depth (full)/"
+    fi
 }
 
 

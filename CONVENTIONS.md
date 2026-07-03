@@ -253,6 +253,14 @@ or mutates — is the **blast-radius markers** (🟢 vs 🔵 ⚪ 🔴); call tho
 - Safety consideration notes
 - Integration points with external tools
 
+### Self-contained tool prose
+- **A tool file's comments and `-h`/usage describe its OWN tools only.** No
+  editorializing about what an agent does elsewhere ("renaming is the agent's
+  job"), and no pointing at other files the tool doesn't use — say it plainly
+  ("reports only", "read-only"). Design docs (this file, `CLAUDE.md`, the memory
+  store) may discuss the agent-era lens and cross-area comparisons; a tool's own
+  prose may not — a sourced file should stand on its own.
+
 # Consistency Patterns
 
 ### Command Structure
@@ -332,7 +340,22 @@ subprocess.** That reshapes what is worth building:
   adds little. Build one only when it adds a **guard or transparency the raw
   command lacks** — e.g. a system-Python guard, a lane-mixing warning, or a
   `· active venv` source annotation — never just to rename a command the agent
-  already types.
+  already types. **And don't reimplement a mature packaged tool:** if an
+  apt-installable tool already does the job (`fdupes`, `duf`, …), prefer it and
+  drop the bespoke wrapper — Occam over NIH. (Dropped `jwfs_dupes` → `fdupes -r`,
+  `jwfs_disk` → `duf`.)
+- **Show a would-be mutation; don't silently do it.** In an oversight-first /
+  mostly-🟢 area the file promises *"safe to run (almost) anything blindly"* — that
+  low cognitive load *invites* a reflexive call, so the rare mutator must not betray
+  the contract. Two shapes: (a) **print-the-command** (stays 🟢) — emit the exact
+  runnable command, pipeable to a shell (`jwfs_backup` prints its `cp`); (b)
+  **dry-run + `--execute`/`-x`** (⚪) — print the plan by default, apply only with
+  the flag (`jwfs_rename`, `jwfs_flatten`). The terraform/rsync "see it first" model.
+  **Scope it deliberately:** the guard exists to protect the *"run it blindly"*
+  contract, so it belongs in oversight-first areas — NOT the older mutation-heavy /
+  many-colored files, where you already act with deliberation and the guard is
+  friction without benefit. The safeguard's value tracks the likelihood of a
+  careless call; match it to the mental mode the file is used in.
 - **Forward rule, not a retroactive purge.** This governs what to *add*; existing
   doing-wrappers that carry real guards stay (they cost nothing and serve the
   occasional ad-hoc interactive moment). Concretely, this lens is why the uv lane

@@ -1,10 +1,6 @@
 # A collection of miscellaneous file naming manipulation and file system related functions
 
 
-jwdiff() {
-    wdiff -n $1 $2 | colordiff
-}
-
 jwodspacjacz ()
 {
     if [ $# -ne 0 ]
@@ -28,33 +24,6 @@ EOF
         if [ "$old_name" != "$new_name" ]
         then
             mv -i -v "$old_name" "$new_name"
-        fi
-    done
-}
-
-jwodspacjaczRekursywny()
-{
-    if [ $# -ne 0 ]
-    then
-cat 1>&2 <<EOF
-
-$FUNCNAME
-
-    A simple function that removes whitespaces from the names of all files and folders from
-    the current location AND recursively down. Each whitespace occurrence is replaced with "_".
-    Does not affect items, the names of which already don't include whitespaces.
-    Does not affect hidden items.
-
-EOF
-        return 1
-    fi
-
-    jwodspacjacz
-    ls -1 | while read fsitem; do
-        if [ -d "$fsitem" ]; then
-            cd "$fsitem"
-            jwodspacjaczRekursywny
-            cd ..
         fi
     done
 }
@@ -191,41 +160,4 @@ EOF
             fi
         fi
     done
-}
-
-
-jwlabelhere () 
-{ 
-
-    if [ $# -ne 0 ]
-    then
-cat 1>&2 <<EOF
-
-$FUNCNAME
-
-    The function prepends the names of all the files and directories
-    in the current location with the name of the current directory.
-
-EOF
-        return 1
-    fi
-
-    ### ~ mass effect: ~ ##########################################################
-    ### for f in `ls` ; do [ -d "$f" ] && cd "$f" && jwlabelhere && cd - ; done ###
-    ###############################################################################
-    for p in `ls`;
-    do
-        mv $p "$(basename `pwd`)__$p";
-    done
-
-}
-
-
-jw1leveldeepfoldermielenie ()
-{
-cat 1>&2 <<'EOF'
-
-  for p in `ls`; do [ -d "$p" ] && cd $p && MIELENIE && cd - > /dev/null ; done
-
-EOF
 }

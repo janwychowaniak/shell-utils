@@ -105,7 +105,6 @@ B=(
   "jwfiles_bigfiles '$FIX'"
   "jwfiles_bigfiles 3 '$FIX'"
   "jwfiles_bigfiles -a '$FIX'"              # -a -> include noise dirs (.git, node_modules)
-  "jwfiles_disk '$FIX'"
   "jwfiles_oldest '$FIX'"
   "jwfiles_oldest 2 '$FIX'"
   "jwfiles_oldest -a '$FIX'"
@@ -126,7 +125,6 @@ B=(
   "jwfiles_ext /nonexistent_xyz"
   "jwfiles_tree /nonexistent_xyz"
   "jwfiles_tree '$FIX' notanint"            # bad-depth error path
-  "jwfiles_disk /nonexistent_xyz"
   "jwfiles_oldest 2 /nonexistent_xyz"
   "jwfiles_stat /nonexistent_xyz"
   "jwfiles_perms /nonexistent_xyz"

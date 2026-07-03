@@ -33,7 +33,6 @@ jwfiles_toc() {
     echo " -----------------------------  size / disk pressure"
     __jwfiles_toc_row__ 🟢 jwfiles_size     "du, sorted, human — this dir"
     __jwfiles_toc_row__ 🟢 jwfiles_bigfiles "largest files, subtree"
-    __jwfiles_toc_row__ 🟢 jwfiles_disk     "df + inodes for the mount"
     echo
     echo " -----------------------------  recency / change"
     __jwfiles_toc_row__ 🟢 jwfiles_newest "newest files, subtree"
@@ -289,30 +288,6 @@ jwfiles_bigfiles() {
         | while IFS="$(printf '\t')" read -r sz p; do
               printf '%8s  %s\n' "$(numfmt --to=iec "$sz" 2>/dev/null || echo "${sz}B")" "$p"
           done
-}
-
-# Disk space + inode usage for the filesystem holding a path. The quick "am I
-# about to run out of room / inodes?" glance.
-jwfiles_disk() {
-    case "${1:-}" in
-        -h|--help)
-            echo "Usage: jwfiles_disk [dir]"
-            echo "  Disk space and inode usage for the filesystem holding [dir] (default: .)."
-            echo "Examples:"
-            echo "  jwfiles_disk"
-            echo "  jwfiles_disk /var/lib/docker"
-            return 0 ;;
-    esac
-    local dir="${1:-.}"
-    if [ ! -d "$dir" ]; then
-        echo "❌ not a directory: $dir" >&2
-        return 1
-    fi
-    echo "---[ Space ]---"
-    df -h  -- "$dir" 2>/dev/null
-    echo
-    echo "---[ Inodes ]---"
-    df -ih -- "$dir" 2>/dev/null
 }
 
 

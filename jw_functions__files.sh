@@ -216,6 +216,7 @@ jwfiles_tree() {
                   sub(/.*\//, "", rel)
                   print ind "  " rel }'
     fi
+    echo "/depth: $depth/"
 }
 
 

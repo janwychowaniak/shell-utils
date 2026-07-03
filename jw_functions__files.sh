@@ -36,7 +36,7 @@ jwfiles_toc() {
     __jwfiles_toc_row__ 🟢 jwfiles_disk     "df + inodes for the mount"
     echo
     echo " -----------------------------  recency / change"
-    __jwfiles_toc_row__ 🟢 jwfiles_recent "newest files, subtree"
+    __jwfiles_toc_row__ 🟢 jwfiles_newest "newest files, subtree"
     __jwfiles_toc_row__ 🟢 jwfiles_oldest "oldest files, subtree"
     echo
     echo " -----------------------------  search / inventory"
@@ -80,7 +80,7 @@ __jwfiles_flag__() {
 }
 
 # Emit the whole stream, or only its first N lines when N is a non-empty integer.
-# The opt-in cap behind jwfiles_recent / _oldest / _bigfiles' [count] argument.
+# The opt-in cap behind jwfiles_newest / _oldest / _bigfiles' [count] argument.
 __jwfiles_cap__() {
     if [ -n "$1" ]; then head -n "$1"; else cat; fi
 }
@@ -93,7 +93,7 @@ __jwfiles_cap__() {
 # One-shot, read-only X-ray of a directory tree — the aggregate profiler of this area.
 # The bounded "top N" lists below are the deliberate exception to the repo's
 # no-silent-caps rule — a profile is a summary, not a viewer; the dedicated viewers
-# (jwfiles_size / _recent) are uncapped.
+# (jwfiles_size / _newest) are uncapped.
 jwfiles_profile() {
     case "${1:-}" in
         -h|--help)
@@ -292,16 +292,16 @@ jwfiles_disk() {
 
 # Files under a tree, newest-first by mtime. Uncapped by default (pipe to head
 # yourself); an optional leading integer caps the list.
-jwfiles_recent() {
+jwfiles_newest() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwfiles_recent [count] [dir]"
+            echo "Usage: jwfiles_newest [count] [dir]"
             echo "  Files under [dir] (default: .), newest-first by mtime."
             echo "  No count → full list; a leading [count] caps it."
             echo "Examples:"
-            echo "  jwfiles_recent"
-            echo "  jwfiles_recent 20"
-            echo "  jwfiles_recent 20 /var/log"
+            echo "  jwfiles_newest"
+            echo "  jwfiles_newest 20"
+            echo "  jwfiles_newest 20 /var/log"
             return 0 ;;
     esac
     local n="" dir="."
@@ -321,7 +321,7 @@ jwfiles_recent() {
 
 
 # Files under a tree, OLDEST-first by mtime — the stale/forgotten end of the
-# timeline. Mirror of jwfiles_recent; uncapped by default, optional leading count.
+# timeline. Mirror of jwfiles_newest; uncapped by default, optional leading count.
 jwfiles_oldest() {
     case "${1:-}" in
         -h|--help)

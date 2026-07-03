@@ -88,9 +88,9 @@ B=(
   "jwfiles_profile '$FIX/sub'"
   "jwfiles_size '$FIX'"
   "jwfiles_size '$FIX/empty_dir'"           # empty dir -> nothing but total
-  "jwfiles_recent '$FIX'"
-  "jwfiles_recent 3 '$FIX'"
-  "jwfiles_recent '$FIX/sub'"
+  "jwfiles_newest '$FIX'"
+  "jwfiles_newest 3 '$FIX'"
+  "jwfiles_newest '$FIX/sub'"
   "jwfiles_find txt '$FIX'"                  # multiple hits
   "jwfiles_find no_such_phrase '$FIX'"       # zero hits
   "jwfiles_grep spaced '$FIX'"              # content hit
@@ -115,7 +115,7 @@ B=(
   "jwfiles_backup '$FIX/empty_dir'"         # prints the command for a directory too
   "jwfiles_profile /nonexistent_xyz"        # not-a-dir error path
   "jwfiles_size /nonexistent_xyz"
-  "jwfiles_recent 5 /nonexistent_xyz"
+  "jwfiles_newest 5 /nonexistent_xyz"
   "jwfiles_find x /nonexistent_xyz"
   "jwfiles_ext /nonexistent_xyz"
   "jwfiles_tree /nonexistent_xyz"
@@ -149,10 +149,10 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwfiles_toc'
     'jwfiles_profile -h'
     'jwfiles_size -h'
-    'jwfiles_recent -h'
+    'jwfiles_newest -h'
     "jwfiles_size '$FIX'"
-    "jwfiles_recent '$FIX'"
-    "jwfiles_recent 3 '$FIX'"
+    "jwfiles_newest '$FIX'"
+    "jwfiles_newest 3 '$FIX'"
     "jwfiles_ext '$FIX'"
     "jwfiles_find txt '$FIX'"
     "jwfiles_grep spaced '$FIX'"

@@ -69,6 +69,17 @@ __jwfiles_kv__() {
     printf "%-${3:-14}s%s\n" "$1" "$2"
 }
 
+# A section header "---[ Title ]---", bold via jw_colors.sh's jwpaintfgBold when
+# that file is sourced; plain otherwise — so jw_functions__files.sh works sourced
+# standalone (no raw ANSI here, no hard dependency on jw_colors.sh).
+__jwfiles_h__() {
+    if command -v jwpaintfgBold >/dev/null 2>&1; then
+        jwpaintfgBold "---[ $1 ]---"
+    else
+        echo "---[ $1 ]---"
+    fi
+}
+
 # One anomaly row: "Label  count  mark". The mark (✅/⚠️) sits in the TRAILING,
 # unpadded slot so a ✅↔⚠️ byte-width difference never shifts the label column.
 __jwfiles_flag__() {
@@ -130,20 +141,20 @@ jwfiles_profile() {
     local top=8   # bounded top-N (diag-style summary exception to no-caps)
 
     echo
-    echo "---[ Location ]---"
+    __jwfiles_h__ "Location"
     local abs; abs=$(cd "$dir" 2>/dev/null && pwd)
     __jwfiles_kv__ "Path"       "${abs:-$dir}"
     __jwfiles_kv__ "Mount"      "$(df -P  -- "$dir" 2>/dev/null | awk 'NR==2{print $6}')"
     __jwfiles_kv__ "Filesystem" "$(df -PT -- "$dir" 2>/dev/null | awk 'NR==2{print $2" on "$1}')"
 
     echo
-    echo "---[ Disk (holding mount) ]---"
+    __jwfiles_h__ "Disk (holding mount)"
     df -h  -- "$dir" 2>/dev/null | awk 'NR==1 || NR==2'
     echo
     df -ih -- "$dir" 2>/dev/null | awk 'NR==1 || NR==2'
 
     echo
-    echo "---[ Counts (subtree) ]---"
+    __jwfiles_h__ "Counts (subtree)"
     __jwfiles_kv__ "Files"      "$(find "$dir" -type f 2>/dev/null | wc -l)"
     __jwfiles_kv__ "Dirs"       "$(find "$dir" -mindepth 1 -type d 2>/dev/null | wc -l)"
     __jwfiles_kv__ "Symlinks"   "$(find "$dir" -mindepth 1 -type l 2>/dev/null | wc -l)"
@@ -151,28 +162,28 @@ jwfiles_profile() {
     __jwfiles_kv__ "Total size" "$(du -sh -- "$dir" 2>/dev/null | cut -f1)"
 
     echo
-    echo "---[ Biggest entries (top $top, depth 1) ]---"
+    __jwfiles_h__ "Biggest entries (top $top, depth 1)"
     find "$dir" -mindepth 1 -maxdepth 1 -exec du -sh {} + 2>/dev/null | sort -rh | head -n "$top"
 
     echo
-    echo "---[ Biggest files (top $top, subtree) ]---"
+    __jwfiles_h__ "Biggest files (top $top, subtree)"
     find "$dir" -type f -printf '%s\t%p\n' 2>/dev/null | sort -rn | head -n "$top" \
         | while IFS="$(printf '\t')" read -r sz p; do
               printf '%8s  %s\n' "$(numfmt --to=iec "$sz" 2>/dev/null || echo "${sz}B")" "$p"
           done
 
     echo
-    echo "---[ Newest files (top $top, subtree) ]---"
+    __jwfiles_h__ "Newest files (top $top, subtree)"
     find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
         | sort -t'|' -k1,1 -rn | head -n "$top" | cut -d'|' -f2-
 
     echo
-    echo "---[ Extensions (top $top by count) ]---"
+    __jwfiles_h__ "Extensions (top $top by count)"
     find "$dir" -type f 2>/dev/null | sed -n 's/.*\.\([^./]\{1,\}\)$/\1/p' \
         | sort | uniq -c | sort -rn | head -n "$top"
 
     echo
-    echo "---[ Flags ]---"
+    __jwfiles_h__ "Flags"
     __jwfiles_flag__ "Broken symlinks"   "$(find "$dir" -xtype l 2>/dev/null | wc -l)"
     __jwfiles_flag__ "Empty files"       "$(find "$dir" -type f -empty 2>/dev/null | wc -l)"
     __jwfiles_flag__ "Empty dirs"        "$(find "$dir" -mindepth 1 -type d -empty 2>/dev/null | wc -l)"

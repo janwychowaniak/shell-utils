@@ -133,6 +133,14 @@ B=(
   "jwfiles_empty /nonexistent_xyz"
   "jwfiles_weirdnames /nonexistent_xyz"
   "jwfiles_backup /nonexistent_xyz"         # missing path -> warns, still prints cmd
+  "( cd '$FIX' && jwfiles_rename --despace )"   # ⚪ dry-run (NO mutation): plan only
+  "( cd '$FIX' && jwfiles_rename --ascii )"     # dry-run: transliterate plan
+  "( cd '$FIX' && jwfiles_rename txt )"         # dry-run: substring plan
+  "( cd '$FIX' && jwfiles_flatten )"            # dry-run: flatten plan
+  "jwfiles_rename"                          # no <from> -> error path
+  "jwfiles_rename --despace extra"          # mode + phrase -> error path
+  "jwfiles_rename --bogus"                  # unknown flag -> error path
+  "jwfiles_flatten pos"                     # positional -> error path
 )
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -173,6 +181,9 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwfiles_symlinks '$FIX'"
     "jwfiles_empty '$FIX'"
     "jwfiles_weirdnames '$FIX'"
+    "( cd '$FIX' && jwfiles_rename --despace )"
+    "( cd '$FIX' && jwfiles_rename --ascii )"
+    "( cd '$FIX' && jwfiles_flatten )"
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -188,6 +199,29 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
 else
   echo "  ⏭️  skipped (needs both bash and zsh)"
 fi
+
+# Part D — the --execute path really mutates, so run it in a throwaway mktemp dir
+# (never $FIX or real state): despace + ascii rename, then flatten, then assert
+# the resulting tree. The only part that exercises actual mv / rmdir.
+echo "=== Part D: --execute on a throwaway (mutates a temp dir, asserts result) ==="
+for sh in "${SHELLS[@]}"; do
+  T=$(mktemp -d) || { echo "  ⏭️  $sh: mktemp failed"; continue; }
+  out=$( "$sh" -c "source '$LIB'
+    cd '$T' || exit 3
+    : > 'a b.txt'; : > 'łódź.md'; mkdir sub; : > sub/x
+    jwfiles_rename --despace --execute >/dev/null 2>&1
+    jwfiles_rename --ascii   --execute >/dev/null 2>&1
+    jwfiles_flatten          --execute >/dev/null 2>&1
+    if [ -e 'a_b.txt' ] && [ -e 'lodz.md' ] && [ -e 'x' ] && [ ! -e 'sub' ]; then
+        echo PASS; else echo FAIL; ls -1A; fi" 2>&1 )
+  rm -rf "$T"
+  if [ "$out" = "PASS" ]; then
+    echo "  ✅ $sh: rename + flatten --execute produced the expected tree"
+  else
+    printf "  ❌ %s: unexpected result:\n%s\n" "$sh" "$out" | sed 's/^/    /'
+    FAILED=$((FAILED + 1))
+  fi
+done
 
 echo
 if [ "$FAILED" -eq 0 ]; then

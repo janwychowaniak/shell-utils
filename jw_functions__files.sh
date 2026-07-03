@@ -4,15 +4,14 @@
 # table of contents
 # ---------------------------------------------------------------------------------
 #
-# Oversight-first area — the read-only cockpit for the local filesystem: quick
-# tools that answer "what's the state of this directory tree?" without changing
-# anything. The whole file is 🟢 read-only — perms / owners / stat only report,
-# and even jwfiles_backup just PRINTS the cp -a command for you to run. No
-# delete/trash tool on purpose — it must work on headless servers (no desktop
-# Trash), where deletion is plain `rm`.
+# Oversight-first area — the cockpit for the local filesystem: quick tools that
+# answer "what's the state of this directory tree?". Almost everything is 🟢
+# read-only (perms / owners / stat only report; jwfiles_backup only PRINTS its cp
+# command). The two exceptions are cwd-scoped mutators — jwfiles_rename and
+# jwfiles_flatten (⚪) — and even those DRY-RUN by default, applying only with
+# --execute. No delete/trash tool on purpose — it must work on headless servers.
 #
-# Built incrementally (greenfield). The map is complete — jwfiles_toc() is the
-# live index.
+# Built incrementally (greenfield). jwfiles_toc() is the live index.
 
 # One TOC row: blast-radius marker, padded function name, one-line "soul" tagline.
 # printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
@@ -24,7 +23,7 @@ __jwfiles_toc_row__() {
 jwfiles_toc() {
     echo
     echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
-    echo "   (oversight-first — this whole area is read-only; nothing here changes state)"
+    echo "   (oversight-first: 🟢 tools are read-only; the two ⚪ cwd mutators dry-run by default)"
     echo
     echo " -----------------------------  orientation (the cockpit)"
     __jwfiles_toc_row__ 🟢 jwfiles_profile "one-shot dir X-ray"
@@ -55,6 +54,10 @@ jwfiles_toc() {
     echo
     echo " -----------------------------  backup (prints the command)"
     __jwfiles_toc_row__ 🟢 jwfiles_backup "prints the cp -a command"
+    echo
+    echo " -----------------------------  rename / restructure (cwd; dry-run by default)"
+    __jwfiles_toc_row__ ⚪ jwfiles_rename  "batch rename: substr/despace/ascii"
+    __jwfiles_toc_row__ ⚪ jwfiles_flatten "lift subdirs up one level"
     echo
 }
 
@@ -658,4 +661,128 @@ jwfiles_backup() {
         dest="${p%/}.${ts}.JWBAK"
         printf 'cp -a -- "%s" "%s"\n' "$p" "$dest"
     done
+}
+
+
+# ---------------------------------------------------------------------------------
+# rename / restructure (current dir; dry-run by default, --execute to apply)
+# ---------------------------------------------------------------------------------
+
+# ⚪ Batch-rename non-hidden items in the CURRENT directory by one of three rewrites.
+# DRY-RUN by default — prints the `mv -i -v` commands it would run; add --execute
+# (-x) to perform them. cwd only, no [dir] argument (by design — matches the old
+# habit). The "doing" half of the read-only jwfiles_weirdnames.
+#   jwfiles_rename <from> [to]   substring: remove <from>, or replace <from> with <to>
+#   jwfiles_rename --despace     spaces → underscores
+#   jwfiles_rename --ascii       transliterate diacritics to ASCII (ą→a, ł→l, é→e, …)
+jwfiles_rename() {
+    local execute=0 mode="subst" a
+    local -a pos
+    for a in "$@"; do
+        case "$a" in
+            -h|--help)
+                echo "Usage: jwfiles_rename <from> [to] | --despace | --ascii  [--execute]"
+                echo "  Batch-rename non-hidden items in the CURRENT directory (no [dir] arg)."
+                echo "    <from> [to]   remove <from> from names, or replace <from> with <to>"
+                echo "    --despace     replace spaces with underscores"
+                echo "    --ascii       transliterate diacritics to ASCII (iconv //TRANSLIT)"
+                echo "  DRY-RUN by default (prints the mv commands); --execute / -x applies them."
+                echo "Examples:"
+                echo "  jwfiles_rename ' - copy'             # preview removing ' - copy'"
+                echo "  jwfiles_rename --despace --execute   # spaces → _ , for real"
+                echo "  jwfiles_rename draft final -x"
+                return 0 ;;
+            -x|--execute) execute=1 ;;
+            --despace)    mode="despace" ;;
+            --ascii)      mode="ascii" ;;
+            -*)  echo "❌ unknown flag: $a" >&2; return 1 ;;
+            *)   pos+=("$a") ;;
+        esac
+    done
+    local from="" to=""
+    if [ "$mode" = "subst" ]; then
+        set -- "${pos[@]}"
+        if [ $# -eq 0 ]; then
+            echo "❌ need <from> (or use --despace / --ascii). See -h." >&2
+            return 1
+        fi
+        from="$1"; to="${2:-}"
+    elif [ "${#pos[@]}" -ne 0 ]; then
+        echo "❌ --$mode takes no phrase argument" >&2
+        return 1
+    fi
+    if [ "$mode" = "ascii" ] && ! command -v iconv >/dev/null 2>&1; then
+        echo "❌ --ascii needs iconv" >&2
+        return 1
+    fi
+    local name new n=0
+    while IFS= read -r name; do
+        name="${name#./}"
+        case "$mode" in
+            despace) new="${name// /_}" ;;
+            ascii)   new="$(printf '%s' "$name" | iconv -f UTF-8 -t ASCII//TRANSLIT 2>/dev/null)" ;;
+            *)       new="${name//"$from"/"$to"}" ;;
+        esac
+        if [ -z "$new" ] || [ "$new" = "$name" ]; then continue; fi
+        n=$((n + 1))
+        if [ "$execute" -eq 1 ]; then
+            mv -i -v -- "$name" "$new"
+        else
+            printf 'mv -i -v -- "%s" "%s"\n' "$name" "$new"
+        fi
+    done < <(find . -maxdepth 1 -mindepth 1 ! -name '.*' 2>/dev/null | sort)
+    if [ "$n" -eq 0 ]; then
+        echo "(nothing to rename)"
+    elif [ "$execute" -ne 1 ]; then
+        echo "-- dry-run: $n rename(s); add --execute to apply --"
+    fi
+}
+
+# ⚪ Flatten the CURRENT directory by ONE level: lift each non-hidden subdir's
+# contents up into the cwd, then rmdir the emptied subdir. Does NOT recurse — a
+# subdir's internal structure is preserved, only raised one level. DRY-RUN by
+# default; --execute / -x applies. cwd only (no [dir] arg). Refuses in $HOME;
+# rmdir (never rm -r) can't delete a non-empty dir, so nothing is ever lost.
+jwfiles_flatten() {
+    local execute=0 a
+    for a in "$@"; do
+        case "$a" in
+            -h|--help)
+                echo "Usage: jwfiles_flatten [--execute]"
+                echo "  Lift each non-hidden subdir's contents up one level into the current"
+                echo "  directory, then rmdir the emptied subdir. ONE level only, no recursion."
+                echo "  cwd only (no [dir] arg). DRY-RUN by default; --execute / -x applies."
+                echo "Examples:"
+                echo "  jwfiles_flatten            # preview"
+                echo "  jwfiles_flatten --execute"
+                return 0 ;;
+            -x|--execute) execute=1 ;;
+            -*) echo "❌ unknown flag: $a" >&2; return 1 ;;
+            *)  echo "❌ jwfiles_flatten takes no positional args (cwd only)" >&2; return 1 ;;
+        esac
+    done
+    if [ "$(pwd)" = "$HOME" ]; then
+        echo "❌ refusing to flatten \$HOME" >&2
+        return 1
+    fi
+    local d n=0
+    while IFS= read -r d; do
+        d="${d#./}"
+        n=$((n + 1))
+        if [ "$execute" -eq 1 ]; then
+            find "$d" -maxdepth 1 -mindepth 1 ! -name '.*' -exec mv -i -v -t . -- {} + 2>/dev/null
+            if rmdir -- "$d" 2>/dev/null; then
+                echo "flattened + removed: $d"
+            else
+                echo "  (kept $d — not empty, e.g. hidden items)"
+            fi
+        else
+            printf 'flatten: %s/  ->  ./   (then rmdir %s)\n' "$d" "$d"
+        fi
+    done < <(find . -maxdepth 1 -mindepth 1 -type d ! -name '.*' 2>/dev/null | sort)
+    if [ "$n" -eq 0 ]; then
+        echo "(no subdirectories to flatten)"
+    elif [ "$execute" -ne 1 ]; then
+        echo "-- dry-run: $n subdir(s); add --execute to apply --"
+    fi
 }

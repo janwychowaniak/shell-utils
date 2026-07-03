@@ -470,7 +470,7 @@ jwfiles_stat() {
     IFS='|' read -r ftype perms operm owner group uid gid size links inode atime mtime ctime \
         < <(stat -c '%F|%A|%a|%U|%G|%u|%g|%s|%h|%i|%x|%y|%z' -- "$p" 2>/dev/null)
     echo
-    echo "---[ $(stat -c '%N' -- "$p" 2>/dev/null) ]---"
+    __jwfiles_h__ "$(stat -c '%N' -- "$p" 2>/dev/null)"
     __jwfiles_kv__ "Type"   "$ftype"
     __jwfiles_kv__ "Perms"  "$perms  ($operm)"
     __jwfiles_kv__ "Owner"  "$owner:$group  ($uid:$gid)"
@@ -504,16 +504,16 @@ jwfiles_perms() {
         return 1
     fi
     echo
-    echo "---[ World-writable files ]---"
+    __jwfiles_h__ "World-writable files"
     find "$dir" -type f -perm -o+w -printf '%M  %u:%g  %p\n' 2>/dev/null
     echo
-    echo "---[ World-writable dirs without sticky bit ]---"
+    __jwfiles_h__ "World-writable dirs without sticky bit"
     find "$dir" -type d -perm -o+w ! -perm -1000 -printf '%M  %u:%g  %p\n' 2>/dev/null
     echo
-    echo "---[ setuid ]---"
+    __jwfiles_h__ "setuid"
     find "$dir" -type f -perm -4000 -printf '%M  %u:%g  %p\n' 2>/dev/null
     echo
-    echo "---[ setgid ]---"
+    __jwfiles_h__ "setgid"
     find "$dir" -type f -perm -2000 -printf '%M  %u:%g  %p\n' 2>/dev/null
     echo
 }
@@ -563,10 +563,10 @@ jwfiles_symlinks() {
         return 1
     fi
     echo
-    echo "---[ All symlinks ]---"
+    __jwfiles_h__ "All symlinks"
     find "$dir" -type l -printf '%p -> %l\n' 2>/dev/null | sort
     echo
-    echo "---[ Broken (dangling) ]---"
+    __jwfiles_h__ "Broken (dangling)"
     find "$dir" -xtype l -printf '%p -> %l\n' 2>/dev/null | sort
     echo
 }
@@ -589,10 +589,10 @@ jwfiles_empty() {
         return 1
     fi
     echo
-    echo "---[ Empty files ]---"
+    __jwfiles_h__ "Empty files"
     find "$dir" -type f -empty 2>/dev/null | sort
     echo
-    echo "---[ Empty dirs ]---"
+    __jwfiles_h__ "Empty dirs"
     find "$dir" -mindepth 1 -type d -empty 2>/dev/null | sort
     echo
 }
@@ -618,14 +618,14 @@ jwfiles_weirdnames() {
         return 1
     fi
     echo
-    echo "---[ Names with spaces ]---"
+    __jwfiles_h__ "Names with spaces"
     find "$dir" -mindepth 1 2>/dev/null | grep ' ' | sort
     echo
-    echo "---[ Names with shell/glob-special characters ]---"
+    __jwfiles_h__ "Names with shell/glob-special characters"
     find "$dir" -mindepth 1 2>/dev/null \
         | LC_ALL=C grep -E '[]!"#$%&'\''()*+,:;<=>?@[\\^`{|}~]' | sort
     echo
-    echo "---[ Names with non-ASCII characters ]---"
+    __jwfiles_h__ "Names with non-ASCII characters"
     find "$dir" -mindepth 1 2>/dev/null | LC_ALL=C grep '[^ -~]' | sort
     echo
 }

@@ -65,6 +65,18 @@ __jwweb_kv__() {
     printf "%-${3:-16}s%s\n" "$1" "$2"
 }
 
+# A section header "---[ Title ]---", rendered bold + yellow via jw_colors.sh's
+# jwpaintfg* helpers when that file is sourced; plain otherwise — so
+# jw_functions__web.sh works sourced standalone (no raw ANSI here, no hard
+# dependency on jw_colors.sh).
+__jwweb_h__() {
+    if command -v jwpaintfgBold >/dev/null 2>&1 && command -v jwpaintfgYellow >/dev/null 2>&1; then
+        jwpaintfgBold "$(jwpaintfgYellow "---[ $1 ]---")"
+    else
+        echo "---[ $1 ]---"
+    fi
+}
+
 # Parse a URL/host into "scheme host port path" on one line. No scheme ⇒ https;
 # port defaults from the scheme (443/80). Pure parameter-expansion (bash + zsh).
 __jwweb_parse_url__() {
@@ -292,10 +304,10 @@ jwweb_headers() {
     final="$(printf '%s\n' "$raw" | awk '/^HTTP\//{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}')"
 
     echo
-    echo "---[ Response headers: $url ]---"
+    __jwweb_h__ "Response headers: $url"
     if [ "$all" -eq 1 ]; then printf '%s\n' "$raw"; else printf '%s\n' "$final"; fi
     echo
-    echo "---[ Security headers ]---"
+    __jwweb_h__ "Security headers"
     printf '%s\n' "$final" | __jwweb_sec_headers__
     return 0
 }
@@ -344,7 +356,7 @@ jwweb_timing() {
     t_total="$(printf '%s\n' "$winfo" | grep '^T_TOTAL=' | cut -d= -f2)"
 
     echo
-    echo "---[ Timing: $url ]---"
+    __jwweb_h__ "Timing: $url"
     __jwweb_kv__ "Status" "$hmark" 9
     __jwweb_print_timing__ "$scheme" "$t_dns" "$t_conn" "$t_tls" "$t_ttfb" "$t_total" 9
     return 0
@@ -378,7 +390,7 @@ jwweb_redirects() {
         END { if (seen) print code "\t" loc }')"
 
     echo
-    echo "---[ Redirect chain: $url ]---"
+    __jwweb_h__ "Redirect chain: $url"
     local code="" loc="" i=0 finalcode="" finalurl="$url" hmark=""
     while IFS="$(printf '\t')" read -r code loc; do
         [ -z "$code" ] && continue
@@ -442,19 +454,19 @@ jwweb_json() {
     printf '%s' "$body" | jq empty >/dev/null 2>&1 && valid=1
 
     echo
-    echo "---[ JSON GET: $url ]---"
+    __jwweb_h__ "JSON GET: $url"
     __jwweb_kv__ "Status" "$hmark" 14
     [ -n "$ctype" ] && __jwweb_kv__ "Content-Type" "$ctype"    14
     [ -n "$size" ]  && __jwweb_kv__ "Size"         "${size} B" 14
     if [ "$valid" -eq 1 ]; then
         __jwweb_kv__ "Valid JSON" "✅" 14
         echo
-        echo "---[ Body ]---"
+        __jwweb_h__ "Body"
         printf '%s' "$body" | jq .
     else
         __jwweb_kv__ "Valid JSON" "❌ (parse error)" 14
         echo
-        echo "---[ Body (raw) ]---"
+        __jwweb_h__ "Body (raw)"
         printf '%s\n' "$body"
     fi
     return 0
@@ -540,10 +552,10 @@ jwweb_cert() {
     local kw=12
     echo
     if [ "$islocal" -eq 1 ]; then
-        echo "---[ TLS certificate (file) ]---"
+        __jwweb_h__ "TLS certificate (file)"
         __jwweb_kv__ "File"       "$header" "$kw"
     else
-        echo "---[ TLS certificate: $header ]---"
+        __jwweb_h__ "TLS certificate: $header"
         __jwweb_kv__ "Host"       "$header" "$kw"
     fi
     __jwweb_kv__ "Subject CN" "$cn"         "$kw"
@@ -595,7 +607,7 @@ jwweb_cert-chain() {
 
     local kw=16
     echo
-    echo "---[ TLS chain: $host:$port ]---"
+    __jwweb_h__ "TLS chain: $host:$port"
     __jwweb_kv__ "Verify" "$vmark"          "$kw"
     __jwweb_kv__ "Depth"  "$ncerts cert(s)" "$kw"
     echo
@@ -684,7 +696,7 @@ jwweb_cert-expiry() {
     fi
 
     echo
-    echo "---[ TLS certificate: $host:$port ]---"
+    __jwweb_h__ "TLS certificate: $host:$port"
     __jwweb_kv__ "Host"       "$host:$port" 12
     __jwweb_kv__ "Subject CN" "$cn"         12
     __jwweb_kv__ "Issuer"     "$iss"        12
@@ -723,11 +735,11 @@ jwweb_tls() {
     cipher="$(printf '%s\n' "$pc" | grep '^CIPHER ' | sed 's/^CIPHER //')"
 
     echo
-    echo "---[ TLS: $host:$port ]---"
+    __jwweb_h__ "TLS: $host:$port"
     __jwweb_kv__ "Negotiated" "${proto:-?}${cipher:+ / $cipher}" 12
 
     echo
-    echo "---[ Supported versions ]---"
+    __jwweb_h__ "Supported versions"
     local spec="" lbl="" rest="" flag="" cls=""
     for spec in "TLS 1.0|-tls1|old" "TLS 1.1|-tls1_1|old" "TLS 1.2|-tls1_2|ok" "TLS 1.3|-tls1_3|ok"; do
         lbl="${spec%%|*}"
@@ -778,7 +790,7 @@ jwweb_dns() {
 
     local kw=10
     echo
-    echo "---[ DNS: $host ]---"
+    __jwweb_h__ "DNS: $host"
     local cname=""
     command -v dig >/dev/null 2>&1 && \
         cname="$(dig +short CNAME "$host" 2>/dev/null | head -1 | sed 's/\.$//')"
@@ -825,7 +837,7 @@ jwweb_dns-trace() {
     [ -z "$host" ] && { echo "❌ no host" >&2; return 1; }
 
     echo
-    echo "---[ DNS records: $host ]---"
+    __jwweb_h__ "DNS records: $host"
     local kw=8 t="" recs="" r="" firstrec=1
     for t in A AAAA CNAME MX NS TXT SOA CAA; do
         recs="$(dig +short "$t" "$host" 2>/dev/null)"
@@ -880,7 +892,7 @@ jwweb_dns-reverse() {
     [ "${#ips[@]}" -eq 0 ] && { echo "❌ could not resolve $arg to an IP" >&2; return 1; }
 
     echo
-    echo "---[ Reverse DNS: $arg ]---"
+    __jwweb_h__ "Reverse DNS: $arg"
     local ip="" ptr=""
     for ip in "${ips[@]}"; do
         ptr="$(dig +short -x "$ip" 2>/dev/null | sed 's/\.$//' | paste -sd, - | sed 's/,/, /g')"
@@ -912,7 +924,7 @@ jwweb_dns-prop() {
     local rtype="${2:-A}"
 
     echo
-    echo "---[ DNS propagation: $host ($rtype) ]---"
+    __jwweb_h__ "DNS propagation: $host ($rtype)"
     local kw=10
     local r="" out="" first="" idx=0 mism=0
     for r in system 1.1.1.1 8.8.8.8 9.9.9.9; do
@@ -1028,7 +1040,7 @@ jwweb_domain() {
 
     local kw=13
     echo
-    echo "---[ Domain: $domain ]---"
+    __jwweb_h__ "Domain: $domain"
     __jwweb_kv__ "Source" "$src" "$kw"
     [ -n "$registrar" ] && __jwweb_kv__ "Registrar"   "$registrar" "$kw"
     [ -n "$created" ]   && __jwweb_kv__ "Created"     "$created${cago:+   $cago}"   "$kw"
@@ -1068,7 +1080,7 @@ jwweb_port() {
     if [ $# -gt 0 ]; then ports=("$@"); else ports=("$defport"); fi
 
     echo
-    echo "---[ TCP ports: $host ]---"
+    __jwweb_h__ "TCP ports: $host"
     local p="" rc=0
     for p in "${ports[@]}"; do
         __jwweb_tcp_probe__ "$host" "$p"; rc=$?
@@ -1124,12 +1136,12 @@ jwweb_diag() {
     local v_dns="∅" v_tcp="∅" v_tls="—" v_http="∅"
 
     echo
-    echo "---[ web diag: $url ]---"
+    __jwweb_h__ "web diag: $url"
     __jwweb_kv__ "Target" "$scheme / $host / $port / $pth" "$kw"
 
     # --- DNS (hard prerequisite) ---
     echo
-    echo "---[ DNS ]---"
+    __jwweb_h__ "DNS"
     local dnsout="" rline="" line="" hasip=0
     dnsout="$(__jwweb_resolve__ "$host")"
     rline="$(printf '%s\n' "$dnsout" | grep '^RESOLVER ' | head -1 | sed 's/^RESOLVER //')"
@@ -1143,7 +1155,7 @@ jwweb_diag() {
     if [ "$hasip" -eq 0 ]; then
         __jwweb_kv__ "Result" "❌ no A/AAAA records — aborting" "$kw"
         echo
-        echo "---[ Verdict ]---"
+        __jwweb_h__ "Verdict"
         echo "❌ DNS"
         echo
         return 1
@@ -1152,7 +1164,7 @@ jwweb_diag() {
 
     # --- TCP ---
     echo
-    echo "---[ TCP :$port ]---"
+    __jwweb_h__ "TCP :$port"
     local tcprc=0
     __jwweb_tcp_probe__ "$host" "$port"; tcprc=$?
     case "$tcprc" in
@@ -1164,7 +1176,7 @@ jwweb_diag() {
     # --- TLS (https only) ---
     if [ "$scheme" = "https" ]; then
         echo
-        echo "---[ TLS ]---"
+        __jwweb_h__ "TLS"
         if command -v openssl >/dev/null 2>&1; then
             local cfields="" proto="" cipher="" notafter="" subject="" issuer="" cn="" iss="" days="" ee="" nn=""
             cfields="$(__jwweb_cert_enddate__ "$host" "$port" "$host")"
@@ -1206,7 +1218,7 @@ jwweb_diag() {
         "$url" 2>/dev/null)"
 
     echo
-    echo "---[ HTTP ]---"
+    __jwweb_h__ "HTTP"
     local code="" finalurl="" nredir="" ctype="" hmark=""
     code="$(printf '%s\n' "$winfo" | grep '^CODE=' | cut -d= -f2)"
     finalurl="$(printf '%s\n' "$winfo" | grep '^URL=' | cut -d= -f2-)"
@@ -1224,7 +1236,7 @@ jwweb_diag() {
     [ -n "$ctype" ]    && __jwweb_kv__ "Content-Type" "$ctype" "$kw"
 
     echo
-    echo "---[ Timing ]---"
+    __jwweb_h__ "Timing"
     local t_dns="" t_conn="" t_tls="" t_ttfb="" t_total=""
     t_dns="$(printf   '%s\n' "$winfo" | grep '^T_DNS='   | cut -d= -f2)"
     t_conn="$(printf  '%s\n' "$winfo" | grep '^T_CONN='  | cut -d= -f2)"
@@ -1235,7 +1247,7 @@ jwweb_diag() {
 
     # --- Security headers ---
     echo
-    echo "---[ Security headers ]---"
+    __jwweb_h__ "Security headers"
     local dhdr="" dcode=""
     dhdr="$(curl -sS -I -L "$url" 2>/dev/null | tr -d '\r')"
     dcode="$(printf '%s\n' "$dhdr" | grep -E '^HTTP/' | tail -1 | awk '{print $2}')"
@@ -1247,7 +1259,7 @@ jwweb_diag() {
 
     # --- Verdict ---
     echo
-    echo "---[ Verdict ]---"
+    __jwweb_h__ "Verdict"
     local tlsbit=""
     [ "$v_tls" != "—" ] && tlsbit=" · $v_tls TLS"
     echo "$v_dns DNS · $v_tcp TCP$tlsbit · $v_http HTTP ${code}"

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Commit-msg secret scan via gitleaks.
+# Activated once with:  git config core.hooksPath .githooks
+#
+# Closes the gap the pre-commit hook cannot see: `gitleaks protect --staged`
+# scans staged FILE content only, never the commit MESSAGE. A secret pasted or
+# dumped into the message body — e.g. an accidental `typeset`/`export`/`env`
+# capture appended to the text — sails straight through the staged-file scan.
+# This hook scans the proposed message itself and blocks the commit on a hit.
+#
+# $1 is the path to the file holding the proposed commit message.
+
+command -v gitleaks >/dev/null 2>&1 || {
+    echo "⚠️  gitleaks not installed — skipping commit-message secret scan (commit allowed)" >&2
+    exit 0
+}
+
+if ! gitleaks detect --no-git --source="$1" --redact -v; then
+    echo "❌ gitleaks: potential secret in the commit MESSAGE — commit blocked." >&2
+    echo "   The message body carries what looks like a credential — strip it." >&2
+    echo "   False positive? Add a regex/path to .gitleaks.toml -> [allowlist]." >&2
+    exit 1
+fi

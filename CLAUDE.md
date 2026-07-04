@@ -33,8 +33,15 @@ bash tests/smoke_<area>.sh
 ## Secret scanning
 
 Secrets are scanned with [gitleaks](https://github.com/gitleaks/gitleaks) (apt 8.16).
-A versioned pre-commit hook (`.githooks/pre-commit`) runs `gitleaks protect --staged`
-and blocks commits that introduce secrets. Activate it once per clone:
+Two versioned hooks guard commits — activate both once per clone with the single
+`core.hooksPath` setting below:
+- `.githooks/pre-commit` runs `gitleaks protect --staged` — blocks secrets in
+  staged **file content**.
+- `.githooks/commit-msg` runs `gitleaks detect --no-git` on the message file —
+  blocks secrets in the **commit message** itself. This covers the gap the
+  staged-file scan cannot see: text pasted or dumped into the message body (an
+  accidental `typeset`/`env` capture) never touches a file, so `protect --staged`
+  is blind to it. That exact vector once leaked a full environment here.
 
 ```bash
 git config core.hooksPath .githooks

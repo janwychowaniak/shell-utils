@@ -56,6 +56,7 @@ Config is `.gitleaks.toml` (extends the default ruleset; add false positives to
 | `jw_functions__python.sh` | Python virtualenvs, packages, projects & tooling — uv/pip/pipx (`jwpy_*`) |
 | `jw_functions__web.sh` | Web/API diagnostics — HTTP/TLS/DNS/connectivity, oversight-first/diag-first (`jwweb_*`) |
 | `jw_functions__fs.sh` | Filesystem cockpit — read-only orientation/profiling (size, recency, tree, search, posture, hygiene) + print-only backup + two ⚪ cwd mutators (rename/flatten, dry-run by default); oversight-first, server-safe (`jwfs_*`) |
+| `jw_functions__process.sh` | Live-runtime cockpit — read-only process/port/resource oversight (find, listening sockets + owners, top consumers); ps/ss/free only, oversight-first, server-safe (`jwps_*`) |
 | `jw_functions__media.sh` | Media notes/templates (sox, etc.) |
 | `jw_functions__mediaff.sh` | FFmpeg/ffprobe functions (`jwff*`) |
 | `jw_functions__mediaim.sh` | ImageMagick functions (`jwim*`) |

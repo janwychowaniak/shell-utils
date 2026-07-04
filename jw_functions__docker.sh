@@ -124,6 +124,19 @@ __jwdocker_kvalign__() {
     '
 }
 
+# Render an aligned table for multi-field "record" rows: pass the tab-joined
+# header cells as $1, feed tab-separated data rows on stdin. Every column is
+# padded to its own max width by column(1), then the block is indented 2 spaces.
+# The N-column sibling of __jwdocker_kvalign__. Prints NOTHING when there are no
+# data rows (no lone header) — $(cat) also strips the trailing newline
+# `docker inspect -f` appends, so an empty section collapses cleanly.
+__jwdocker_table__() {
+    local body
+    body=$(cat)
+    [ -n "$body" ] || return 0
+    printf '%s\n%s\n' "$1" "$body" | column -t -s "$(printf '\t')" | sed 's/^/  /'
+}
+
 
 # ---------------------------------------------------------------------------------
 # legacy: aliases
@@ -350,11 +363,11 @@ jwdocker_container-inspect() {
     docker inspect -f 'RestartCount:  {{ .RestartCount }}' "$CONTAINER"
     echo
     __jwdocker_h__ "Ports"
-    docker inspect -f '{{ range $key, $value := .NetworkSettings.Ports }}{{printf "%s -> %s\n" $value $key}}{{ end }}' "$CONTAINER"
+    docker inspect -f '{{ range $p, $b := .NetworkSettings.Ports }}{{ range $b }}{{ printf "%s\t%s\t%s\n" $p .HostIp .HostPort }}{{ end }}{{ end }}' "$CONTAINER" | __jwdocker_table__ $'CONTAINER-PORT\tHOST-IP\tHOST-PORT' ; echo
     __jwdocker_h__ "Volumes"
-    docker inspect -f '{{ range $item := .Mounts }}{{printf "%s [%s]  ->  %s : %s\n" .Type .Mode .Source .Destination}}{{ end }}' "$CONTAINER"
+    docker inspect -f '{{ range .Mounts }}{{ printf "%s\t%s\t%s\t%s\n" .Type .Mode .Source .Destination }}{{ end }}' "$CONTAINER" | __jwdocker_table__ $'TYPE\tMODE\tSOURCE\tDESTINATION' ; echo
     __jwdocker_h__ "Networks"
-    docker inspect -f '{{ range $key, $value := .NetworkSettings.Networks }}{{printf "%s  [NetworkID: %s]  -->  IP: %s , Aliases: %s\n" $key .NetworkID .IPAddress .Aliases}}{{ end }}' "$CONTAINER"
+    docker inspect -f '{{ range $n, $c := .NetworkSettings.Networks }}{{ printf "%s\t%s\t%.12s\t%s\n" $n $c.IPAddress $c.NetworkID $c.Aliases }}{{ end }}' "$CONTAINER" | __jwdocker_table__ $'NAME\tIP\tNETWORK-ID\tALIASES' ; echo
     __jwdocker_h__ "RestartPolicy"
     docker inspect -f '{{ range $k, $v := .HostConfig.RestartPolicy }}{{ printf "%s\t%v\n" $k $v }}{{ end }}' "$CONTAINER" | __jwdocker_kvalign__ ; echo
     __jwdocker_h__ "Labels"

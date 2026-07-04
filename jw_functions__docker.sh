@@ -698,9 +698,11 @@ jwdocker_network-inspect() {
     docker inspect -f 'Id:         {{ .Id }}  [{{ .Name }}]' "$NETWORK"
     docker inspect -f 'Scope:      {{ .Scope }}' "$NETWORK"
     docker inspect -f 'Driver:     {{ .Driver }}' "$NETWORK"
-    docker inspect -f '{{ range $item := .IPAM.Config }}{{ range $key, $value := $item }}{{printf "%s\t\t%s\n" $key $value}}{{ end }}{{ end }}' "$NETWORK"
+    echo
+    __jwdocker_h__ "IPAM"
+    docker inspect -f '{{ range $item := .IPAM.Config }}{{ range $k, $v := $item }}{{ printf "%s\t%s\n" $k $v }}{{ end }}{{ end }}' "$NETWORK" | __jwdocker_kvalign__ ; echo
     __jwdocker_h__ "Containers"
-    docker network inspect -f '{{ range $key, $value := .Containers }}{{printf "%s: [%s]  %s\n" $key .IPv4Address .Name}}{{ end }}' "$NETWORK"
+    docker network inspect -f '{{ range $id, $c := .Containers }}{{ printf "%.12s\t%s\t%s\n" $id .IPv4Address .Name }}{{ end }}' "$NETWORK" | __jwdocker_table__ $'CONTAINER-ID\tIPV4\tNAME' ; echo
 }
 
 

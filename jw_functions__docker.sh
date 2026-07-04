@@ -222,9 +222,11 @@ jwdocker_containers() {
 
 jwdocker_container-start() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker ps --filter status=exited --filter status=created --format "{{.Names}}"
+        echo "Usage: jwdocker_container-start <container>"
+        echo "Start a stopped container."
         echo
+        echo "Stopped / created:"
+        docker ps --filter status=exited --filter status=created --format "- {{.Names}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -285,9 +287,11 @@ jwdocker_container-stop() {
 
 jwdocker_container-restart() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker ps -a --format "{{.Names}}"
+        echo "Usage: jwdocker_container-restart <container> [timeout]"
+        echo "Restart a container (SIGTERM grace period, default 20s)."
         echo
+        echo "Containers:"
+        docker ps -a --format "- {{.Names}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -305,9 +309,11 @@ jwdocker_container-restart() {
 
 jwdocker_container-remove() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker ps -a --filter status=exited --filter status=created --format "{{.Names}}"
+        echo "Usage: jwdocker_container-remove <container> [force|-f]"
+        echo "Remove a container; running ones need the force gate."
         echo
+        echo "Stopped / created:"
+        docker ps -a --filter status=exited --filter status=created --format "- {{.Names}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -335,16 +341,18 @@ jwdocker_container-inspect() {
     # [https://golang.org/pkg/text/template/#hdr-Functions]
     # [https://golang.org/pkg/fmt/]
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker ps --filter status=running --format "- {{.Names}}"
-        echo "---"
+        echo "Usage: jwdocker_container-inspect <container>"
+        echo "Full inspect: config, ports, volumes, networks, restart policy, labels, env, state."
+        echo
+        echo "Running:"
+        docker ps --filter status=running --format "- {{.Names}}" | sed 's/^/  /'
+        echo "Other:"
         docker ps --filter status=created \
                   --filter status=restarting \
                   --filter status=removing \
                   --filter status=paused \
                   --filter status=exited \
-                  --filter status=dead --format "- {{.Names}}"
-        echo
+                  --filter status=dead --format "- {{.Names}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -453,9 +461,11 @@ jwdocker_image-build() {
 
 jwdocker_image-rm() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker images --format "{{.Repository}}:{{.Tag}}"
+        echo "Usage: jwdocker_image-rm <image[:tag]> [force|-f]"
+        echo "Remove an image; images used by containers need the force gate."
         echo
+        echo "Images:"
+        docker images --format "- {{.Repository}}:{{.Tag}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -487,11 +497,11 @@ jwdocker_image-rm() {
 
 jwdocker_image-history() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        echo "Usage: jwdocker_image-history <image> [--no-trunc]"
+        echo "Usage: jwdocker_image-history <image[:tag]> [--no-trunc]"
+        echo "Show an image's layer history."
         echo
-        docker images --format "{{.Repository}}:{{.Tag}}"
-        echo
+        echo "Images:"
+        docker images --format "- {{.Repository}}:{{.Tag}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -533,9 +543,11 @@ jwdocker_volumes() {
 
 jwdocker_volume-inspect() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker volume ls --format "{{.Name}}"
+        echo "Usage: jwdocker_volume-inspect <volume>"
+        echo "Inspect a volume: driver, mountpoint, labels, options, and which containers use it."
         echo
+        echo "Volumes:"
+        docker volume ls --format "- {{.Name}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -606,9 +618,11 @@ jwdocker_volume-create() {
 
 jwdocker_volume-remove() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker volume ls --format "{{.Name}}"
+        echo "Usage: jwdocker_volume-remove <volume> [force|-f]"
+        echo "Remove a volume; volumes used by containers need the force gate."
         echo
+        echo "Volumes:"
+        docker volume ls --format "- {{.Name}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -686,9 +700,11 @@ jwdocker_networks() {
 
 jwdocker_network-inspect() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker network ls --format "- {{.Name}}"
+        echo "Usage: jwdocker_network-inspect <network>"
+        echo "Inspect a network: scope, driver, IPAM, and connected containers."
         echo
+        echo "Networks:"
+        docker network ls --format "- {{.Name}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -743,10 +759,11 @@ jwdocker_network-create() {
 
 jwdocker_network-remove() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        echo "Available networks (excluding system networks):"
-        docker network ls --filter type=custom --format "- {{.Name}}"
+        echo "Usage: jwdocker_network-remove <network> [force|-f]"
+        echo "Remove a network; networks with attached containers need the force gate."
         echo
+        echo "Custom networks:"
+        docker network ls --filter type=custom --format "- {{.Name}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -897,9 +914,11 @@ jwdocker_monitor-stats() {
 
 jwdocker_monitor-top() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker ps --filter status=running --format "{{.Names}}"
+        echo "Usage: jwdocker_monitor-top <container>"
+        echo "Show the running processes inside a container (docker top)."
         echo
+        echo "Running:"
+        docker ps --filter status=running --format "- {{.Names}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -1786,9 +1805,11 @@ jwdocker_test-connectivity() {
 
 jwdocker_exec() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker ps --filter status=running --format "{{.Names}}"
+        echo "Usage: jwdocker_exec <container> [shell]"
+        echo "Open an interactive shell in a running container (default /bin/bash)."
         echo
+        echo "Running:"
+        docker ps --filter status=running --format "- {{.Names}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 
@@ -1802,9 +1823,11 @@ jwdocker_exec() {
 
 jwdocker_logs() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo -e "\n\t???"
-        docker ps -a --format "{{.Names}}"
+        echo "Usage: jwdocker_logs <container> [lines]"
+        echo "Show the last N lines of a container's logs (default 50)."
         echo
+        echo "Containers:"
+        docker ps -a --format "- {{.Names}}" | sed 's/^/  /'
         [ $# -eq 0 ] && return 1 || return 0
     fi
 

@@ -549,10 +549,10 @@ jwdocker_volume-inspect() {
     docker volume inspect --format 'Created:    {{ .CreatedAt }}' "$VOLUME"
     echo
     __jwdocker_h__ "Labels"
-    docker volume inspect --format '{{ range $key, $value := .Labels }}{{ printf "  %-30s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$VOLUME"
+    docker volume inspect --format '{{ range $k, $v := .Labels }}{{ printf "%s\t%s\n" $k $v }}{{ end }}' "$VOLUME" | __jwdocker_kvalign__
     echo
     __jwdocker_h__ "Options"
-    docker volume inspect --format '{{ range $key, $value := .Options }}{{ printf "  %-30s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$VOLUME"
+    docker volume inspect --format '{{ range $k, $v := .Options }}{{ printf "%s\t%s\n" $k $v }}{{ end }}' "$VOLUME" | __jwdocker_kvalign__
     echo
     
     # Show which containers are using this volume

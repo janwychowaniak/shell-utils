@@ -112,9 +112,9 @@ case "${1:-}" in -h|--help) echo "Usage: ..."; return 0 ;; esac
 - **Footgun — a public command that is also an internal callee.** If a function references `$1` (e.g. for `-h`) *and* is called elsewhere in the file with no args, shellcheck flags SC2120/SC2119. This repo is zero-disable, so fix it structurally: move the body into an internal `__<area>_<name>__` worker, have the public function parse `-h` and delegate to it, and repoint the internal call sites at the worker. (Applied to `jwgit_status`, `jwdeb_dist-upgrade`, `jwdocker_volume-prune`/`network-prune`.)
 - Display available options (running containers, installed packages, etc.)
 - Provide multiple example use cases with different parameter combinations
-- Two styles for no-args help:
-  - **"Pick one" style**: print `\n\t???` then list available resources — used when the function just needs a target picked from a known set
-  - **"Usage" style**: print `Usage:` / `Examples:` block — used when the function takes complex or multi-parameter input
+- **Every** no-args / `-h` block leads with a real `Usage:` line + a one-line description. Two shapes from there:
+  - **"Usage" style**: `Usage:` line + `Examples:` block — for functions taking complex or multi-parameter input.
+  - **"Picker" style**: `Usage:` line + description + a **labelled list of available resources** (running containers, images, volumes, …), so the user copies a target straight from the block. Split by state when it helps (e.g. `Running:` / `Other:`). `docker --format` strips leading whitespace, so indent list rows with `… --format "- {{.Names}}" | sed 's/^/  /'`, never spaces inside the template. (Supersedes the old bare `\n\t???` placeholder — a real `Usage:` line serves both no-args and `-h`; ref: the 13 `jwdocker_*` picker functions.)
 - Help format template:
 ```bash
 echo "Usage: jwdocker_image-build <tag> [dockerfile_path] [build_context]"

@@ -96,6 +96,19 @@ jwdocker_toc() {
 }
 
 
+# A section header "---[ Title ]---", rendered bold + yellow via jw_colors.sh's
+# jwpaintfg* helpers when that file is sourced; plain otherwise — so
+# jw_functions__docker.sh works sourced standalone (no raw ANSI here, no hard
+# dependency on jw_colors.sh).
+__jwdocker_h__() {
+    if command -v jwpaintfgBold >/dev/null 2>&1 && command -v jwpaintfgYellow >/dev/null 2>&1; then
+        jwpaintfgBold "$(jwpaintfgYellow "---[ $1 ]---")"
+    else
+        echo "---[ $1 ]---"
+    fi
+}
+
+
 # ---------------------------------------------------------------------------------
 # legacy: aliases
 # ---------------------------------------------------------------------------------
@@ -308,7 +321,7 @@ jwdocker_container-inspect() {
 
     local CONTAINER=$1
     echo
-    echo "---[ Container ]---------------------------------------"
+    __jwdocker_h__ "Container"
     docker inspect -f 'Id:            {{ .Id }}' "$CONTAINER"
     docker inspect -f 'Hostname:      {{ .Config.Hostname }} ({{ .Name }})' "$CONTAINER"
     docker inspect -f 'Image:         {{ .Config.Image }}' "$CONTAINER"
@@ -320,19 +333,19 @@ jwdocker_container-inspect() {
     docker inspect -f 'ExtraHosts:    {{json .HostConfig.ExtraHosts }}' "$CONTAINER"
     docker inspect -f 'RestartCount:  {{ .RestartCount }}' "$CONTAINER"
     echo
-    echo "---[ Ports ]-------------------------------------------"
+    __jwdocker_h__ "Ports"
     docker inspect -f '{{ range $key, $value := .NetworkSettings.Ports }}{{printf "%s -> %s\n" $value $key}}{{ end }}' "$CONTAINER"
-    echo "---[ Volumes ]-----------------------------------------"
+    __jwdocker_h__ "Volumes"
     docker inspect -f '{{ range $item := .Mounts }}{{printf "\"%s\" [%s]  ->  %s : %s\n" .Type .Mode .Source .Destination}}{{ end }}' "$CONTAINER"
-    echo "---[ Networks ]----------------------------------------"
+    __jwdocker_h__ "Networks"
     docker inspect -f '{{ range $key, $value := .NetworkSettings.Networks }}{{printf "\"%s\"  [NetworkID: %s]  -->  IP: %s , Aliases: %s\n" $key .NetworkID .IPAddress .Aliases}}{{ end }}' "$CONTAINER"
-    echo "---[ RestartPolicy ]-----------------------------------"
+    __jwdocker_h__ "RestartPolicy"
     docker inspect -f '{{ range $key, $value := .HostConfig.RestartPolicy }}{{ printf "  %-22s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
-    echo "---[ Labels ]------------------------------------------"
+    __jwdocker_h__ "Labels"
     docker inspect -f '{{ range $key, $value := .Config.Labels }}{{ printf "  %-40s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
-    echo "---[ Env ]---------------------------------------------"
+    __jwdocker_h__ "Env"
     docker inspect -f '{{ range $item := .Config.Env }}{{ range $ii := split $item "=" }}{{printf "  %-30s" $ii}}{{ end }}{{"\n"}}{{ end }}' "$CONTAINER" | grep -v "^$" | sort ; echo
-    echo "---[ State ($(docker inspect  -f '{{ .State.Status }}' "$CONTAINER")) ]---------------------------------"
+    __jwdocker_h__ "State ($(docker inspect  -f '{{ .State.Status }}' "$CONTAINER"))"
     docker inspect -f '{{ range $key, $value := .State }}{{ printf "  %-15s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
 }
 
@@ -374,7 +387,7 @@ jwdocker_image-pull() {
     
     # Show the pulled image info
     echo
-    echo "---[ Pulled Image Info ]---------------------------"
+    __jwdocker_h__ "Pulled Image Info"
     docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -1
     docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | grep "$(echo "$IMAGE" | cut -d: -f1)"
 }
@@ -402,7 +415,7 @@ jwdocker_image-build() {
     # Show the built image info
     if docker build -t "$TAG" -f "$DOCKERFILE" "$CONTEXT"; then
         echo
-        echo "---[ Built Image Info ]----------------------------"
+        __jwdocker_h__ "Built Image Info"
         docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -1
         docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | grep "$(echo "$TAG" | cut -d: -f1)"
     fi
@@ -462,7 +475,7 @@ jwdocker_image-history() {
     fi
 
     echo
-    echo "---[ Image History: $IMAGE ]----------------------"
+    __jwdocker_h__ "Image History: $IMAGE"
     docker history $TRUNC_FLAG --format "table {{.CreatedBy}}\t{{.Size}}\t{{.CreatedSince}}" "$IMAGE"
     echo
 }
@@ -499,22 +512,22 @@ jwdocker_volume-inspect() {
 
     local VOLUME=$1
     echo
-    echo "---[ Volume: $VOLUME ]-----------------------------"
+    __jwdocker_h__ "Volume: $VOLUME"
     docker volume inspect --format 'Name:       {{ .Name }}' "$VOLUME"
     docker volume inspect --format 'Driver:     {{ .Driver }}' "$VOLUME"
     docker volume inspect --format 'Mountpoint: {{ .Mountpoint }}' "$VOLUME"
     docker volume inspect --format 'Scope:      {{ .Scope }}' "$VOLUME"
     docker volume inspect --format 'Created:    {{ .CreatedAt }}' "$VOLUME"
     echo
-    echo "---[ Labels ]--------------------------------------"
+    __jwdocker_h__ "Labels"
     docker volume inspect --format '{{ range $key, $value := .Labels }}{{ printf "  %-30s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$VOLUME"
     echo
-    echo "---[ Options ]-------------------------------------"
+    __jwdocker_h__ "Options"
     docker volume inspect --format '{{ range $key, $value := .Options }}{{ printf "  %-30s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$VOLUME"
     echo
     
     # Show which containers are using this volume
-    echo "---[ Used By ]-------------------------------------"
+    __jwdocker_h__ "Used By"
     local using_containers
     using_containers=$(docker ps -a --filter volume="$VOLUME" --format "{{.Names}}")
     if [ -n "$using_containers" ]; then
@@ -555,7 +568,7 @@ jwdocker_volume-create() {
         docker volume create --driver "$DRIVER" "$VOLUME_NAME"
     fi && {
         echo
-        echo "---[ Created Volume Info ]-------------------------"
+        __jwdocker_h__ "Created Volume Info"
         docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | head -1
         docker volume ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | grep "^$VOLUME_NAME"
     }
@@ -652,12 +665,12 @@ jwdocker_network-inspect() {
 
     local NETWORK=$1
     echo
-    echo "---[ Network ]-----------------------------------------"
+    __jwdocker_h__ "Network"
     docker inspect -f 'Id:         {{ .Id }}  [{{ .Name }}]' "$NETWORK"
     docker inspect -f 'Scope:      {{ .Scope }}' "$NETWORK"
     docker inspect -f 'Driver:     {{ .Driver }}' "$NETWORK"
     docker inspect -f '{{ range $item := .IPAM.Config }}{{ range $key, $value := $item }}{{printf "%s\t\t%s\n" $key $value}}{{ end }}{{ end }}' "$NETWORK"
-    echo "---[ Containers ]--------------------------------------"
+    __jwdocker_h__ "Containers"
     docker network inspect -f '{{ range $key, $value := .Containers }}{{printf "%s: [%s]  %s\n" $key .IPv4Address .Name}}{{ end }}' "$NETWORK"
 }
 
@@ -690,7 +703,7 @@ jwdocker_network-create() {
         docker network create --driver "$DRIVER" "$NETWORK_NAME"
     fi && {
         echo
-        echo "---[ Created Network Info ]------------------------"
+        __jwdocker_h__ "Created Network Info"
         docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | head -1
         docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}" | grep "^$NETWORK_NAME"
     }
@@ -771,7 +784,7 @@ jwdocker_network-connect() {
         docker network connect "$NETWORK" "$CONTAINER"
     fi && {
         echo
-        echo "---[ Connection Info ]-----------------------------"
+        __jwdocker_h__ "Connection Info"
         docker inspect "$CONTAINER" --format '{{ range $key, $value := .NetworkSettings.Networks }}{{printf "%s: %s\n" $key .IPAddress}}{{ end }}' | grep "$NETWORK"
     }
 }
@@ -861,7 +874,7 @@ jwdocker_monitor-top() {
 
     local CONTAINER=$1
     echo
-    echo "---[ Processes in $CONTAINER ]-------------------------"
+    __jwdocker_h__ "Processes in $CONTAINER"
     docker top "$CONTAINER"
     echo
 }
@@ -874,7 +887,7 @@ jwdocker_monitor-health() {
         return 0
     fi
     echo
-    echo "---[ Container Health Status ]-------------------------"
+    __jwdocker_h__ "Container Health Status"
     docker ps --format "table {{.Names}}\t{{.Status}}" | head -1
     docker ps --format "table {{.Names}}\t{{.Status}}" | tail -n +2 | while read -r name container_status; do
         # NB: test "unhealthy" before "healthy" — the latter is a substring of the former.
@@ -903,10 +916,10 @@ jwdocker_disk-usage() {
         return 0
     fi
     echo
-    echo "---[ Docker Disk Usage ]---------------------------"
+    __jwdocker_h__ "Docker Disk Usage"
     docker system df
     echo
-    echo "---[ Detailed Breakdown ]-------------------------"
+    __jwdocker_h__ "Detailed Breakdown"
     docker system df -v
     echo
 }
@@ -919,7 +932,7 @@ jwdocker_system-info() {
         return 0
     fi
     echo
-    echo "---[ Docker System Information ]-------------------"
+    __jwdocker_h__ "Docker System Information"
     docker version --format "Client Version: {{.Client.Version}}"
     docker version --format "Server Version: {{.Server.Version}}"
     echo
@@ -929,7 +942,7 @@ jwdocker_system-info() {
     docker info --format "Storage Driver: {{.Driver}}"
     docker info --format "Docker Root Dir: {{.DockerRootDir}}"
     echo
-    echo "---[ Resource Usage ]------------------------------"
+    __jwdocker_h__ "Resource Usage"
     docker system df --format "table {{.Type}}\t{{.TotalCount}}\t{{.Active}}\t{{.Size}}\t{{.Reclaimable}}"
     echo
 }
@@ -1132,17 +1145,17 @@ jwdocker_size() {
     case $TYPE in
         containers)
             echo
-            echo "---[ Container Sizes ]---------------------------------"
+            __jwdocker_h__ "Container Sizes"
             docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Size}}"
             ;;
         images)
             echo
-            echo "---[ Image Sizes ]-------------------------------------"
+            __jwdocker_h__ "Image Sizes"
             docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
             ;;
         volumes)
             echo
-            echo "---[ Volume Sizes ]------------------------------------"
+            __jwdocker_h__ "Volume Sizes"
             docker system df -v | grep -A 100 "Local Volumes" | tail -n +3
             ;;
         all)
@@ -1150,7 +1163,7 @@ jwdocker_size() {
             jwdocker_size images
             jwdocker_size volumes
             echo
-            echo "---[ Summary ]------------------------------------------"
+            __jwdocker_h__ "Summary"
             docker system df
             ;;
         *)
@@ -1229,7 +1242,7 @@ jwdocker_load() {
     
     if docker load -i "$TAR_FILE"; then
         echo
-        echo "---[ Loaded Images ]--------------------------------"
+        __jwdocker_h__ "Loaded Images"
         echo "Recent images (last 5):"
         docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -6
     else
@@ -1302,7 +1315,7 @@ jwdocker_import() {
         echo "Repository: $REPOSITORY"
         if docker import "$TAR_FILE" "$REPOSITORY"; then
             echo
-            echo "---[ Imported Image ]-------------------------------"
+            __jwdocker_h__ "Imported Image"
             echo "Recent images (last 5):"
             docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -6
         else
@@ -1313,7 +1326,7 @@ jwdocker_import() {
         echo "Repository: (will be <none>:<none>)"
         if docker import "$TAR_FILE"; then
             echo
-            echo "---[ Imported Image ]-------------------------------"
+            __jwdocker_h__ "Imported Image"
             echo "Recent images (last 5):"
             docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -6
         else
@@ -1419,7 +1432,7 @@ EOF
     
     # Show backup summary
     echo
-    echo "---[ Backup Complete ]------------------------------"
+    __jwdocker_h__ "Backup Complete"
     echo "Location: $BACKUP_PATH"
     echo "Files created:"
     ls -lh "$BACKUP_PATH"
@@ -1499,7 +1512,7 @@ jwdocker_run() {
     fi && {
         # Show the new container if it was created
         echo
-        echo "---[ New Container ]--------------------------------"
+        __jwdocker_h__ "New Container"
         docker ps -l --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
     }
 }
@@ -1526,7 +1539,7 @@ jwdocker_tag() {
     if docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"; then
         echo "Image tagged successfully!"
         echo
-        echo "---[ Tagged Images ]--------------------------------"
+        __jwdocker_h__ "Tagged Images"
         docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | head -1
         docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" | grep "$(echo "$TARGET_IMAGE" | cut -d: -f1)"
     else
@@ -1602,7 +1615,7 @@ jwdocker_test-connectivity() {
     echo
     
     # Get network information for both containers
-    echo "---[ Network Analysis ]-----------------------------"
+    __jwdocker_h__ "Network Analysis"
     
     # Get networks for source container
     local source_networks
@@ -1627,7 +1640,7 @@ jwdocker_test-connectivity() {
     echo
     
     # Find shared networks
-    echo "---[ Shared Networks ]------------------------------"
+    __jwdocker_h__ "Shared Networks"
     local shared_networks=""
     local target_ips=()
     
@@ -1654,7 +1667,7 @@ jwdocker_test-connectivity() {
     echo
     
     # Test connectivity
-    echo "---[ Connectivity Tests ]---------------------------"
+    __jwdocker_h__ "Connectivity Tests"
     
     # Test ping connectivity to each shared network IP
     for target_ip in "${target_ips[@]}"; do
@@ -1679,7 +1692,7 @@ jwdocker_test-connectivity() {
     # Test port connectivity if specified
     if [ -n "$PORT" ]; then
         echo
-        echo "---[ Port Connectivity Test ]-----------------------"
+        __jwdocker_h__ "Port Connectivity Test"
         for target_ip in "${target_ips[@]}"; do
             if [ -n "$target_ip" ] && [ "$target_ip" != "<no value>" ]; then
                 echo -n "Port $PORT test to $target_ip: "
@@ -1722,7 +1735,7 @@ jwdocker_test-connectivity() {
     fi
     
     echo
-    echo "---[ Summary ]--------------------------------------"
+    __jwdocker_h__ "Summary"
     if [ -n "$shared_networks" ]; then
         echo "✅ Containers can communicate via shared networks"
         if [ -n "$PORT" ]; then
@@ -1768,7 +1781,7 @@ jwdocker_logs() {
     local LINES=${2:-50}
     
     echo
-    echo "---[ Last $LINES lines from $CONTAINER ]---------------"
+    __jwdocker_h__ "Last $LINES lines from $CONTAINER"
     docker logs --tail "$LINES" "$CONTAINER"
     echo
 }
@@ -1782,13 +1795,13 @@ jwdocker_port() {
     fi
     if [ $# -eq 0 ]; then
         echo
-        echo "---[ Port Mappings ]--------------------------------"
+        __jwdocker_h__ "Port Mappings"
         docker ps --format "table {{.Names}}\t{{.Ports}}"
         echo
     else
         local CONTAINER=$1
         echo
-        echo "---[ Ports for $CONTAINER ]------------------------"
+        __jwdocker_h__ "Ports for $CONTAINER"
         docker port "$CONTAINER"
         echo
     fi
@@ -1878,7 +1891,7 @@ jwdocker_test() {
 
 __jwdocker_test_health__() {
     local CONTAINER=$1
-    echo "---[ Health Check ]--------------------------------"
+    __jwdocker_h__ "Health Check"
     
     # Container status
     local container_status
@@ -1945,7 +1958,7 @@ __jwdocker_test_logs__() {
     local CONTAINER=$1
     local LINES=${2:-100}
     
-    echo "---[ Log Analysis ]--------------------------------"
+    __jwdocker_h__ "Log Analysis"
     echo "Analyzing last $LINES log lines..."
     
     # Get logs
@@ -2007,7 +2020,7 @@ __jwdocker_human_bytes__() {
 __jwdocker_test_limits__() {
     local CONTAINER=$1
 
-    echo "---[ Resource Limits ]-----------------------------"
+    __jwdocker_h__ "Resource Limits"
 
     # Configured limits/reservations (what the container is ALLOWED), from the
     # host config — distinct from jwdocker_test ... stats (live usage).
@@ -2044,7 +2057,7 @@ __jwdocker_test_limits__() {
 __jwdocker_test_config__() {
     local CONTAINER=$1
 
-    echo "---[ Configuration Validation ]--------------------"
+    __jwdocker_h__ "Configuration Validation"
 
     # NB: `docker inspect --format` appends its own trailing newline after the
     # template's, so `... | wc -l` over-counts by one. Capture each list once,
@@ -2084,7 +2097,7 @@ __jwdocker_test_config__() {
 __jwdocker_test_deps__() {
     local CONTAINER=$1
     
-    echo "---[ Dependency Testing ]--------------------------"
+    __jwdocker_h__ "Dependency Testing"
     
     # Check if container is running
     if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
@@ -2126,7 +2139,7 @@ __jwdocker_test_http__() {
     local CONTAINER=$1
     local PORT=${2:-80}
     
-    echo "---[ HTTP Testing ]--------------------------------"
+    __jwdocker_h__ "HTTP Testing"
     
     # Check if container is running
     if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
@@ -2208,7 +2221,7 @@ __jwdocker_test_http__() {
 __jwdocker_test_stats__() {
     local CONTAINER=$1
 
-    echo "---[ Live Stats ]----------------------------------"
+    __jwdocker_h__ "Live Stats"
     
     # Check if container is running
     if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then
@@ -2326,7 +2339,7 @@ jwdocker_debug() {
 __jwdocker_debug_startup__() {
     local CONTAINER=$1
     
-    echo "---[ Startup Debug ]-------------------------------"
+    __jwdocker_h__ "Startup Debug"
     
     # Container state
     local container_status
@@ -2368,7 +2381,7 @@ __jwdocker_debug_startup__() {
 __jwdocker_debug_network__() {
     local CONTAINER=$1
     
-    echo "---[ Network Debug ]-------------------------------"
+    __jwdocker_h__ "Network Debug"
     
     # Network settings
     echo "Networks:"
@@ -2404,7 +2417,7 @@ __jwdocker_debug_network__() {
 __jwdocker_debug_fs__() {
     local CONTAINER=$1
     
-    echo "---[ Filesystem Debug ]----------------------------"
+    __jwdocker_h__ "Filesystem Debug"
     
     # Volume mounts
     echo "Volume mounts:"
@@ -2438,7 +2451,7 @@ __jwdocker_debug_fs__() {
 __jwdocker_debug_ps__() {
     local CONTAINER=$1
     
-    echo "---[ Process Debug ]-------------------------------"
+    __jwdocker_h__ "Process Debug"
     
     # Check if running
     if ! docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then

@@ -2113,7 +2113,7 @@ __jwdocker_test_config__() {
 
     # Ports
     local ports
-    ports=$(docker inspect --format='{{range $key, $value := .NetworkSettings.Ports}}{{printf "%s -> %s\n" $key $value}}{{end}}' "$CONTAINER" | grep .)
+    ports=$(docker inspect --format='{{range $p, $b := .NetworkSettings.Ports}}{{printf "%s -> " $p}}{{if $b}}{{range $b}}{{.HostIp}}:{{.HostPort}} {{end}}{{else}}(not published){{end}}{{printf "\n"}}{{end}}' "$CONTAINER" | grep .)
     echo -n "Exposed ports: "
     if [ -n "$ports" ]; then
         echo "✅ $(printf '%s\n' "$ports" | grep -c .) configured"
@@ -2421,7 +2421,7 @@ __jwdocker_debug_network__() {
     # Port mappings
     echo
     echo "Port mappings:"
-    docker inspect --format='{{range $key, $value := .NetworkSettings.Ports}}{{printf "  %s -> %s\n" $key $value}}{{end}}' "$CONTAINER"
+    docker inspect --format='{{range $p, $b := .NetworkSettings.Ports}}{{printf "  %s -> " $p}}{{if $b}}{{range $b}}{{.HostIp}}:{{.HostPort}} {{end}}{{else}}(not published){{end}}{{printf "\n"}}{{end}}' "$CONTAINER"
     
     # Test basic connectivity if running
     if docker ps --format "{{.Names}}" | grep -q "^${CONTAINER}$"; then

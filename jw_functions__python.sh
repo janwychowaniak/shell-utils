@@ -1281,7 +1281,7 @@ emit("HASPROJECT", "1" if p else "0")
 # ---------------------------------------------------------------------------------
 # The modern, declarative uv workflow: pyproject.toml + uv.lock are the source of truth,
 # .venv is derived (uv sync). Oversight-skewed (status / sync / lock / tree / export) —
-# bootstrap and add/remove are done directly (or by an agent) with uv. Every command
+# bootstrap and add/remove are done directly with uv. Every command
 # guards on a real uv project via __jwpy_require_uvproject__.
 
 jwpy_uv-status() {

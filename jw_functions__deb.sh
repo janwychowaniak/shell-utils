@@ -69,6 +69,18 @@ __jwdeb_kv__() {
     printf "%-${3:-24}s%s\n" "$1" "$2"
 }
 
+# A section header "---[ Title ]---", rendered bold + yellow via jw_colors.sh's
+# jwpaintfg* helpers when that file is sourced; plain otherwise — so
+# jw_functions__deb.sh works sourced standalone (no raw ANSI here, no hard
+# dependency on jw_colors.sh).
+__jwdeb_h__() {
+    if command -v jwpaintfgBold >/dev/null 2>&1 && command -v jwpaintfgYellow >/dev/null 2>&1; then
+        jwpaintfgBold "$(jwpaintfgYellow "---[ $1 ]---")"
+    else
+        echo "---[ $1 ]---"
+    fi
+}
+
 
 # ---------------------------------------------------------------------------------
 # package search and information
@@ -104,27 +116,27 @@ jwdeb_search() {
     echo
     
     if [ -n "$opt_installed" ]; then
-        echo "---[ Installed Packages ]---------------------------"
+        __jwdeb_h__ "Installed Packages"
         if [ -n "$opt_names" ]; then
             dpkg -l | grep -i "$SEARCH_TERM" | awk '{printf "%-30s %s\n", $2, $3}'
         else
             apt list --installed 2>/dev/null | grep -i "$SEARCH_TERM"
         fi
     elif [ -n "$opt_names" ]; then
-        echo "---[ Package Names ]--------------------------------"
+        __jwdeb_h__ "Package Names"
         apt-cache pkgnames | grep -i "$SEARCH_TERM"
     elif [ -n "$opt_full" ]; then
-        echo "---[ Detailed Search Results ]----------------------"
+        __jwdeb_h__ "Detailed Search Results"
         apt-cache search "$SEARCH_TERM"
         echo
-        echo "---[ Package Details ]------------------------------"
+        __jwdeb_h__ "Package Details"
         apt-cache search "$SEARCH_TERM" | while read -r pkg _; do
             echo "Package: $pkg"
             apt-cache show "$pkg" 2>/dev/null | grep -E "^(Version|Description|Size|Depends):"
             echo
         done
     else
-        echo "---[ Search Results ]-------------------------------"
+        __jwdeb_h__ "Search Results"
         apt-cache search "$SEARCH_TERM"
     fi
     echo
@@ -152,7 +164,7 @@ jwdeb_info() {
     
     # Check if package is installed
     if dpkg -l "$PACKAGE" 2>/dev/null | grep -q "^ii"; then
-        echo "---[ Installation Status ]-------------------------"
+        __jwdeb_h__ "Installation Status"
         echo "✅ Package is installed"
         local installed_version
         installed_version=$(dpkg -l "$PACKAGE" 2>/dev/null | grep "^ii" | awk '{print $3}')
@@ -160,17 +172,17 @@ jwdeb_info() {
         echo
         
         # Show installed package info
-        echo "---[ Installed Package Details ]-------------------"
+        __jwdeb_h__ "Installed Package Details"
         dpkg -s "$PACKAGE" 2>/dev/null | grep -E "^(Package|Version|Architecture|Maintainer|Description|Installed-Size|Depends|Recommends):"
         echo
     else
-        echo "---[ Installation Status ]-------------------------"
+        __jwdeb_h__ "Installation Status"
         echo "❌ Package is not installed"
         echo
     fi
     
     # Show available package info
-    echo "---[ Available Package Details ]-------------------"
+    __jwdeb_h__ "Available Package Details"
     if apt-cache show "$PACKAGE" >/dev/null 2>&1; then
         apt-cache show "$PACKAGE" 2>/dev/null | grep -E "^(Package|Version|Architecture|Maintainer|Description|Size|Depends|Recommends|Suggests):"
     else
@@ -180,7 +192,7 @@ jwdeb_info() {
     
     # Show reverse dependencies if installed
     if dpkg -l "$PACKAGE" 2>/dev/null | grep -q "^ii"; then
-        echo "---[ Reverse Dependencies ]------------------------"
+        __jwdeb_h__ "Reverse Dependencies"
         local reverse_deps
         reverse_deps=$(apt-cache rdepends "$PACKAGE" 2>/dev/null | grep -v "Reverse Depends:")
         if [ -n "$reverse_deps" ]; then
@@ -218,7 +230,7 @@ jwdeb_depends() {
     echo
     
     if [ -n "$TREE_MODE" ]; then
-        echo "---[ Dependency Tree ]------------------------------"
+        __jwdeb_h__ "Dependency Tree"
         if command -v apt-rdepends >/dev/null 2>&1; then
             apt-rdepends "$PACKAGE" 2>/dev/null
         else
@@ -227,11 +239,11 @@ jwdeb_depends() {
             apt-cache depends "$PACKAGE" 2>/dev/null
         fi
     else
-        echo "---[ Direct Dependencies ]--------------------------"
+        __jwdeb_h__ "Direct Dependencies"
         apt-cache depends "$PACKAGE" 2>/dev/null | grep -E "^\s*(Depends|Recommends|Suggests):"
         echo
         
-        echo "---[ Reverse Dependencies ]------------------------"
+        __jwdeb_h__ "Reverse Dependencies"
         apt-cache rdepends "$PACKAGE" 2>/dev/null
     fi
     echo
@@ -264,19 +276,19 @@ jwdeb_files() {
         return 1
     fi
     
-    echo "---[ Configuration Files ]-------------------------"
+    __jwdeb_h__ "Configuration Files"
     dpkg -L "$PACKAGE" 2>/dev/null | grep -E "^/etc/" | sed 's/^/  /' || echo "  (no configuration files)"
     echo
     
-    echo "---[ Executables ]----------------------------------"
+    __jwdeb_h__ "Executables"
     dpkg -L "$PACKAGE" 2>/dev/null | grep -E "^/(usr/)?s?bin/" | sed 's/^/  /' || echo "  (no executables)"
     echo
     
-    echo "---[ Documentation ]-------------------------------"
+    __jwdeb_h__ "Documentation"
     dpkg -L "$PACKAGE" 2>/dev/null | grep -E "^/usr/share/(doc|man)/" | sed 's/^/  /' || echo "  (no documentation)"
     echo
     
-    echo "---[ All Files ]-----------------------------------"
+    __jwdeb_h__ "All Files"
     dpkg -L "$PACKAGE" 2>/dev/null | sed 's/^/  /'
     
     local total_files
@@ -322,19 +334,19 @@ jwdeb_which() {
     owner_package=$(dpkg -S "$FILE_PATH" 2>/dev/null | cut -d: -f1)
     
     if [ -n "$owner_package" ]; then
-        echo "---[ Package Owner ]-------------------------------"
+        __jwdeb_h__ "Package Owner"
         echo "✅ File owned by: $owner_package"
         echo
         
         # Show package info
-        echo "---[ Package Information ]-------------------------"
+        __jwdeb_h__ "Package Information"
         dpkg -s "$owner_package" 2>/dev/null | grep -E "^(Package|Version|Description):"
         echo
         
         # Show other files from same package in same directory
         local dir_path
         dir_path=$(dirname "$FILE_PATH")
-        echo "---[ Other Files in $dir_path ]-------------------"
+        __jwdeb_h__ "Other Files in $dir_path"
         dpkg -L "$owner_package" 2>/dev/null | grep "^$dir_path/" | sed 's/^/  /'
     else
         echo "❌ No package owns this file"
@@ -342,7 +354,7 @@ jwdeb_which() {
         
         # Try apt-file if available
         if command -v apt-file >/dev/null 2>&1; then
-            echo "---[ Searching with apt-file ]---------------------"
+            __jwdeb_h__ "Searching with apt-file"
             apt-file search "$FILE_PATH" 2>/dev/null | sed 's/^/  /' || echo "  (no results)"
         else
             echo "💡 Install apt-file for more comprehensive searching:"
@@ -433,7 +445,7 @@ jwdeb_install() {
     fi
     
     # Show what will be installed
-    echo "---[ Installation Plan ]---------------------------"
+    __jwdeb_h__ "Installation Plan"
     apt-get install -s "$@" 2>/dev/null | grep -E "^(Inst|Conf)"
     echo
     
@@ -445,7 +457,7 @@ jwdeb_install() {
         sudo apt-get update && sudo apt-get install -y "$@"
         
         echo
-        echo "---[ Installation Summary ]------------------------"
+        __jwdeb_h__ "Installation Summary"
         for package in "$@"; do
             if [[ "$package" != *.deb ]] && [[ "$package" != ./* ]] && [[ "$package" != /* ]]; then
                 if dpkg -l "$package" 2>/dev/null | grep -q "^ii"; then
@@ -507,12 +519,12 @@ jwdeb_remove() {
     fi
     
     # Show what will be removed
-    echo "---[ Removal Plan ]--------------------------------"
+    __jwdeb_h__ "Removal Plan"
     apt-get remove -s "${installed_packages[@]}" 2>/dev/null | grep -E "^Remv"
     echo
 
     # Show reverse dependencies
-    echo "---[ Packages That Depend On These ]---------------"
+    __jwdeb_h__ "Packages That Depend On These"
     local rdeps=""
     for package in "${installed_packages[@]}"; do
         rdeps=$(apt-cache rdepends "$package" 2>/dev/null | grep -v "Reverse Depends:")
@@ -534,7 +546,7 @@ jwdeb_remove() {
         sudo apt-get remove -y "${installed_packages[@]}"
 
         echo
-        echo "---[ Removal Summary ]-----------------------------"
+        __jwdeb_h__ "Removal Summary"
         for package in "${installed_packages[@]}"; do
             if dpkg -l "$package" 2>/dev/null | grep -q "^rc"; then
                 echo "✅ $package (removed, config files remain)"
@@ -599,7 +611,7 @@ jwdeb_purge() {
     fi
     
     # Show what will be purged
-    echo "---[ Purge Plan ]----------------------------------"
+    __jwdeb_h__ "Purge Plan"
     local pkg_state=""
     for package in "${can_purge[@]}"; do
         pkg_state=$(dpkg -l "$package" 2>/dev/null | grep -E "^(ii|rc)" | awk '{print $1}')
@@ -615,7 +627,7 @@ jwdeb_purge() {
     echo
     
     # Show configuration files that will be removed
-    echo "---[ Configuration Files To Be Removed ]-----------"
+    __jwdeb_h__ "Configuration Files To Be Removed"
     local config_files=""
     for package in "${can_purge[@]}"; do
         config_files=$(dpkg -L "$package" 2>/dev/null | grep "^/etc/")
@@ -637,7 +649,7 @@ jwdeb_purge() {
         sudo apt-get purge -y "${can_purge[@]}"
 
         echo
-        echo "---[ Purge Summary ]-------------------------------"
+        __jwdeb_h__ "Purge Summary"
         for package in "${can_purge[@]}"; do
             if ! dpkg -l "$package" 2>/dev/null | grep -qE "^(ii|rc)"; then
                 echo "✅ $package (completely purged)"
@@ -808,7 +820,7 @@ jwdeb_hold() {
 
     sudo apt-mark hold "${to_hold[@]}"
     echo
-    echo "---[ Now on hold ]---------------------------------"
+    __jwdeb_h__ "Now on hold"
     apt-mark showhold 2>/dev/null | sed 's/^/  🔒 /'
     echo
 }
@@ -863,7 +875,7 @@ jwdeb_unhold() {
 
     sudo apt-mark unhold "${to_unhold[@]}"
     echo
-    echo "---[ Still on hold ]-------------------------------"
+    __jwdeb_h__ "Still on hold"
     local still
     still=$(apt-mark showhold 2>/dev/null)
     if [ -n "$still" ]; then
@@ -890,7 +902,7 @@ jwdeb_update() {
     echo
     
     # Show current update status
-    echo "---[ Current Status ]------------------------------"
+    __jwdeb_h__ "Current Status"
     local last_update
     if [ -f /var/lib/apt/periodic/update-success-stamp ]; then
         last_update=$(stat -c %y /var/lib/apt/periodic/update-success-stamp 2>/dev/null | cut -d' ' -f1)
@@ -906,12 +918,12 @@ jwdeb_update() {
     echo
     
     # Update package lists
-    echo "---[ Updating Package Lists ]----------------------"
+    __jwdeb_h__ "Updating Package Lists"
     sudo apt-get update
     
     # Show what's new
     echo
-    echo "---[ Update Summary ]------------------------------"
+    __jwdeb_h__ "Update Summary"
     local new_upgradable_count
     new_upgradable_count=$(apt list --upgradable 2>/dev/null | wc -l)
     new_upgradable_count=$((new_upgradable_count - 1))
@@ -920,7 +932,7 @@ jwdeb_update() {
     
     if [ "$new_upgradable_count" -gt 0 ]; then
         echo
-        echo "---[ Available Updates (first 10) ]----------------"
+        __jwdeb_h__ "Available Updates (first 10)"
         apt list --upgradable 2>/dev/null | tail -n +2 | while read -r line; do
             package=$(echo "$line" | cut -d'/' -f1)
             version_info=$(echo "$line" | grep -o '\[.*\]' || echo "")
@@ -960,7 +972,7 @@ jwdeb_upgrade() {
         return 0
     fi
     
-    echo "---[ Available Updates ]---------------------------"
+    __jwdeb_h__ "Available Updates"
     echo "Found $upgradable_count packages with updates available"
     echo
     
@@ -978,7 +990,7 @@ jwdeb_upgrade() {
     echo
     
     # Show upgrade simulation
-    echo "---[ Upgrade Simulation ]---------------------------"
+    __jwdeb_h__ "Upgrade Simulation"
     apt-get upgrade -s 2>/dev/null | grep -cE "^(Inst|Conf)" | xargs echo "Operations to perform:"
     echo
     
@@ -986,7 +998,7 @@ jwdeb_upgrade() {
     local held_packages
     held_packages=$(apt-mark showhold 2>/dev/null)
     if [ -n "$held_packages" ]; then
-        echo "---[ Held Packages (will not be upgraded) ]--------"
+        __jwdeb_h__ "Held Packages (will not be upgraded)"
         printf '%s\n' "$held_packages" | sed 's/^/  🔒 /'
         echo
     fi
@@ -999,7 +1011,7 @@ jwdeb_upgrade() {
         sudo apt-get upgrade -y
         
         echo
-        echo "---[ Upgrade Complete ]----------------------------"
+        __jwdeb_h__ "Upgrade Complete"
         local remaining_updates
         remaining_updates=$(apt list --upgradable 2>/dev/null | wc -l)
         remaining_updates=$((remaining_updates - 1))
@@ -1050,7 +1062,7 @@ __jwdeb_dist-upgrade__() {
     echo
     
     # Show what dist-upgrade would do
-    echo "---[ Distribution Upgrade Simulation ]--------------"
+    __jwdeb_h__ "Distribution Upgrade Simulation"
     local simulation
     simulation=$(apt-get dist-upgrade -s 2>/dev/null)
     
@@ -1068,7 +1080,7 @@ __jwdeb_dist-upgrade__() {
     echo
     
     if [ "$remove_count" -gt 0 ]; then
-        echo "---[ Packages To Be Removed ]----------------------"
+        __jwdeb_h__ "Packages To Be Removed"
         echo "$simulation" | grep "^Remv" | awk '{print "  🗑️  " $2}'
         if [ "$remove_count" -gt 10 ]; then
             echo "  ... and $((remove_count - 10)) more packages"
@@ -1077,7 +1089,7 @@ __jwdeb_dist-upgrade__() {
     fi
     
     if [ "$install_count" -gt 0 ]; then
-        echo "---[ New Packages To Be Installed ]----------------"
+        __jwdeb_h__ "New Packages To Be Installed"
         echo "$simulation" | grep "^Inst" | grep -v "\[upgrade" | awk '{print "  📦 " $2}'
         if [ "$((install_count - upgrade_count))" -gt 10 ]; then
             echo "  ... and $((install_count - upgrade_count - 10)) more packages"
@@ -1095,7 +1107,7 @@ __jwdeb_dist-upgrade__() {
         sudo apt-get dist-upgrade -y
         
         echo
-        echo "---[ Distribution Upgrade Complete ]---------------"
+        __jwdeb_h__ "Distribution Upgrade Complete"
         
         # Check final status
         local remaining_updates
@@ -1153,7 +1165,7 @@ jwdeb_autoremove() {
     local package_count
     package_count=$(echo "$autoremove_list" | wc -l)
     
-    echo "---[ Packages To Be Removed ]----------------------"
+    __jwdeb_h__ "Packages To Be Removed"
     echo "Found $package_count unused packages:"
     printf '%s\n' "$autoremove_list" | sed 's/^/  🗑️  /'
     
@@ -1181,7 +1193,7 @@ jwdeb_autoremove() {
         sudo apt-get autoremove -y
         
         echo
-        echo "---[ Autoremove Complete ]-------------------------"
+        __jwdeb_h__ "Autoremove Complete"
         
         # Check if there are still packages to remove
         local remaining_autoremove
@@ -1213,7 +1225,7 @@ jwdeb_autoclean() {
     echo
     
     # Show current cache status
-    echo "---[ Current Cache Status ]------------------------"
+    __jwdeb_h__ "Current Cache Status"
     local cache_dir="/var/cache/apt/archives"
     
     if [ -d "$cache_dir" ]; then
@@ -1236,7 +1248,7 @@ jwdeb_autoclean() {
     echo
     
     # Show what autoclean will do
-    echo "---[ Autoclean Simulation ]------------------------"
+    __jwdeb_h__ "Autoclean Simulation"
     local autoclean_simulation
     autoclean_simulation=$(apt-get autoclean -s 2>/dev/null)
     
@@ -1267,7 +1279,7 @@ jwdeb_autoclean() {
         sudo apt-get autoclean
         
         echo
-        echo "---[ Autoclean Complete ]--------------------------"
+        __jwdeb_h__ "Autoclean Complete"
         
         # Show final cache status
         if [ -d "$cache_dir" ]; then
@@ -1307,7 +1319,7 @@ jwdeb_clean() {
     echo
     
     # Show current cache status
-    echo "---[ Current Cache Status ]------------------------"
+    __jwdeb_h__ "Current Cache Status"
     local cache_dir="/var/cache/apt/archives"
     
     if [ -d "$cache_dir" ]; then
@@ -1342,7 +1354,7 @@ jwdeb_clean() {
         sudo apt-get clean
         
         echo
-        echo "---[ Clean Complete ]------------------------------"
+        __jwdeb_h__ "Clean Complete"
         
         # Show final status
         if [ -d "$cache_dir" ]; then
@@ -1422,7 +1434,7 @@ jwdeb_installed() {
     echo
     
     if [ -n "$MANUAL_ONLY" ]; then
-        echo "---[ Manually Installed Packages ]-----------------"
+        __jwdeb_h__ "Manually Installed Packages"
         local manual_packages
         manual_packages=$(apt-mark showmanual 2>/dev/null)
         
@@ -1445,7 +1457,7 @@ jwdeb_installed() {
             echo "No manually installed packages found matching filter."
         fi
     elif [ "$SORT_MODE" = "size" ]; then
-        echo "---[ Packages Sorted by Size ]---------------------"
+        __jwdeb_h__ "Packages Sorted by Size"
         local package_list
         if [ -n "$FILTER" ]; then
             package_list=$(dpkg -l | grep "^ii" | grep -i "$FILTER" | awk '{print $2}')
@@ -1470,7 +1482,7 @@ jwdeb_installed() {
           | sort -rn | cut -d'|' -f2-
         
     elif [ "$SORT_MODE" = "date" ]; then
-        echo "---[ Packages Sorted by Installation Date ]--------"
+        __jwdeb_h__ "Packages Sorted by Installation Date"
         if command -v grep >/dev/null 2>&1 && [ -r /var/log/dpkg.log ]; then
             echo "Installations (oldest first):"
             echo
@@ -1494,7 +1506,7 @@ jwdeb_installed() {
         fi
         
     else
-        echo "---[ Installed Packages ]---------------------------"
+        __jwdeb_h__ "Installed Packages"
         local package_list
         if [ -n "$FILTER" ]; then
             package_list=$(dpkg -l | grep "^ii" | grep -i "$FILTER")
@@ -1572,7 +1584,7 @@ jwdeb_size() {
             return 1
         fi
         
-        echo "---[ Size Information ]-----------------------------"
+        __jwdeb_h__ "Size Information"
         local installed_size
         local download_size
         
@@ -1603,7 +1615,7 @@ jwdeb_size() {
         fi
         
         echo
-        echo "---[ File Count ]-----------------------------------"
+        __jwdeb_h__ "File Count"
         local file_count
         file_count=$(dpkg -L "$PACKAGE" 2>/dev/null | wc -l)
         echo "Total files: $file_count"
@@ -1627,7 +1639,7 @@ jwdeb_size() {
         __jwdeb_kv__ "  Libraries:" "$libs"
         
         echo
-        echo "---[ Dependencies Impact ]-------------------------"
+        __jwdeb_h__ "Dependencies Impact"
         local dep_count
         dep_count=$(apt-cache depends "$PACKAGE" 2>/dev/null | grep -c "Depends:")
         __jwdeb_kv__ "Direct dependencies:" "$dep_count" 29
@@ -1654,7 +1666,7 @@ jwdeb_orphans() {
     if ! command -v deborphan >/dev/null 2>&1; then
         echo "⚠️  deborphan not installed. Using alternative method..."
         echo
-        echo "---[ Packages Marked for Autoremoval ]-------------"
+        __jwdeb_h__ "Packages Marked for Autoremoval"
         local autoremove_list
         autoremove_list=$(apt-get autoremove -s 2>/dev/null | grep "^Remv" | awk '{print $2}')
         
@@ -1676,7 +1688,7 @@ jwdeb_orphans() {
         return 0
     fi
     
-    echo "---[ Library Orphans ]------------------------------"
+    __jwdeb_h__ "Library Orphans"
     local lib_orphans
     lib_orphans=$(deborphan 2>/dev/null)
     
@@ -1690,7 +1702,7 @@ jwdeb_orphans() {
     fi
     
     echo
-    echo "---[ All Orphans ]----------------------------------"
+    __jwdeb_h__ "All Orphans"
     local all_orphans
     all_orphans=$(deborphan -a 2>/dev/null)
     
@@ -1704,7 +1716,7 @@ jwdeb_orphans() {
     fi
     
     echo
-    echo "---[ Package Categories ]---------------------------"
+    __jwdeb_h__ "Package Categories"
     echo "Orphans by category:"
     
     # Check different categories
@@ -1761,7 +1773,7 @@ jwdeb_history() {
         return 1
     fi
 
-    echo "---[ Last $count $label ]--------------------------"
+    __jwdeb_h__ "Last $count $label"
     local rows
     rows=$(grep -E "^[0-9-]+ [0-9:]+ ($actions) " /var/log/dpkg.log 2>/dev/null | tail -n "$count")
     if [ -n "$rows" ]; then
@@ -1787,7 +1799,7 @@ jwdeb_broken() {
     echo "=================================================="
     echo
     
-    echo "---[ Package Database Status ]---------------------"
+    __jwdeb_h__ "Package Database Status"
     
     # Check dpkg status
     echo -n "dpkg database: "
@@ -1802,7 +1814,7 @@ jwdeb_broken() {
     fi
     
     # Check for broken packages
-    echo "---[ Broken Package Check ]------------------------"
+    __jwdeb_h__ "Broken Package Check"
     local broken_packages
     broken_packages=$(apt-get check 2>&1 | grep -E "^E:|^W:" || true)
     
@@ -1815,7 +1827,7 @@ jwdeb_broken() {
     fi
     
     # Check for packages in inconsistent state
-    echo "---[ Package State Check ]-------------------------"
+    __jwdeb_h__ "Package State Check"
     local inconsistent_packages
     inconsistent_packages=$(dpkg -l | grep -E "^[^i]" | grep -v "^Desired" | grep -v "^|" | grep -v "^+++" || true)
     
@@ -1828,7 +1840,7 @@ jwdeb_broken() {
     fi
     
     # Check for held broken packages
-    echo "---[ Held Packages ]-------------------------------"
+    __jwdeb_h__ "Held Packages"
     local held_packages
     held_packages=$(apt-mark showhold 2>/dev/null)
     
@@ -1841,7 +1853,7 @@ jwdeb_broken() {
     fi
     
     # Check for unmet dependencies
-    echo "---[ Dependency Check ]----------------------------"
+    __jwdeb_h__ "Dependency Check"
     local unmet_deps
     unmet_deps=$(apt-get -s install 2>&1 | grep -E "^E:|unmet dependencies" || true)
     
@@ -1854,7 +1866,7 @@ jwdeb_broken() {
     fi
     
     # Check for packages that need configuration
-    echo "---[ Configuration Status ]------------------------"
+    __jwdeb_h__ "Configuration Status"
     local unconfigured
     unconfigured=$(dpkg -l | grep "^iU\|^iF" || true)
     
@@ -1866,7 +1878,7 @@ jwdeb_broken() {
         echo
     fi
     
-    echo "---[ Recommended Actions ]-------------------------"
+    __jwdeb_h__ "Recommended Actions"
     if [ -n "$broken_packages" ] || [ -n "$unmet_deps" ] || [ -n "$unconfigured" ]; then
         echo "Try these commands to fix issues:"
         echo "  sudo apt-get update                    # Update package lists"
@@ -1906,7 +1918,7 @@ jwdeb_fix() {
     fi
     
     echo
-    echo "---[ Step 1: Updating Package Lists ]-------------"
+    __jwdeb_h__ "Step 1: Updating Package Lists"
     if sudo apt-get update; then
         echo "✅ Package lists updated successfully"
     else
@@ -1915,7 +1927,7 @@ jwdeb_fix() {
     fi
     
     echo
-    echo "---[ Step 2: Configuring Pending Packages ]-------"
+    __jwdeb_h__ "Step 2: Configuring Pending Packages"
     if sudo dpkg --configure -a; then
         echo "✅ Package configuration completed"
     else
@@ -1924,7 +1936,7 @@ jwdeb_fix() {
     fi
     
     echo
-    echo "---[ Step 3: Fixing Broken Dependencies ]----------"
+    __jwdeb_h__ "Step 3: Fixing Broken Dependencies"
     if sudo apt-get -f install; then
         echo "✅ Dependencies fixed successfully"
     else
@@ -1933,7 +1945,7 @@ jwdeb_fix() {
     fi
     
     echo
-    echo "---[ Step 4: Checking Final Status ]---------------"
+    __jwdeb_h__ "Step 4: Checking Final Status"
     local final_check
     final_check=$(apt-get check 2>&1 | grep -E "^E:|^W:" || true)
     
@@ -1950,7 +1962,7 @@ jwdeb_fix() {
     fi
     
     echo
-    echo "---[ Cleanup Recommendations ]---------------------"
+    __jwdeb_h__ "Cleanup Recommendations"
     local autoremove_count
     autoremove_count=$(apt-get autoremove -s 2>/dev/null | grep -c "^Remv")
     
@@ -1977,14 +1989,14 @@ jwdeb_diag() {
     echo "=================================================="
     echo
     
-    echo "---[ System Information ]---------------------------"
+    __jwdeb_h__ "System Information"
     echo "OS: $(lsb_release -d 2>/dev/null | cut -f2 || grep PRETTY_NAME /etc/os-release | cut -d'"' -f2)"
     echo "Architecture: $(dpkg --print-architecture)"
     echo "Kernel: $(uname -r)"
     echo "Date: $(date)"
     echo
     
-    echo "---[ Package Statistics ]---------------------------"
+    __jwdeb_h__ "Package Statistics"
     local total_packages
     local installed_packages
     local upgradable_packages
@@ -2002,7 +2014,7 @@ jwdeb_diag() {
     __jwdeb_kv__ "Autoremovable packages:" "$autoremovable_packages" 27
     echo
     
-    echo "---[ Repository Status ]----------------------------"
+    __jwdeb_h__ "Repository Status"
     echo "Active repositories:"
     echo "  Count: $(awk '/^deb /{n++} END{print n+0}' /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null)"
     
@@ -2014,7 +2026,7 @@ jwdeb_diag() {
     fi
     echo
     
-    echo "---[ Disk Usage ]-----------------------------------"
+    __jwdeb_h__ "Disk Usage"
     echo "Package cache:"
     du -sh /var/cache/apt/archives 2>/dev/null | awk '{print "  " $1}' || echo "  Unknown"
     
@@ -2025,7 +2037,7 @@ jwdeb_diag() {
     df -h / | tail -1 | awk '{print "  " $4 " available (" $5 " used)"}'
     echo
     
-    echo "---[ Recent Activity ]------------------------------"
+    __jwdeb_h__ "Recent Activity"
     if [ -r /var/log/dpkg.log ]; then
         echo "Recent package operations (last 20):"
         tail -20 /var/log/dpkg.log | while read -r line; do
@@ -2040,7 +2052,7 @@ jwdeb_diag() {
     fi
     echo
     
-    echo "---[ System Health ]--------------------------------"
+    __jwdeb_h__ "System Health"
     
     # Check for broken packages
     local broken_check
@@ -2083,7 +2095,7 @@ jwdeb_diag() {
     fi
     
     echo
-    echo "---[ Recommendations ]------------------------------"
+    __jwdeb_h__ "Recommendations"
     
     if [ "$upgradable_packages" -gt 0 ]; then
         echo "💡 $upgradable_packages packages can be upgraded - run 'jwdeb_upgrade'"

@@ -108,6 +108,22 @@ __jwdocker_h__() {
     fi
 }
 
+# Align "key<TAB>value" rows (one per line, on stdin) into a two-column block:
+# 2-space indent, key left-padded to the LONGEST key + 2 spaces, then the value.
+# Two-pass awk (buffers rows), so the width adapts to the actual data instead of
+# a hardcoded %-Ns. Order is preserved from input (map ranges arrive Go-sorted;
+# sort upstream for slices). Blank input lines are skipped — this swallows the
+# trailing newline `docker inspect -f` appends, so callers add their own `echo`
+# for inter-section spacing. substr past the first tab keeps tabs in the value.
+__jwdocker_kvalign__() {
+    awk -F'\t' '
+        $1 == "" { next }
+        { key[++n] = $1; val[n] = substr($0, index($0, "\t") + 1)
+          if (length($1) > w) w = length($1) }
+        END { for (i = 1; i <= n; i++) printf "  %-*s  %s\n", w, key[i], val[i] }
+    '
+}
+
 
 # ---------------------------------------------------------------------------------
 # legacy: aliases
@@ -340,13 +356,13 @@ jwdocker_container-inspect() {
     __jwdocker_h__ "Networks"
     docker inspect -f '{{ range $key, $value := .NetworkSettings.Networks }}{{printf "%s  [NetworkID: %s]  -->  IP: %s , Aliases: %s\n" $key .NetworkID .IPAddress .Aliases}}{{ end }}' "$CONTAINER"
     __jwdocker_h__ "RestartPolicy"
-    docker inspect -f '{{ range $key, $value := .HostConfig.RestartPolicy }}{{ printf "  %-22s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
+    docker inspect -f '{{ range $k, $v := .HostConfig.RestartPolicy }}{{ printf "%s\t%v\n" $k $v }}{{ end }}' "$CONTAINER" | __jwdocker_kvalign__ ; echo
     __jwdocker_h__ "Labels"
-    docker inspect -f '{{ range $key, $value := .Config.Labels }}{{ printf "  %-40s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
+    docker inspect -f '{{ range $k, $v := .Config.Labels }}{{ printf "%s\t%s\n" $k $v }}{{ end }}' "$CONTAINER" | __jwdocker_kvalign__ ; echo
     __jwdocker_h__ "Env"
-    docker inspect -f '{{ range $item := .Config.Env }}{{ range $ii := split $item "=" }}{{printf "  %-30s" $ii}}{{ end }}{{"\n"}}{{ end }}' "$CONTAINER" | grep -v "^$" | sort ; echo
+    docker inspect -f '{{ range .Config.Env }}{{ printf "%s\n" . }}{{ end }}' "$CONTAINER" | sort | sed 's/=/\t/' | __jwdocker_kvalign__ ; echo
     __jwdocker_h__ "State ($(docker inspect  -f '{{ .State.Status }}' "$CONTAINER"))"
-    docker inspect -f '{{ range $key, $value := .State }}{{ printf "  %-15s" $key }}{{ $value }}{{ printf "\n" }}{{ end }}' "$CONTAINER"
+    docker inspect -f '{{ range $k, $v := .State }}{{ printf "%s\t%v\n" $k $v }}{{ end }}' "$CONTAINER" | __jwdocker_kvalign__ ; echo
 }
 
 

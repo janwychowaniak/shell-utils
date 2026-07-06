@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Smoke test for jw_functions__process.sh
+# Smoke test for jw_functions__ps.sh
 # =========================================
 # Runs every jwps_* function under BOTH bash and zsh, failing if any zsh/bash
 # RUNTIME-error signature appears — e.g. "read-only variable" (a reserved name
@@ -27,7 +27,7 @@
 set -u
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-LIB="$SCRIPT_DIR/../jw_functions__process.sh"
+LIB="$SCRIPT_DIR/../jw_functions__ps.sh"
 
 [ -f "$LIB" ] || { echo "❌ cannot find library: $LIB"; exit 2; }
 

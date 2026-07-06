@@ -28,7 +28,7 @@ And then `.bashrc` (or `.zshrc` — the snippet is identical for both shells) mi
 #
 [[ -f "$HOME/bin/shell-utils/jw_functions__web.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__web.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__fs.sh" ]]      && . "$HOME/bin/shell-utils/jw_functions__fs.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__process.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__process.sh"
+[[ -f "$HOME/bin/shell-utils/jw_functions__ps.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__ps.sh"
 #
 [[ -f "$HOME/bin/shell-utils/jw_functions__media.sh" ]]   && . "$HOME/bin/shell-utils/jw_functions__media.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__mediaff.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaff.sh"

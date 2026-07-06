@@ -68,7 +68,7 @@ __jwps_ancestry__() {
 
 # A section header "---[ Title ]---", rendered bold + yellow via jw_colors.sh's
 # jwpaintfg* helpers when that file is sourced; plain otherwise — so
-# jw_functions__process.sh works sourced standalone (no raw ANSI here, no hard
+# jw_functions__ps.sh works sourced standalone (no raw ANSI here, no hard
 # dependency on jw_colors.sh).
 __jwps_h__() {
     if command -v jwpaintfgBold >/dev/null 2>&1 && command -v jwpaintfgYellow >/dev/null 2>&1; then

@@ -41,7 +41,7 @@ jwps_toc() {
     __jwps_toc_row__ 🟢 jwps_of-port "reverse: who owns a port"
     echo
     echo " -----------------------------  services (systemd)"
-    __jwps_toc_row__ 🟢 jwps_svc      "unit status + journal"
+    __jwps_toc_row__ 🟢 jwps_svc      "status + journal + cmds"
     __jwps_toc_row__ 🟢 jwps_svc-list "running + failed units"
     echo
     echo " -----------------------------  resources (snapshot)"
@@ -406,15 +406,20 @@ jwps_of-port() {
 # ---------------------------------------------------------------------------------
 
 # One systemd unit at a glance: `systemctl status` (active / loaded / main-PID)
-# with its own log tail suppressed (-n 0), then a longer journal tail on its own.
-# A '.service' suffix is assumed when omitted. journalctl needs journal read access
-# (systemd-journal / adm group); without it the tail is simply empty. Reports only.
+# with its own log tail suppressed (-n 0), then a longer journal tail, then a
+# copy-paste Commands section (start/stop/restart/enable/… + follow-logs) — PRINTED
+# for you to run, never executed, so this stays 🟢. It is the fusion of "inspect"
+# and "here are the lifecycle commands" — no separate mutator functions, and honest
+# about privilege (the commands carry their own sudo; a shell function can't be
+# sudo'd anyway). A '.service' suffix is assumed when omitted. journalctl needs
+# journal read access (systemd-journal / adm group); without it the tail is empty.
+# Reports only.
 jwps_svc() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwps_svc <unit>"
-        echo "  A systemd unit at a glance: 'systemctl status' (state / loaded / main-PID)"
-        echo "  plus a journal tail. A '.service' suffix is assumed if you omit it."
-        echo "  Reports only — never starts, stops, or reconfigures anything."
+        echo "  A systemd unit at a glance: 'systemctl status' (state / loaded / main-PID),"
+        echo "  a journal tail, and a copy-paste Commands section (start/stop/restart/…)."
+        echo "  Reports only — the Commands are printed for you to run, never executed."
         echo "Examples:"
         echo "  jwps_svc ssh"
         echo "  jwps_svc NetworkManager"
@@ -435,6 +440,15 @@ jwps_svc() {
         __jwps_h__ "Recent journal (last 30)"
         journalctl -u "$unit" -n 30 --no-pager -o short 2>&1
     fi
+    echo
+    __jwps_h__ "Commands (copy-paste — printed, not run)"
+    echo "  sudo systemctl restart $unit"
+    echo "  sudo systemctl stop $unit"
+    echo "  sudo systemctl start $unit"
+    echo "  sudo systemctl reload $unit"
+    echo "  sudo systemctl enable --now $unit    # start now + at boot"
+    echo "  sudo systemctl disable --now $unit   # stop now + not at boot"
+    echo "  journalctl -u $unit -f               # follow logs live"
     echo
 }
 

@@ -101,7 +101,8 @@ B=(
   "jwps_svc systemd-journald"  # a unit present on any systemd host
   "jwps_svc no_such_unit_xyz"  # not found -> message + rc 1, no journal section
   "jwps_svc-list"              # failed + running services
-  "jwps_svc-list '*ssh*'"      # pattern filter (may match nothing)
+  "jwps_svc-list dock"         # case-insensitive substring filter
+  "jwps_svc-list NoSuchTermXYZ" # substring, zero matches
 )
 for sh in "${SHELLS[@]}"; do
   n=0

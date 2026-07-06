@@ -147,6 +147,13 @@ __jwps_match_pids__() {
           }'
 }
 
+# Filter stdin to lines containing a case-insensitive substring, or pass everything
+# through when the term is empty — shared by jwps_svc-list. Matched as a literal
+# (grep -F), so a '.'/'-' in the term is inert; '--' so a leading '-' is not a flag.
+__jwps_grep__() {
+    if [ -n "$1" ]; then grep -i -F -- "$1"; else cat; fi
+}
+
 
 # ---------------------------------------------------------------------------------
 # processes
@@ -449,36 +456,37 @@ jwps_svc() {
     echo "  sudo systemctl enable --now $unit    # start now + at boot"
     echo "  sudo systemctl disable --now $unit   # stop now + not at boot"
     echo "  journalctl -u $unit -f               # follow logs live"
+    echo "  journalctl -u $unit -b               # logs since last boot"
     echo
 }
 
 # The systemd units that matter, at a glance: FAILED units first (the actionable
-# ones), then RUNNING services. An optional [pattern] (a unit glob) narrows both.
-# Reports only.
+# ones), then RUNNING services. An optional [term] keeps only matching lines — a
+# plain case-insensitive substring (no globs / asterisks needed): `jwps_svc-list
+# dock` finds the docker units. Reports only.
 jwps_svc-list() {
     case "${1:-}" in
         -h|--help)
-            echo "Usage: jwps_svc-list [pattern]"
+            echo "Usage: jwps_svc-list [term]"
             echo "  systemd units that matter: FAILED units first (the actionable ones),"
-            echo "  then RUNNING services. Optional [pattern] (a unit glob) narrows both."
-            echo "  Reports only."
+            echo "  then RUNNING services. Optional [term] keeps only matching lines —"
+            echo "  a plain case-insensitive substring (no globs needed). Reports only."
             echo "Examples:"
             echo "  jwps_svc-list"
-            echo "  jwps_svc-list '*ssh*'"
+            echo "  jwps_svc-list dock"
             return 0 ;;
     esac
     if ! command -v systemctl >/dev/null 2>&1; then
         echo "❌ systemctl not found (not a systemd host)" >&2
         return 1
     fi
-    local -a filt
-    [ -n "${1:-}" ] && filt=("$1")
+    local term="${1:-}"
     echo
     __jwps_h__ "Failed"
-    systemctl list-units --failed --no-legend --no-pager "${filt[@]}"
+    systemctl list-units --failed --no-legend --no-pager | __jwps_grep__ "$term"
     echo
     __jwps_h__ "Running services"
-    systemctl list-units --type=service --state=running --no-legend --no-pager "${filt[@]}"
+    systemctl list-units --type=service --state=running --no-legend --no-pager | __jwps_grep__ "$term"
     echo
 }
 

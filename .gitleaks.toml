@@ -17,3 +17,69 @@ paths = [
 ]
 # regexes = [ '''YOUR_[A-Z_]*_(KEY|TOKEN)''' ]   # e.g. placeholders shown in usage text
 # commits = [ ]                                   # whitelist a specific finding by commit SHA
+
+# ---------------------------------------------------------------------------------
+# Repo-specific ADD-ON rules
+# ---------------------------------------------------------------------------------
+# These only ADD coverage. `[extend] useDefault = true` above keeps every built-in
+# gitleaks rule intact; the rules below are appended on top. Every id is jw-prefixed
+# and unique, so no built-in rule is ever overridden or disabled (a colliding id
+# would replace that one built-in — unique ids prevent that). Prefixes here are the
+# credential formats this repo's owner actually uses; belt-and-suspenders over the
+# defaults so a provider the pinned binary doesn't yet know is still caught. Truly
+# prefix-less random secrets stay covered by the built-in generic-api-key/entropy
+# rules — untouched.
+
+[[rules]]
+id = "jw-github-pat-classic"
+description = "GitHub personal access token, classic (ghp_)"
+regex = '''ghp_[0-9A-Za-z]{36}'''
+keywords = ["ghp_"]
+
+[[rules]]
+id = "jw-github-pat-finegrained"
+description = "GitHub fine-grained PAT (github_pat_)"
+regex = '''github_pat_[0-9A-Za-z_]{22,255}'''
+keywords = ["github_pat_"]
+
+[[rules]]
+id = "jw-anthropic-key"
+description = "Anthropic API key (sk-ant-api03-)"
+regex = '''sk-ant-api03-[0-9A-Za-z_-]{80,120}'''
+keywords = ["sk-ant-api03-"]
+
+[[rules]]
+id = "jw-openrouter-key"
+description = "OpenRouter API key (sk-or-v1-)"
+regex = '''sk-or-v1-[0-9a-f]{64}'''
+keywords = ["sk-or-v1-"]
+
+[[rules]]
+id = "jw-groq-key"
+description = "Groq API key (gsk_)"
+regex = '''gsk_[0-9A-Za-z]{40,60}'''
+keywords = ["gsk_"]
+
+[[rules]]
+id = "jw-jina-key"
+description = "Jina AI API key (jina_)"
+regex = '''jina_[0-9A-Za-z_-]{24,80}'''
+keywords = ["jina_"]
+
+[[rules]]
+id = "jw-firecrawl-key"
+description = "Firecrawl API key (fc-)"
+regex = '''fc-[0-9a-f]{20,64}'''
+keywords = ["fc-"]
+
+[[rules]]
+id = "jw-mailgun-key"
+description = "Mailgun-style API key (key-)"
+regex = '''key-[0-9a-f]{32}'''
+keywords = ["key-"]
+
+[[rules]]
+id = "jw-google-apikey"
+description = "Google API key (AIza)"
+regex = '''AIza[0-9A-Za-z_-]{35}'''
+keywords = ["AIza"]

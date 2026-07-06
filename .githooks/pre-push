@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Pre-push secret scan via gitleaks — the boundary backstop.
+# Activated once with:  git config core.hooksPath .githooks
+#
+# The per-commit hooks (pre-commit = staged files, commit-msg = message) can be
+# skipped with --no-verify or bypassed by a tool that ignores hooksPath, and they
+# only ever saw one commit at a time. This hook re-scans the WHOLE range about to
+# be pushed — both file content AND commit messages (gitleaks' git mode scans
+# patches, not messages, so the message pass is separate) — as the last line
+# before anything leaves the machine. Still local/advisory (a determined
+# --no-verify skips it too); the non-bypassable layer is the server-side CI scan.
+#
+# stdin: one line per ref being pushed:  <local_ref> <local_sha> <remote_ref> <remote_sha>
+
+command -v gitleaks >/dev/null 2>&1 || {
+    echo "⚠️  gitleaks not installed — skipping pre-push secret scan (push allowed)" >&2
+    exit 0
+}
+
+z=0000000000000000000000000000000000000000   # the all-zeros SHA (ref create/delete)
+fail=0
+tmpd=$(mktemp -d) || exit 0
+trap 'rm -rf "$tmpd"' EXIT
+
+while read -r _ local_sha _ remote_sha; do
+    [ "$local_sha" = "$z" ] && continue                  # deleting a remote ref — nothing to scan
+
+    if [ "$remote_sha" = "$z" ]; then
+        # new branch on the remote: everything reachable locally but not already pushed
+        set -- "$local_sha" --not --remotes
+    else
+        # existing branch: just the newly pushed commits
+        set -- "$remote_sha..$local_sha"
+    fi
+
+    # 1) file content across the pushed range
+    if ! gitleaks detect --source=. --log-opts="$*" --redact -v; then
+        echo "❌ gitleaks: potential secret in pushed FILE content ($*)" >&2
+        fail=1
+    fi
+
+    # 2) commit MESSAGES across the pushed range (the vector git-mode detect misses)
+    git log --format=%B "$@" > "$tmpd/msgs" 2>/dev/null
+    if [ -s "$tmpd/msgs" ] && ! gitleaks detect --no-git --source="$tmpd/msgs" --redact -v; then
+        echo "❌ gitleaks: potential secret in a pushed commit MESSAGE ($*)" >&2
+        fail=1
+    fi
+done
+
+if [ "$fail" -ne 0 ]; then
+    echo "❌ push blocked — resolve the finding above, or (last resort) 'git push --no-verify'." >&2
+    exit 1
+fi

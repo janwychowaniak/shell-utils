@@ -1,0 +1,38 @@
+name: gitleaks
+
+# Server-side secret scan — the non-bypassable layer. The local hooks
+# (.githooks/pre-commit, commit-msg, pre-push) are advisory: --no-verify or a tool
+# that ignores core.hooksPath skips them. This runs on GitHub regardless, on every
+# push and PR plus a weekly sweep, and fails the check on any finding. It uses the
+# repo's .gitleaks.toml (same rules as local), and scans BOTH file content and
+# commit messages — gitleaks' git mode scans patches only, so the message pass
+# (the vector that leaked here once) is run explicitly.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '17 4 * * 1'   # weekly, Monday 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # full history for the content scan + git log --all
+
+      - name: Install gitleaks (apt — same source as local)
+        run: sudo apt-get update && sudo apt-get install -y gitleaks
+
+      - name: Scan file content (full history)
+        run: gitleaks detect --source . --config .gitleaks.toml --redact -v
+
+      - name: Scan commit messages (the vector git-mode detect misses)
+        run: |
+          git log --all --format=%B > "$RUNNER_TEMP/allmsgs.txt"
+          gitleaks detect --no-git --source "$RUNNER_TEMP/allmsgs.txt" --config .gitleaks.toml --redact -v

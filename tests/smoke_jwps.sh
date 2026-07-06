@@ -83,6 +83,15 @@ B=(
   "jwps_top 5"
   "jwps_top 1"                 # single row past the header
   "jwps_top notanint"          # bad-count error path
+  "jwps_tree"                  # whole system tree
+  "jwps_tree 1"                # subtree from PID 1 (always exists)
+  "jwps_tree $SLEEP_PID"       # numeric arg -> PID path, our tagged sleep
+  "jwps_tree 'sleep 424242'"   # non-numeric -> pattern path (> file, no self-match) -> the sleep
+  "jwps_tree no_such_proc_xyz" # pattern, zero matches
+  "jwps_tree 999999999"        # non-existent PID -> error path
+  "jwps_of-port 22"            # a common port (listening or not)
+  "jwps_of-port 65123"         # nothing listening -> graceful
+  "jwps_of-port notaport"      # non-numeric -> error path
 )
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -107,6 +116,11 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwps_find'                    # no-args usage block (return 1, deterministic stdout)
     'jwps_find no_such_proc_xyz'   # deterministic no-match line
     'jwps_top notanint'            # deterministic bad-count error
+    'jwps_tree -h'
+    'jwps_of-port -h'
+    'jwps_of-port'                 # no-args usage block (stdout, return 1)
+    'jwps_of-port 65123'           # deterministic "(nothing listening on port 65123)"
+    'jwps_tree no_such_proc_xyz'   # deterministic no-match (the >file / ancestry defense)
   )
   n=0
   for inv in "${RO[@]}"; do

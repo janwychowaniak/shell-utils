@@ -17,7 +17,7 @@
 # printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
 # every row, so the tagline column aligns regardless of emoji width.
 __jwps_toc_row__() {
-    printf " - %s %-15s%s\n" "$1" "$2" "$3"
+    printf " - %s %-17s%s\n" "$1" "$2" "$3"
 }
 
 jwps_toc() {
@@ -26,10 +26,12 @@ jwps_toc() {
     echo "   (oversight-first: every tool here is 🟢 read-only — it queries, never signals)"
     echo
     echo " -----------------------------  processes"
-    __jwps_toc_row__ 🟢 jwps_find  "pgrep→ps, busiest first"
+    __jwps_toc_row__ 🟢 jwps_find "cmd match, busiest first"
+    __jwps_toc_row__ 🟢 jwps_tree "process tree (pstree)"
     echo
     echo " -----------------------------  ports / sockets"
-    __jwps_toc_row__ 🟢 jwps_ports "listening ports + program"
+    __jwps_toc_row__ 🟢 jwps_ports   "listening ports + program"
+    __jwps_toc_row__ 🟢 jwps_of-port "reverse: who owns a port"
     echo
     echo " -----------------------------  resources (snapshot)"
     __jwps_toc_row__ 🟢 jwps_top   "one-shot top (cpu/mem)"
@@ -78,6 +80,62 @@ __jwps_h__() {
     fi
 }
 
+# Render `ss -tulpn` (plus any filter args) as an aligned proto/addr/port/program
+# table, port-sorted — the shared engine of jwps_ports and jwps_of-port. awk pulls
+# the name(pid) pairs out of ss's verbose users:((...)) field; column -t aligns.
+# Returns 1 and prints nothing (not even a header) for an empty set, so each caller
+# owns its own "empty" message.
+__jwps_ss_table__() {
+    local tab; tab=$(printf '\t')
+    local body
+    body=$(ss -tulpnH "$@" 2>/dev/null | awk '
+        {
+            proto = $1; local = $5; proc = $7
+            port = local; sub(/.*:/, "", port)        # after the last colon
+            addr = local; sub(/:[^:]*$/, "", addr)    # everything before it
+            out = ""
+            while (match(proc, /"[^"]+",pid=[0-9]+/)) {
+                seg  = substr(proc, RSTART, RLENGTH)
+                proc = substr(proc, RSTART + RLENGTH)
+                name = seg; sub(/",pid=[0-9]+/, "", name); sub(/^"/, "", name)
+                pid  = seg; sub(/.*pid=/, "", pid)
+                out = out (out == "" ? "" : ",") name "(" pid ")"
+            }
+            if (out == "") out = "-"
+            printf "%s\t%s\t%s\t%s\n", proto, addr, port, out
+        }' | sort -t"$tab" -k3 -n)
+    [ -z "$body" ] && return 1
+    { printf 'PROTO\tADDRESS\tPORT\tPROGRAM\n'; printf '%s\n' "$body"; } | column -t -s "$tab"
+}
+
+# Emit the PIDs whose COMMAND matches <pattern> (case-insensitive ERE), one per
+# line — the PID-only counterpart to jwps_find, for feeding pstree (and, later, a
+# guarded kill). Same self-match defense as jwps_find, and nothing more: match the
+# COMMAND column only, drop the caller's ancestry, pass the pattern via the
+# environment (never awk's argv). Deliberately NO process-group exclusion — that
+# would hide a real target spawned as a sibling in the caller's own group (e.g. an
+# agent's `sh -c "svc & jwps_tree svc"`). Instead, callers MUST consume this with a
+# `> file` redirect, NEVER a command substitution: a `$()` subshell persists during
+# the ps snapshot carrying the caller's argv, so under `sh -c "...<pat>..."` it
+# would self-match; a `> file` runs in the caller's own shell, so no such
+# pattern-carrying subshell exists (mirrors why jwps_find streams instead of captures).
+__jwps_match_pids__() {
+    local excl; excl=$(__jwps_ancestry__ | tr '\n' ' ')
+    JWPS_PAT="$1" ps -eo pid,args 2>/dev/null \
+      | JWPS_PAT="$1" awk -v excl="$excl" '
+          BEGIN {
+              pat = tolower(ENVIRON["JWPS_PAT"])
+              n = split(excl, A, " "); for (i = 1; i <= n; i++) X[A[i]] = 1
+          }
+          NR == 1 { next }
+          ($1 in X) { next }                                 # our own ancestry
+          {
+              cmd = ""
+              for (i = 2; i <= NF; i++) cmd = cmd " " $i      # the COMMAND column only
+              if (tolower(cmd) ~ pat) print $1
+          }'
+}
+
 
 # ---------------------------------------------------------------------------------
 # processes
@@ -124,14 +182,68 @@ jwps_find() {
           }'
 }
 
+# Process tree — the "who spawned what" view. pstree(1) when present (rich, with
+# PIDs); a `ps --forest` fallback otherwise. No arg → the whole system tree; a
+# numeric [pid] → that process with its parents and children; a [pattern] → the
+# same slice for every process whose command matches (case-insensitive), so you
+# see where each one sits. Reports only.
+jwps_tree() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwps_tree [pid | pattern]"
+            echo "  Process tree — pstree(1), or a 'ps --forest' fallback:"
+            echo "    (no arg)   the whole system tree, with PIDs"
+            echo "    <pid>      that process with its parents and children"
+            echo "    <pattern>  the same slice for each process matching by command"
+            echo "  Reports only."
+            echo "Examples:"
+            echo "  jwps_tree"
+            echo "  jwps_tree 1"
+            echo "  jwps_tree sshd"
+            return 0 ;;
+    esac
+    local arg="${1:-}"
+    if ! command -v pstree >/dev/null 2>&1; then
+        [ -n "$arg" ] && echo "💡 install 'pstree' (psmisc) for [pid]/[pattern] filtering; showing full tree" >&2
+        ps -e --forest -o pid,user:16,stat,comm 2>/dev/null
+        return 0
+    fi
+    if [ -z "$arg" ]; then
+        pstree -p
+        return 0
+    fi
+    case "$arg" in
+        *[!0-9]*) ;;                                          # non-numeric → pattern, below
+        *)
+            if [ -d "/proc/$arg" ]; then
+                pstree -sp "$arg"
+            else
+                echo "❌ no such PID: $arg" >&2
+                return 1
+            fi
+            return 0 ;;
+    esac
+    local pids_file p
+    pids_file=$(mktemp) || { echo "❌ cannot mktemp" >&2; return 1; }
+    __jwps_match_pids__ "$arg" > "$pids_file"          # '> file', never $() — see helper
+    if [ ! -s "$pids_file" ]; then
+        rm -f "$pids_file"
+        echo "(no processes match: $arg)"
+        return 0
+    fi
+    while IFS= read -r p; do
+        [ -n "$p" ] && pstree -sp "$p"
+    done < "$pids_file"
+    rm -f "$pids_file"
+}
+
 
 # ---------------------------------------------------------------------------------
 # ports / sockets
 # ---------------------------------------------------------------------------------
 
 # Every LISTENING TCP/UDP socket and the process that owns it, port-sorted:
-# proto, bind address, port, program(pid). ss(-tulpn) is the source; awk pulls the
-# name(pid) pairs out of ss's verbose users:((...)) field, column -t aligns. Falls
+# proto, bind address, port, program(pid) — rendered by __jwps_ss_table__. Falls
 # back to raw netstat where ss is absent. Reports only. Process owners for OTHER
 # users' sockets need root — a hint is printed when you are not root.
 jwps_ports() {
@@ -155,34 +267,52 @@ jwps_ports() {
         echo "❌ neither ss nor netstat available" >&2
         return 1
     fi
-    local tab; tab=$(printf '\t')
-    local body
-    body=$(ss -tulpnH 2>/dev/null | awk '
-        {
-            proto = $1; local = $5; proc = $7
-            port = local; sub(/.*:/, "", port)        # after the last colon
-            addr = local; sub(/:[^:]*$/, "", addr)    # everything before it
-            out = ""
-            while (match(proc, /"[^"]+",pid=[0-9]+/)) {
-                seg  = substr(proc, RSTART, RLENGTH)
-                proc = substr(proc, RSTART + RLENGTH)
-                name = seg; sub(/",pid=[0-9]+/, "", name); sub(/^"/, "", name)
-                pid  = seg; sub(/.*pid=/, "", pid)
-                out = out (out == "" ? "" : ",") name "(" pid ")"
-            }
-            if (out == "") out = "-"
-            printf "%s\t%s\t%s\t%s\n", proto, addr, port, out
-        }' | sort -t"$tab" -k3 -n)
-    if [ -z "$body" ]; then
+    if ! __jwps_ss_table__; then
         echo "(no listening sockets visible)"
         [ "$(id -u)" -ne 0 ] && echo "💡 run with sudo to see all process owners"
         return 0
     fi
-    { printf 'PROTO\tADDRESS\tPORT\tPROGRAM\n'; printf '%s\n' "$body"; } \
-        | column -t -s "$tab"
     if [ "$(id -u)" -ne 0 ]; then
         echo
         echo "💡 process owners for other users' sockets need root (sudo jwps_ports)"
+    fi
+}
+
+# Reverse of jwps_ports: which process is LISTENING on ONE <port> (proto, bind
+# address, program(pid)) — via ss's port filter, same table renderer. Raw netstat
+# fallback where ss is absent. Reports only; owners for other users need root.
+jwps_of-port() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwps_of-port <port>"
+        echo "  Which process is LISTENING on <port> — the reverse of jwps_ports"
+        echo "  (proto, bind address, program(pid)). Reports only; owners for other"
+        echo "  users' sockets need root."
+        echo "Examples:"
+        echo "  jwps_of-port 8080"
+        echo "  sudo jwps_of-port 443"
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    local port="$1"
+    case "$port" in
+        ''|*[!0-9]*) echo "❌ port must be an integer: $port" >&2; return 1 ;;
+    esac
+    if ! command -v ss >/dev/null 2>&1; then
+        if command -v netstat >/dev/null 2>&1; then
+            echo "⚠️  ss not found — raw netstat fallback:" >&2
+            netstat -tulpn 2>/dev/null | awk -v port="$port" 'NR<=2 || $4 ~ (":" port "$")'
+            return 0
+        fi
+        echo "❌ neither ss nor netstat available" >&2
+        return 1
+    fi
+    if ! __jwps_ss_table__ "sport = :$port"; then
+        echo "(nothing listening on port $port)"
+        [ "$(id -u)" -ne 0 ] && echo "💡 run with sudo to see all process owners"
+        return 0
+    fi
+    if [ "$(id -u)" -ne 0 ]; then
+        echo
+        echo "💡 owners for other users' sockets need root (sudo jwps_of-port $port)"
     fi
 }
 

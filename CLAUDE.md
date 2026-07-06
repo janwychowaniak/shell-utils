@@ -32,9 +32,11 @@ bash tests/smoke_<area>.sh
 
 ## Secret scanning
 
-Secrets are scanned with [gitleaks](https://github.com/gitleaks/gitleaks) (apt 8.16).
-Two versioned hooks guard commits — activate both once per clone with the single
-`core.hooksPath` setting below:
+Secrets are scanned with [gitleaks](https://github.com/gitleaks/gitleaks) (apt 8.16),
+in **defense-in-depth layers** — three local hooks plus a server-side CI scan.
+
+Three versioned hooks guard the working machine — activate all three at once with
+the single `core.hooksPath` setting below:
 - `.githooks/pre-commit` runs `gitleaks protect --staged` — blocks secrets in
   staged **file content**.
 - `.githooks/commit-msg` runs `gitleaks detect --no-git` on the message file —
@@ -42,13 +44,23 @@ Two versioned hooks guard commits — activate both once per clone with the sing
   staged-file scan cannot see: text pasted or dumped into the message body (an
   accidental `typeset`/`env` capture) never touches a file, so `protect --staged`
   is blind to it. That exact vector once leaked a full environment here.
+- `.githooks/pre-push` re-scans the whole **pushed range** — content *and* commit
+  messages — as the last check before anything leaves the machine (catches commits
+  made with `--no-verify` or by a tool that ignored the per-commit hooks).
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-Config is `.gitleaks.toml` (extends the default ruleset; add false positives to
-`[allowlist]`). Ad-hoc scans: `gitleaks detect -v` (history),
+Local hooks are advisory — `--no-verify`, a `hooksPath`-ignoring tool, or a machine
+without gitleaks all skip them. The **non-bypassable** layer is
+`.github/workflows/gitleaks.yml`: it runs server-side on every push + PR + a weekly
+sweep, scanning full-history content *and* all commit messages, and fails the check
+on any finding.
+
+Config is `.gitleaks.toml` — `[extend] useDefault = true` keeps the full built-in
+ruleset and adds `jw-`prefixed provider rules on top (nothing built-in is disabled).
+Add false positives to `[allowlist]`. Ad-hoc scans: `gitleaks detect -v` (history),
 `gitleaks detect --no-git -v` (files).
 
 ## Architecture

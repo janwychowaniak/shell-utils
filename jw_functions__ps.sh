@@ -23,7 +23,7 @@
 # printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
 # every row, so the tagline column aligns regardless of emoji width.
 __jwps_toc_row__() {
-    printf " - %s %-17s%s\n" "$1" "$2" "$3"
+    printf " - %s %-18s%s\n" "$1" "$2" "$3"
 }
 
 jwps_toc() {
@@ -39,6 +39,10 @@ jwps_toc() {
     echo " -----------------------------  ports / sockets"
     __jwps_toc_row__ 🟢 jwps_ports   "listening ports + program"
     __jwps_toc_row__ 🟢 jwps_of-port "reverse: who owns a port"
+    echo
+    echo " -----------------------------  services (systemd)"
+    __jwps_toc_row__ 🟢 jwps_svc      "unit status + journal"
+    __jwps_toc_row__ 🟢 jwps_svc-list "running + failed units"
     echo
     echo " -----------------------------  resources (snapshot)"
     __jwps_toc_row__ 🟢 jwps_top   "one-shot top (cpu/mem)"
@@ -394,6 +398,74 @@ jwps_of-port() {
         echo
         echo "💡 not root — a '-' owner is a socket owned by another user (hidden from you)"
     fi
+}
+
+
+# ---------------------------------------------------------------------------------
+# services (systemd)
+# ---------------------------------------------------------------------------------
+
+# One systemd unit at a glance: `systemctl status` (active / loaded / main-PID)
+# with its own log tail suppressed (-n 0), then a longer journal tail on its own.
+# A '.service' suffix is assumed when omitted. journalctl needs journal read access
+# (systemd-journal / adm group); without it the tail is simply empty. Reports only.
+jwps_svc() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwps_svc <unit>"
+        echo "  A systemd unit at a glance: 'systemctl status' (state / loaded / main-PID)"
+        echo "  plus a journal tail. A '.service' suffix is assumed if you omit it."
+        echo "  Reports only — never starts, stops, or reconfigures anything."
+        echo "Examples:"
+        echo "  jwps_svc ssh"
+        echo "  jwps_svc NetworkManager"
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    if ! command -v systemctl >/dev/null 2>&1; then
+        echo "❌ systemctl not found (not a systemd host)" >&2
+        return 1
+    fi
+    local unit="$1" st
+    echo
+    __jwps_h__ "Status"
+    systemctl status --no-pager -n 0 -- "$unit"
+    st=$?
+    [ "$st" -eq 4 ] && return 1                    # unit not found — status said so; skip journal
+    if command -v journalctl >/dev/null 2>&1; then
+        echo
+        __jwps_h__ "Recent journal (last 30)"
+        journalctl -u "$unit" -n 30 --no-pager -o short 2>&1
+    fi
+    echo
+}
+
+# The systemd units that matter, at a glance: FAILED units first (the actionable
+# ones), then RUNNING services. An optional [pattern] (a unit glob) narrows both.
+# Reports only.
+jwps_svc-list() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwps_svc-list [pattern]"
+            echo "  systemd units that matter: FAILED units first (the actionable ones),"
+            echo "  then RUNNING services. Optional [pattern] (a unit glob) narrows both."
+            echo "  Reports only."
+            echo "Examples:"
+            echo "  jwps_svc-list"
+            echo "  jwps_svc-list '*ssh*'"
+            return 0 ;;
+    esac
+    if ! command -v systemctl >/dev/null 2>&1; then
+        echo "❌ systemctl not found (not a systemd host)" >&2
+        return 1
+    fi
+    local -a filt
+    [ -n "${1:-}" ] && filt=("$1")
+    echo
+    __jwps_h__ "Failed"
+    systemctl list-units --failed --no-legend --no-pager "${filt[@]}"
+    echo
+    __jwps_h__ "Running services"
+    systemctl list-units --type=service --state=running --no-legend --no-pager "${filt[@]}"
+    echo
 }
 
 

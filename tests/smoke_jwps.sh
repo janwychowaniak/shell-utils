@@ -98,6 +98,10 @@ B=(
   "jwps_kill --bogus x"        # unknown flag -> error
   "jwps_kill -s NOSUCH x"      # invalid signal -> error
   "jwps_kill a b"              # two patterns -> error
+  "jwps_svc systemd-journald"  # a unit present on any systemd host
+  "jwps_svc no_such_unit_xyz"  # not found -> message + rc 1, no journal section
+  "jwps_svc-list"              # failed + running services
+  "jwps_svc-list '*ssh*'"      # pattern filter (may match nothing)
 )
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -130,6 +134,9 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwps_kill -h'
     'jwps_kill'                    # no-args usage (return 1, deterministic stdout)
     'jwps_kill no_such_proc_xyz'   # deterministic no-match (guard never lists the caller)
+    'jwps_svc -h'
+    'jwps_svc'                     # no-args usage block (return 1)
+    'jwps_svc-list -h'
   )
   n=0
   for inv in "${RO[@]}"; do

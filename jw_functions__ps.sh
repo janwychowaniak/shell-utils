@@ -8,8 +8,12 @@
 # "what is running, what is listening, what is it costing?". Everything here is 🟢
 # read-only — it only queries the running system (ps / ss / free), never signals,
 # kills, or reconfigures anything. Server-safe: base-Linux tools only, no daemons
-# to install, no credentials. Mutators (kill, service start/stop) will land later
-# behind the show-it-first guard; the read-only oversight layer comes first.
+# to install, no credentials. Scoped to the CURRENT USER: these are shell
+# functions, so there is no `sudo jwps_*` path (sudo runs a command, not a
+# function) — privileged-only detail (e.g. another user's socket owner) is reported
+# as unavailable rather than faked. Want a root-powered view? Source the file for
+# root separately. Mutators (kill, service start/stop) will land later behind the
+# show-it-first guard; the read-only oversight layer comes first.
 #
 # Built incrementally (greenfield). jwps_toc() is the live index.
 
@@ -244,18 +248,17 @@ jwps_tree() {
 
 # Every LISTENING TCP/UDP socket and the process that owns it, port-sorted:
 # proto, bind address, port, program(pid) — rendered by __jwps_ss_table__. Falls
-# back to raw netstat where ss is absent. Reports only. Process owners for OTHER
-# users' sockets need root — a hint is printed when you are not root.
+# back to raw netstat where ss is absent. Reports only. Owners of OTHER users'
+# sockets show only to root; a hint flags this when you are not root.
 jwps_ports() {
     case "${1:-}" in
         -h|--help)
             echo "Usage: jwps_ports"
             echo "  List every LISTENING TCP/UDP socket and the process that owns it"
             echo "  (proto, bind address, port, program(pid)), port-sorted. Reports only."
-            echo "  Process owners for other users' sockets need root (run with sudo)."
+            echo "  Runs as the current user; owners of OTHER users' sockets show only to root."
             echo "Examples:"
             echo "  jwps_ports"
-            echo "  sudo jwps_ports"
             return 0 ;;
     esac
     if ! command -v ss >/dev/null 2>&1; then
@@ -268,28 +271,27 @@ jwps_ports() {
         return 1
     fi
     if ! __jwps_ss_table__; then
-        echo "(no listening sockets visible)"
-        [ "$(id -u)" -ne 0 ] && echo "💡 run with sudo to see all process owners"
+        echo "(no listening sockets)"
         return 0
     fi
     if [ "$(id -u)" -ne 0 ]; then
         echo
-        echo "💡 process owners for other users' sockets need root (sudo jwps_ports)"
+        echo "💡 not root — a '-' owner is a socket owned by another user (hidden from you)"
     fi
 }
 
 # Reverse of jwps_ports: which process is LISTENING on ONE <port> (proto, bind
 # address, program(pid)) — via ss's port filter, same table renderer. Raw netstat
-# fallback where ss is absent. Reports only; owners for other users need root.
+# fallback where ss is absent. Reports only; another user's socket owner shows only to root.
 jwps_of-port() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwps_of-port <port>"
         echo "  Which process is LISTENING on <port> — the reverse of jwps_ports"
-        echo "  (proto, bind address, program(pid)). Reports only; owners for other"
-        echo "  users' sockets need root."
+        echo "  (proto, bind address, program(pid)). Reports only; the owner shows"
+        echo "  only to root if the socket belongs to another user."
         echo "Examples:"
         echo "  jwps_of-port 8080"
-        echo "  sudo jwps_of-port 443"
+        echo "  jwps_of-port 443"
         [ $# -eq 0 ] && return 1 || return 0
     fi
     local port="$1"
@@ -307,12 +309,11 @@ jwps_of-port() {
     fi
     if ! __jwps_ss_table__ "sport = :$port"; then
         echo "(nothing listening on port $port)"
-        [ "$(id -u)" -ne 0 ] && echo "💡 run with sudo to see all process owners"
         return 0
     fi
     if [ "$(id -u)" -ne 0 ]; then
         echo
-        echo "💡 owners for other users' sockets need root (sudo jwps_of-port $port)"
+        echo "💡 not root — a '-' owner is a socket owned by another user (hidden from you)"
     fi
 }
 

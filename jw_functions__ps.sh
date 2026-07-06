@@ -5,15 +5,17 @@
 # ---------------------------------------------------------------------------------
 #
 # Oversight-first area — the cockpit for the live runtime: quick tools that answer
-# "what is running, what is listening, what is it costing?". Everything here is 🟢
-# read-only — it only queries the running system (ps / ss / free), never signals,
-# kills, or reconfigures anything. Server-safe: base-Linux tools only, no daemons
-# to install, no credentials. Scoped to the CURRENT USER: these are shell
-# functions, so there is no `sudo jwps_*` path (sudo runs a command, not a
-# function) — privileged-only detail (e.g. another user's socket owner) is reported
-# as unavailable rather than faked. Want a root-powered view? Source the file for
-# root separately. Mutators (kill, service start/stop) will land later behind the
-# show-it-first guard; the read-only oversight layer comes first.
+# "what is running, what is listening, what is it costing?". Almost everything is 🟢
+# read-only — it only queries the running system (ps / ss / free), never signals or
+# reconfigures. The one exception is jwps_kill 🔴, and it keeps the "safe to run
+# blindly" contract: it DRY-RUNS by default (prints the matches + the signal it
+# would send, and does nothing), acting only with --execute. Server-safe: base-Linux
+# tools only, no daemons to install, no credentials. Scoped to the CURRENT USER:
+# these are shell functions, so there is no `sudo jwps_*` path (sudo runs a command,
+# not a function) — privileged-only detail (e.g. another user's socket owner) is
+# reported as unavailable rather than faked. Want a root-powered view? Source the
+# file for root separately. Further mutators (service start/stop) will follow the
+# same show-it-first guard.
 #
 # Built incrementally (greenfield). jwps_toc() is the live index.
 
@@ -27,11 +29,12 @@ __jwps_toc_row__() {
 jwps_toc() {
     echo
     echo "   blast radius:  🟢 read-only   🔵 creates   ⚪ state change / transfer   🔴 destructive"
-    echo "   (oversight-first: every tool here is 🟢 read-only — it queries, never signals)"
+    echo "   (oversight-first: 🟢 tools are read-only; jwps_kill 🔴 dry-runs by default, --execute to act)"
     echo
     echo " -----------------------------  processes"
     __jwps_toc_row__ 🟢 jwps_find "cmd match, busiest first"
     __jwps_toc_row__ 🟢 jwps_tree "process tree (pstree)"
+    __jwps_toc_row__ 🔴 jwps_kill "signal by pattern (dry-run)"
     echo
     echo " -----------------------------  ports / sockets"
     __jwps_toc_row__ 🟢 jwps_ports   "listening ports + program"
@@ -239,6 +242,82 @@ jwps_tree() {
         [ -n "$p" ] && pstree -sp "$p"
     done < "$pids_file"
     rm -f "$pids_file"
+}
+
+# 🔴 Signal processes whose COMMAND matches <pattern> — the one destructive tool in
+# this oversight-first area, so it DRY-RUNS by default: it prints the matching
+# processes (a jwps_find-style table) and the signal it WOULD send, and does
+# NOTHING. Add --execute / -x to actually send it. Default signal TERM; -s/--signal
+# overrides (name or number). Never signals the caller's own shell — matches come
+# from __jwps_match_pids__ (ancestry-excluded), consumed via '> file' not $(). The
+# --execute re-uses that same fresh match, so it signals whatever matches now (like
+# pkill); review the dry-run first, a broad pattern matches broadly.
+jwps_kill() {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwps_kill <pattern> [-s <signal>] [--execute]"
+        echo "  Signal processes whose COMMAND matches <pattern> (case-insensitive ERE)."
+        echo "  DRY-RUN by default — prints the matches + the signal it WOULD send, does"
+        echo "  nothing. Add --execute / -x to send it. Never signals your own shell."
+        echo "    -s, --signal <sig>   signal to send (name or number; default TERM)"
+        echo "Examples:"
+        echo "  jwps_kill node               # preview what would be TERM'd"
+        echo "  jwps_kill node --execute     # actually TERM them"
+        echo "  jwps_kill -s KILL node -x    # SIGKILL them"
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
+    local execute=0 sig="TERM" pat=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -x|--execute) execute=1 ;;
+            -s|--signal)  shift; sig="${1:-}"
+                          [ -z "$sig" ] && { echo "❌ --signal needs a value" >&2; return 1; } ;;
+            -*)           echo "❌ unknown flag: $1 (see -h)" >&2; return 1 ;;
+            *)            if [ -z "$pat" ]; then pat="$1"
+                          else echo "❌ one pattern only (extra: $1)" >&2; return 1; fi ;;
+        esac
+        shift
+    done
+    if [ -z "$pat" ]; then
+        echo "❌ need a <pattern> (see -h)" >&2
+        return 1
+    fi
+    if ! kill -l "$sig" >/dev/null 2>&1; then
+        echo "❌ invalid signal: $sig (try TERM, KILL, HUP, or a number)" >&2
+        return 1
+    fi
+
+    local pids_file; pids_file=$(mktemp) || { echo "❌ cannot mktemp" >&2; return 1; }
+    __jwps_match_pids__ "$pat" > "$pids_file"          # '> file', never $() — see helper
+    if [ ! -s "$pids_file" ]; then
+        rm -f "$pids_file"
+        echo "(no processes match: $pat)"
+        return 0
+    fi
+    local pidcsv; pidcsv=$(tr '\n' ',' < "$pids_file" | sed 's/,$//')
+    echo
+    __jwps_h__ "Matched — signal $sig"
+    ps -o pid,user:16,pcpu,pmem,etime,args -p "$pidcsv" 2>/dev/null
+    echo
+
+    if [ "$execute" -ne 1 ]; then
+        local n; n=$(grep -c . "$pids_file")
+        echo "-- dry-run: would send SIG$sig to $n process(es); add --execute to send it --"
+        rm -f "$pids_file"
+        return 0
+    fi
+
+    local p rc=0
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        if kill -s "$sig" "$p" 2>/dev/null; then
+            echo "  ✓ SIG$sig → $p"
+        else
+            echo "  ✗ $p — already gone or not permitted" >&2
+            rc=1
+        fi
+    done < "$pids_file"
+    rm -f "$pids_file"
+    return "$rc"
 }
 
 

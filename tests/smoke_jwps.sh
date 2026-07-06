@@ -92,6 +92,12 @@ B=(
   "jwps_of-port 22"            # a common port (listening or not)
   "jwps_of-port 65123"         # nothing listening -> graceful
   "jwps_of-port notaport"      # non-numeric -> error path
+  "jwps_kill 424242"           # DRY-RUN — shows the tagged sleep, must NOT kill it
+  "jwps_kill no_such_proc_xyz" # no match
+  "jwps_kill -s KILL 424242"   # dry-run with an explicit signal
+  "jwps_kill --bogus x"        # unknown flag -> error
+  "jwps_kill -s NOSUCH x"      # invalid signal -> error
+  "jwps_kill a b"              # two patterns -> error
 )
 for sh in "${SHELLS[@]}"; do
   n=0
@@ -121,6 +127,9 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwps_of-port'                 # no-args usage block (stdout, return 1)
     'jwps_of-port 65123'           # deterministic "(nothing listening on port 65123)"
     'jwps_tree no_such_proc_xyz'   # deterministic no-match (the >file / ancestry defense)
+    'jwps_kill -h'
+    'jwps_kill'                    # no-args usage (return 1, deterministic stdout)
+    'jwps_kill no_such_proc_xyz'   # deterministic no-match (guard never lists the caller)
   )
   n=0
   for inv in "${RO[@]}"; do
@@ -136,6 +145,31 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
 else
   echo "  ⏭️  skipped (needs both bash and zsh)"
 fi
+
+# Part D — jwps_kill signals for real, so exercise the mutation on THROWAWAY sleeps
+# only (unique tags, never the shared fixture): the dry-run must be inert, and
+# --execute must actually kill. Bounded waits (timeout + tail --pid), no foreground
+# sleep, no hang; SIGKILL cleanup if a throwaway somehow survives.
+echo "=== Part D: jwps_kill dry-run inert + --execute kills (throwaway procs) ==="
+for sh in "${SHELLS[@]}"; do
+  ok=1
+  # (1) dry-run must NOT kill
+  sleep 27182818 & dpid=$!
+  "$sh" -c "source '$LIB'; jwps_kill 27182818" >/dev/null 2>&1 </dev/null
+  if ! kill -0 "$dpid" 2>/dev/null; then
+    echo "  ❌ [$sh] dry-run killed the process"; ok=0; FAILED=$((FAILED + 1))
+  fi
+  kill -9 "$dpid" 2>/dev/null; wait "$dpid" 2>/dev/null
+  # (2) --execute must kill
+  sleep 27182819 & xpid=$!
+  "$sh" -c "source '$LIB'; jwps_kill 27182819 --execute" >/dev/null 2>&1 </dev/null
+  timeout 3 tail --pid="$xpid" -f /dev/null 2>/dev/null
+  if kill -0 "$xpid" 2>/dev/null; then
+    echo "  ❌ [$sh] --execute did not kill"; kill -9 "$xpid" 2>/dev/null; wait "$xpid" 2>/dev/null
+    ok=0; FAILED=$((FAILED + 1))
+  fi
+  [ "$ok" -eq 1 ] && echo "  ✅ $sh: dry-run inert, --execute killed"
+done
 
 echo
 if [ "$FAILED" -eq 0 ]; then

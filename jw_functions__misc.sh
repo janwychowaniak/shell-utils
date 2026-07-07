@@ -52,20 +52,24 @@ EOF
 
 jwrandnumgen()
 {
-    if [ $# -ne 1 ]; then
+    if [ $# -ne 1 ] || ! [[ $1 =~ ^[0-9]+$ ]] || [ "$1" -lt 1 ]; then
         echo
         echo "$FUNCNAME  LIMIT"
         echo
         echo "    A small convenience function for generating a pseudo-random integer number from the range of [1, LIMIT]."
+        echo "    LIMIT must be a positive integer."
         echo
         return 1
     fi
-    
-    python3 -c \
-    "import sys;
-LIMIT=sys.argv[1];
-from random import randint;
-print(randint(0, int(LIMIT)))" "$1"
+
+    # Fresh entropy per call from /dev/urandom (4 bytes -> 32-bit uint), mapped
+    # into [1, LIMIT]. One tiny `od` — far cheaper than spawning python, and
+    # unlike bare $RANDOM it stays fresh inside `$(...)` capture under zsh (whose
+    # command-substitution subshells reuse the parent's RANDOM state, so pure
+    # $RANDOM returns a constant for the usual  n=$(jwrandnumgen N)  pattern).
+    local rnd
+    rnd=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
+    echo $(( rnd % $1 + 1 ))
 }
 
 

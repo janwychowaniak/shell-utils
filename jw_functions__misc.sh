@@ -69,30 +69,6 @@ print(randint(0, int(LIMIT)))" "$1"
 }
 
 
-jwdatereverse()
-(
-    __jwjoinby() { local IFS="$1"; shift; echo "$*"; }
-
-    IFS='-' read -r -a array <<< "$1"
-    
-    min=0
-    max=$(( ${#array[@]} -1 ))
-
-    while [[ min -lt max ]]
-    do
-        # Swap current first and last elements
-        x="${array[$min]}"
-        array[$min]="${array[$max]}"
-        array[$max]="$x"
-    
-        # Move closer
-        (( min++, max-- ))
-    done
-    
-    echo $(__jwjoinby - ${array[@]})
-)
-
-
 jwnotatki()
 {
     local STEM_N="__notatki__"
@@ -246,47 +222,4 @@ jwai_jina() {
     # Success message
     # ------------------------------------------------------------------
     printf 'Stored to %s\n' "$outfile"
-}
-
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-jwtvnames()
-{
-    DATEHASH=$(date +%Y%m%d)
-    SEED=$(( ( RANDOM % 100000 ) + 10000 ))
-    NUMER="$DATEHASH$SEED"
-    echo "skocznie-$NUMER"
-    echo "schodki-$NUMER"
-    echo "kanaly-$NUMER"
-    echo "hidden-$NUMER"
-    echo "inne-$NUMER"
-    echo "kilka-$NUMER"
-    echo "zagranie-$NUMER"
-}
-
-jwtvcrop()
-{
-    case $# in
-    "0")
-        echo " *** " $FUNCNAME "arg[s]"
-    ;;
-    "1")
-        local PLIK_IN=$1
-        local PLIK_TEMP="$$-"$PLIK_IN
-        convert "$PLIK_IN" -crop 1812x823+56+165 "$PLIK_TEMP"
-        mv "$PLIK_TEMP" "$PLIK_IN"
-    ;;
-    *)
-        for p in $@
-        do
-            echo "$p"
-            local PLIK_IN=$p
-            local PLIK_TEMP="$$-"$PLIK_IN
-            convert "$PLIK_IN" -crop 1812x823+56+165 "$PLIK_TEMP"
-            mv "$PLIK_TEMP" "$PLIK_IN"
-        done
-    ;;
-    esac
 }

@@ -523,54 +523,6 @@ EOF
 }
 
 
-# probably obsolete
-jwffblender-postencode ()
-{
-  if [ $# -ne 1 ]; then
-    echo "  Filename argument required. The AVI container is assumed."
-    return 1
-  fi
-
-  local FILENAME=$1
-  local FILENAME_NOEXT=${FILENAME%.avi}
-
-  echo
-
-  echo "# resolution not changed"
-
-  local FILENAME_2="$FILENAME_NOEXT""_02.avi"
-  local FILENAME_3="$FILENAME_NOEXT""_03.avi"
-  local FILENAME_4="$FILENAME_NOEXT""_04.avi"
-  local FILENAME_4MP4="$FILENAME_NOEXT""_04-crf.mp4"
-
-  echo 
-
-  echo "ffmpeg -i $FILENAME    -q:v 0 -q:a 0           $FILENAME_2"
-  echo "ffmpeg -i $FILENAME_2 -q:v 0 -q:a 0           $FILENAME_3"
-  echo "ffmpeg -i $FILENAME_3 -q:v 4 -q:a 0 -ar 44100 $FILENAME_4"
-  echo "ffmpeg -i $FILENAME_3 -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k -ar 44100 -ac 2 -sn -strict experimental $FILENAME_4MP4"
-  echo "rm $FILENAME_2"
-  echo "rm $FILENAME_3"
-  echo 
-
-
-  echo "# resolution scaled to 960:XXX"
-
-  local FILENAME_NOEXT_960="$FILENAME_NOEXT""_960"
-
-  local FILENAME_960_2="$FILENAME_NOEXT_960""_02.avi"
-  local FILENAME_960_3="$FILENAME_NOEXT_960""_03.avi"
-  local FILENAME_960_4="$FILENAME_NOEXT_960""_04.avi"
-
-  echo "ffmpeg -i $FILENAME                         -q:v 0 -q:a 0           $FILENAME_960_2"
-  echo "ffmpeg -i $FILENAME_960_2                  -q:v 0 -q:a 0           $FILENAME_960_3"
-  echo "ffmpeg -i $FILENAME_960_3 -vf scale=960:-1 -q:v 4 -q:a 0 -ar 44100 $FILENAME_960_4"
-  echo "rm $FILENAME_960_2"
-  echo "rm $FILENAME_960_3"
-  echo 
-}
-
-
 #--------------------------
 
 jwffmpgrotateCW () 

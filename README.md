@@ -4,7 +4,6 @@ This repository contains a collection of bash scripts that automate or otherwise
 
 * navigating file system and working with files
 * working with media material
-* performing some helpful programming tasks
 * managing Python virtual environments, packages and projects (uv / pip / pipx)
 
 ## Installation suggestions
@@ -34,5 +33,4 @@ And then `.bashrc` (or `.zshrc` — the snippet is identical for both shells) mi
 [[ -f "$HOME/bin/shell-utils/jw_functions__mediaff.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaff.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__mediaim.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaim.sh"
 [[ -f "$HOME/bin/shell-utils/jw_functions__misc.sh" ]]    && . "$HOME/bin/shell-utils/jw_functions__misc.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__prog.sh" ]]    && . "$HOME/bin/shell-utils/jw_functions__prog.sh"
 ```

@@ -80,6 +80,5 @@ Add false positives to `[allowlist]`. Ad-hoc scans: `gitleaks detect -v` (histor
 | `jw_functions__mediaff.sh` | FFmpeg/ffprobe functions (`jwff*`) |
 | `jw_functions__mediaim.sh` | ImageMagick functions (`jwim*`) |
 | `jw_functions__misc.sh` | Uncategorized utilities (`jwpaste`, `jwai_jina`, etc.) |
-| `jw_functions__prog.sh` | Programming helpers (`jwvec*`, `jwc*`) |
 | `jw_aliases.sh` | Shell aliases |
 | `jw_colors.sh` | ANSI color/style helpers (`jwpaintfg*`, `__jwStyle*`) |

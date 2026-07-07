@@ -102,18 +102,5 @@ done \
 EOF
 }
 
-jwgic__git-clean-ignored()
-{
-    if [ -f ".gitignore" ]
-    then
-        while read line; do echo "rm -r $line ;" ; done < .gitignore
-        echo "rm .gitignore ;"
-    else
-        echo "no '.gitignore'"
-    fi
-    echo
-
-    find . -name ".gitignore" -exec echo "# -> {}" \; | grep --color=auto --color=ALWAYS ".gitignore"
-}
 #
 #############################################################################################################################################

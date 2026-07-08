@@ -39,7 +39,7 @@ EOF
         echo " "$ffpro_outp
         br=$(echo $ffpro_outp | awk "{ print ( \$(NF-1) ) }")
         durstr=$(echo $ffpro_outp | awk "{ print ( \$2 ) }")    # "00:01:07.87,"
-        dursec=`python -c "import sys; DURSTR=sys.argv[1]; print sum(int(x) * 60 ** i for i,x in enumerate(reversed(DURSTR.split('.')[0].split(':'))))" $durstr`
+        dursec=$(echo "$durstr" | awk -F'[:.,]' '{ print $1*3600 + $2*60 + $3 }')   # "HH:MM:SS.ss," -> integer seconds
 
         totalbr=$(echo $totalbr+$br | bc )
         totalsize=$(echo $totalsize+$fsize | bc )
@@ -49,7 +49,7 @@ EOF
 
     avg=`echo "scale=0; $totalbr / $count" | bc`
     totalsizeM=`echo "scale=0; $totalsize / 1024" | bc`
-    totaldurHMS=`python -c "import sys; TDURSEC=sys.argv[1]; m, s = divmod(int(TDURSEC), 60); h, m = divmod(m, 60); print \"%d:%02d:%02d\" % (h, m, s)" $totaldur`
+    totaldurHMS=$(printf '%d:%02d:%02d' $((totaldur / 3600)) $((totaldur % 3600 / 60)) $((totaldur % 60)))
 
     suffix=$(echo $ffpro_outp | awk "{ print ( \$(NF) ) }")
     ffprolen=`echo ${#ffpro_outp}`

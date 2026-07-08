@@ -40,26 +40,16 @@ E.g. in `~/bin`:
 cd ~/bin
 git clone https://github.com/janwychowaniak/shell-utils.git
 ```
-And then `.bashrc` (or `.zshrc` — the snippet is identical for both shells) might be appended with the following:
+Then add a single line to your `~/.bashrc` or `~/.zshrc` (identical for both shells):
 
 ```bash
-[[ -f "$HOME/bin/shell-utils/jw_aliases.sh" ]]            && . "$HOME/bin/shell-utils/jw_aliases.sh"
-[[ -f "$HOME/bin/shell-utils/jw_colors.sh" ]]             && . "$HOME/bin/shell-utils/jw_colors.sh"
-#
-[[ -f "$HOME/bin/shell-utils/jw_functions__docker.sh" ]]  && . "$HOME/bin/shell-utils/jw_functions__docker.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__git.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__git.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__deb.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__deb.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__python.sh" ]]  && . "$HOME/bin/shell-utils/jw_functions__python.sh"
-#
-[[ -f "$HOME/bin/shell-utils/jw_functions__web.sh" ]]     && . "$HOME/bin/shell-utils/jw_functions__web.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__fs.sh" ]]      && . "$HOME/bin/shell-utils/jw_functions__fs.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__ps.sh" ]]      && . "$HOME/bin/shell-utils/jw_functions__ps.sh"
-#
-[[ -f "$HOME/bin/shell-utils/jw_functions__media.sh" ]]   && . "$HOME/bin/shell-utils/jw_functions__media.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__mediaff.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaff.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__mediaim.sh" ]] && . "$HOME/bin/shell-utils/jw_functions__mediaim.sh"
-[[ -f "$HOME/bin/shell-utils/jw_functions__misc.sh" ]]    && . "$HOME/bin/shell-utils/jw_functions__misc.sh"
+[ -f "$HOME/bin/shell-utils/load.sh" ] && . "$HOME/bin/shell-utils/load.sh"
 ```
+
+`load.sh` finds its own directory and sources every area file for you, so that one line
+never has to change: adding or removing an area is picked up on your next `git pull`, and
+your shell rc stays untouched. (Cloned somewhere other than `~/bin/shell-utils`? Just point
+that one line at wherever `load.sh` lives.)
 
 ## Using the functions
 

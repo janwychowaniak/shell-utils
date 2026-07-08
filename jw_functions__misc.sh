@@ -81,19 +81,6 @@ jwnotatki()
     local MODAL=${1:-""}
     [[ -n $MODAL ]] && MODAL+="__"
 
-    local FINAL_N="$STEM_N$MODAL"
-    local FINAL_K="$STEM_K$MODAL"
-
-    echo
-    echo "touch $FINAL_N"
-    echo "touch $FINAL_N.md"
-    echo "mkdir $FINAL_N"
-
-    echo
-    echo "touch $FINAL_K"
-    echo "touch $FINAL_K.md"
-    echo "mkdir $FINAL_K"
-
     echo
     echo "locate $STEM_N | grep $STEM_N"
     echo "locate $STEM_K | grep $STEM_K"

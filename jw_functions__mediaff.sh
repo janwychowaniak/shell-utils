@@ -523,41 +523,6 @@ EOF
 }
 
 
-#--------------------------
-
-jwffmpgrotateCW () 
-{ 
-    if [ $# -ne 1 ]; then
-        echo "  Rotating INPLACE by 90deg clockwise"
-        echo "  ${FUNCNAME[0]} plikIN.mpg" 1>&2
-        return
-    fi
-    IN=$1
-    OUT="temp_.$$.mpg"
-    echo ffmpeg -i $IN -vf "transpose=1" -qscale 0 $OUT
-    echo
-    sleep 1
-    ffmpeg -i $IN -vf "transpose=1" -qscale 0 $OUT
-    mv -v $OUT $IN
-}
-
-jwffmpgrotateCCW () 
-{ 
-    if [ $# -ne 1 ]; then
-        echo "  Rotating INPLACE by 90deg counterclockwise"
-        echo "  ${FUNCNAME[0]} plikIN.mpg" 1>&2
-        return
-    fi
-    IN=$1
-    OUT="temp_.$$.mpg"
-    echo ffmpeg -i $IN -vf "transpose=2" -qscale 0 $OUT
-    echo
-    sleep 1
-    ffmpeg -i $IN -vf "transpose=2" -qscale 0 $OUT
-    mv -v $OUT $IN
-}
-
-
 jwffcropclip ()
 {
     if [ $# -ne 3 ]; then

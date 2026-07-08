@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A collection of Bash shell utility functions and aliases, sourced into the user's interactive shell via `.bashrc`/`.zshrc`. There is no build step and no package manager — files are sourced directly. Verification is via per-area smoke tests (`tests/smoke_<area>.sh`) run in both bash and zsh; there is no CI suite.
+A collection of Bash shell utility functions and aliases, sourced into the user's interactive shell via `.bashrc`/`.zshrc` — a single rc line sources `load.sh` (the loader), which sources each area file in turn. There is no build step and no package manager — files are sourced directly. Verification is via per-area smoke tests (`tests/smoke_<area>.sh`) run in both bash and zsh; there is no CI suite.
 
 ## Conventions
 
@@ -82,3 +82,4 @@ Add false positives to `[allowlist]`. Ad-hoc scans: `gitleaks detect -v` (histor
 | `jw_functions__misc.sh` | Uncategorized utilities (`jwpaste`, `jwai_jina`, etc.) |
 | `jw_aliases.sh` | Shell aliases |
 | `jw_colors.sh` | ANSI color/style helpers (`jwpaintfg*`, `__jwStyle*`) |
+| `load.sh` | Loader — self-locating (bash `BASH_SOURCE` / zsh `$0`); sources every area file from an explicit, ordered list. Users source this ONE file from their rc. **Adding/removing an area = update this list too.** |

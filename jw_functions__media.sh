@@ -59,7 +59,7 @@ cat 1>&2 <<'EOF'
 [https://github.com/ytdl-org/youtube-dl]
 [https://github.com/yt-dlp/yt-dlp]
 
-youtube-dl -t -f worst --extract-audio --audio-format wav
+youtube-dl -f worst --extract-audio --audio-format wav
 youtube-dl -f 140 --match-title felieton --playlist-start 170 https://www.youtube.com/user/egida1/videos
 youtube-dl -f "18/43"   https://www.youtube.com/watch?v=FILMIK_ID
 youtube-dl -f "171/140" https://www.youtube.com/playlist?list=LISTA_ID

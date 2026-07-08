@@ -30,7 +30,7 @@ MP3: the above batch'd:
 
 
 OGG: custom quality settings:
- sox INPUT.cos -V2 -C 3 OUTPUT.ogg
+ sox INPUT.wav -V2 -C 3 OUTPUT.ogg
  fldr="sox"; [ ! -d $fldr ] && mkdir $fldr; for plik in *.wav; do echo "$plik -> $fldr/..."; sox $plik -V2 -C -1 $fldr/$plik.ogg tempo -s 2 ; done
  fldr="sox"; [ ! -d $fldr ] && mkdir $fldr; for plik in *.wav; do echo "$plik -> $fldr/..."; sox $plik -V2 -C -1 $fldr/$plik.ogg channels 1 tempo -s 2 ; done
  fldr="sox"; [ ! -d $fldr ] && mkdir $fldr; for plik in *.wav; do echo "$plik -> $fldr/..."; sox $plik -V2 -C -1 $fldr/$plik.ogg channels 1 tempo -s 2 rate 22050 ; done

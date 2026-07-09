@@ -100,11 +100,13 @@ __jwfs_cap__() {
 }
 
 # Run `find` under $1 PRUNING the curated noise dirs, emitting -printf format $2.
-# The single home of the noise-dir list + prune mechanics — shared by the mtime
-# listers (jwfs_newest/_oldest) and jwfs_bigfiles. Each caller's -a/--all
-# branch is a plain unpruned `find` instead. Edit the noise list here, once.
+# Any args after $2 are extra `find` predicates spliced into the -type f branch
+# (e.g. -newermt for a date filter). The single home of the noise-dir list +
+# prune mechanics — shared by the mtime listers (jwfs_newest/_oldest) and
+# jwfs_bigfiles. Each caller's -a/--all branch is a plain unpruned `find`
+# instead. Edit the noise list here, once.
 __jwfs_prune_find__() {
-    local dir="$1" fmt="$2"
+    local dir="$1" fmt="$2"; shift 2   # remaining args = extra -type f predicates
     local d first=1
     local -a prune
     for d in .git .svn .hg .venv venv node_modules __pycache__ \
@@ -113,7 +115,7 @@ __jwfs_prune_find__() {
         else                        prune+=(-o -name "$d"); fi
     done
     find "$dir" \( -type d \( "${prune[@]}" \) -prune \) -o \
-         -type f -printf "$fmt" 2>/dev/null
+         -type f "$@" -printf "$fmt" 2>/dev/null
 }
 
 
@@ -324,22 +326,25 @@ jwfs_bigfiles() {
 # list lives here, once. Args: <fn-name> <sort-flag: -rn|-n> <order-word> [args...]
 __jwfs_mtime_list__() {
     local fn="$1" sortflag="$2" word="$3"; shift 3
-    local all=0 a
+    local all=0 today=0 a
     local -a rest
     for a in "$@"; do
         case "$a" in
             -h|--help)
-                echo "Usage: $fn [count] [dir] [-a|--all]"
+                echo "Usage: $fn [count] [dir] [-a|--all] [-t|--today]"
                 echo "  Files under [dir] (default: .), $word-first by mtime."
                 echo "  Skips common noise dirs (.git, .venv, node_modules, caches, ...);"
                 echo "  pass -a / --all to include them. No count → full list; [count] caps it."
+                echo "  -t / --today restricts to files modified today (since local midnight)."
                 echo "Examples:"
                 echo "  $fn"
                 echo "  $fn 20"
+                echo "  $fn -t"
                 echo "  $fn -a 20 /var/log"
                 return 0 ;;
-            -a|--all) all=1 ;;
-            *)        rest+=("$a") ;;
+            -a|--all)   all=1 ;;
+            -t|--today) today=1 ;;
+            *)          rest+=("$a") ;;
         esac
     done
     set -- "${rest[@]}"
@@ -354,19 +359,24 @@ __jwfs_mtime_list__() {
         echo "❌ not a directory: $dir" >&2
         return 1
     fi
+    # -t/--today → only files modified since local midnight. ISO date keeps the
+    # predicate portable: both GNU find and bfs accept -newermt <YYYY-MM-DD>.
+    local -a filter=()
+    [ "$today" -eq 1 ] && filter=(-newermt "$(date +%Y-%m-%d)")
     if [ "$all" -eq 1 ]; then
-        find "$dir" -type f -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
+        find "$dir" -type f "${filter[@]}" -printf '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' 2>/dev/null \
             | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfs_cap__ "$n"
         return 0
     fi
     # default: prune common noise dirs (list + mechanics in __jwfs_prune_find__)
-    __jwfs_prune_find__ "$dir" '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' \
+    __jwfs_prune_find__ "$dir" '%T@|[%TY-%Tm-%Td %TH:%TM] %p\n' "${filter[@]}" \
         | sort -t'|' -k1,1 "$sortflag" | cut -d'|' -f2- | __jwfs_cap__ "$n"
 }
 
 # Files under a tree, newest-first by mtime. Skips common noise dirs by default
-# (.git / .venv / node_modules / …); pass -a/--all to include them. Uncapped
-# unless a leading [count] is given.
+# (.git / .venv / node_modules / …); pass -a/--all to include them, or -t/--today
+# to keep only files modified since local midnight. Uncapped unless a leading
+# [count] is given.
 jwfs_newest() { __jwfs_mtime_list__ jwfs_newest -rn newest "$@"; }
 
 # Mirror of jwfs_newest, oldest-first — the stale/forgotten end of the timeline.

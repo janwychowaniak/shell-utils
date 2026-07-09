@@ -78,7 +78,7 @@ Add false positives to `[allowlist]`. Ad-hoc scans: `gitleaks detect -v` (histor
 | `jw_functions__ps.sh` | Live-runtime cockpit — process/port/resource/service oversight (find, tree, listening sockets + owners, top consumers, systemd unit status/journal + copy-paste commands); almost all 🟢 read-only + one guarded 🔴 `jwps_kill` (dry-run default, `--execute`); ps/ss/free/pstree/systemctl/journalctl, oversight-first, server-safe (`jwps_*`) |
 | `jw_functions__media.sh` | Media notes/templates (sox, etc.) |
 | `jw_functions__mediaff.sh` | FFmpeg/ffprobe functions (`jwff*`) |
-| `jw_functions__mediaim.sh` | ImageMagick functions (`jwim*`) |
+| `jw_functions__mediaim.sh` | ImageMagick functions (`jwim*`) + `jwgetimageresolution` (image dimensions via exiftool) |
 | `jw_functions__misc.sh` | Uncategorized utilities (`jwpaste`, `jwai_jina`, etc.) |
 | `jw_aliases.sh` | Shell aliases |
 | `jw_colors.sh` | ANSI color/style helpers (`jwpaintfg*`, `__jwStyle*`) |

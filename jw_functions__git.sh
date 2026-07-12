@@ -1609,7 +1609,6 @@ jwgit_commit() {
         echo "Usage: jwgit_commit [message] [options]"
         echo "Examples:"
         echo "  jwgit_commit \"Fix bug in user login\"    # Commit with message"
-        echo "  jwgit_commit                              # Open editor for message"
         echo "  jwgit_commit -m \"Quick fix\"             # Commit with inline message"
         echo "  jwgit_commit --amend                      # Amend last commit"
         echo "  jwgit_commit --all -m \"Commit all\"      # Add and commit all changes"
@@ -1809,7 +1808,7 @@ jwgit_stash() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_stash [push|pop|list|show|drop|clear] [options]"
         echo "Examples:"
-        echo "  jwgit_stash                        # Stash current changes"
+        echo "  jwgit_stash push                   # Stash current changes"
         echo "  jwgit_stash push -m \"WIP feature\" # Stash with message"
         echo "  jwgit_stash pop                    # Apply and remove latest stash"
         echo "  jwgit_stash list                   # List all stashes"
@@ -2074,7 +2073,7 @@ jwgit_reset() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_reset [--soft|--mixed|--hard] [commit] [files]"
         echo "Examples:"
-        echo "  jwgit_reset                    # Unstage all files (mixed reset to HEAD)"
+        echo "  jwgit_reset HEAD               # Unstage all files (mixed reset to HEAD)"
         echo "  jwgit_reset --soft HEAD~1      # Undo last commit, keep changes staged"
         echo "  jwgit_reset --mixed HEAD~1     # Undo last commit, unstage changes"
         echo "  jwgit_reset --hard HEAD~1      # Undo last commit, discard all changes"
@@ -3640,7 +3639,7 @@ jwgit_blame() {
 # ---------------------------------------------------------------------------------
 
 jwgit_clean() {
-    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_clean [options]"
         echo "Examples:"
         echo "  jwgit_clean                    # Show what would be cleaned (dry run)"
@@ -3649,22 +3648,12 @@ jwgit_clean() {
         echo "  jwgit_clean -fx                # Remove untracked and ignored files"
         echo "  jwgit_clean -i                 # Interactive cleaning"
         echo
-        echo "⚠️  WARNING: This will permanently delete files!"
-        echo
-        echo "Current untracked files:"
-        if git status --porcelain | grep "^??" | grep -q .; then
-            git status --porcelain | grep "^??" | head -10 | sed 's/^??/  /' | sed 's/^ */  /'
-            local untracked_count
-            untracked_count=$(git status --porcelain | grep -c "^??")
-            if [ "$untracked_count" -gt 10 ]; then
-                echo "  ... and $((untracked_count - 10)) more files"
-            fi
-        else
-            echo "  (no untracked files)"
-        fi
-        echo
-        [ $# -eq 0 ] && return 1 || return 0
+        echo "⚠️  WARNING: -f permanently deletes untracked files (no args = safe dry run)."
+        return 0
     fi
+
+    # No args → the action below defaults to a dry run (DRY_RUN=-n when no -f/-i),
+    # i.e. read-only 'what would be cleaned'. Deleting still requires an explicit -f.
 
     local FORCE=""
     local DIRECTORIES=""

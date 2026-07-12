@@ -1406,7 +1406,7 @@ jwgit_rebase() {
 
 
 jwgit_tag() {
-    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_tag [name] [commit] | -a <name> -m <msg> [commit] | -d <name> | list"
         echo "Examples:"
         echo "  jwgit_tag                         # List all tags"
@@ -1414,25 +1414,29 @@ jwgit_tag() {
         echo "  jwgit_tag v1.0 abc123             # Lightweight tag at a commit"
         echo "  jwgit_tag -a v1.0 -m \"Release\"    # Annotated tag"
         echo "  jwgit_tag -d v1.0                 # Delete a tag"
-        echo
-        echo "Existing tags:"
-        if git tag >/dev/null 2>&1; then
-            git tag --sort=-creatordate | head -10 | sed 's/^/  /' || echo "  (none)"
+        return 0
+    fi
+
+    # No args, or an explicit list/ls, lists every tag (annotated, newest-created
+    # first). list/ls are kept as guarded aliases on purpose: without them a typed
+    # `jwgit_tag list` would fall through to the create branch and tag HEAD "list".
+    if [ $# -eq 0 ] || [ "$1" = "list" ] || [ "$1" = "ls" ]; then
+        echo "🏷️  Git Tags"
+        echo "=================================================="
+        if git rev-parse --git-dir >/dev/null 2>&1; then
+            local TAGS; TAGS=$(git tag -n --sort=-creatordate)
+            if [ -n "$TAGS" ]; then
+                printf '%s\n' "$TAGS" | sed 's/^/  /'
+            else
+                echo "  (no tags)"
+            fi
         else
             echo "  (not in a git repository)"
         fi
-        echo
-        [ $# -eq 0 ] && return 1 || return 0
+        return 0
     fi
 
     case $1 in
-        list|ls)
-            echo "🏷️  Git Tags"
-            echo "=================================================="
-            git tag -n --sort=-creatordate | sed 's/^/  /' || echo "  (no tags)"
-            return 0
-            ;;
-
         -d|--delete)
             local TAG=$2
             if [ -z "$TAG" ]; then

@@ -238,7 +238,7 @@ jwgit_remote() {
                 echo "✅ Remote removed successfully!"
                 echo
                 echo "Remaining remotes:"
-                git remote -v | sed 's/^/  /' || echo "  (no remotes)"
+                git remote -v | __jwgit_indent_or__ "  (no remotes)"
             else
                 echo "❌ Failed to remove remote"
                 return 1
@@ -895,7 +895,7 @@ jwgit_checkout() {
             git branch --format="  %(refname:short)" | head -10
             echo
             echo "Recent commits:"
-            git log --oneline -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+            git log --oneline -5 2>/dev/null | __jwgit_indent_or__ "  (no commits)"
         else
             echo "  (not in a git repository)"
         fi
@@ -1044,7 +1044,7 @@ jwgit_checkout() {
         git branch --format="  %(refname:short)" | head -5
         echo
         echo "Recent commits:"
-        git log --oneline -3 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+        git log --oneline -3 2>/dev/null | __jwgit_indent_or__ "  (no commits)"
         return 1
     fi
     echo
@@ -1371,7 +1371,7 @@ jwgit_rebase() {
         echo "❌ Rebase failed due to conflicts!"
         echo
         __jwgit_h__ "Conflicted Files"
-        git diff --name-only --diff-filter=U | sed 's/^/  /' 2>/dev/null || echo "  (checking conflicts...)"
+        git diff --name-only --diff-filter=U 2>/dev/null | __jwgit_indent_or__ "  (checking conflicts...)"
         echo
         echo "💡 To resolve conflicts:"
         echo "   1. Edit the conflicted files"
@@ -1829,7 +1829,7 @@ jwgit_stash() {
         fi
         echo
         echo "Existing stashes:"
-        git stash list | head -5 | sed 's/^/  /' 2>/dev/null || echo "  (no stashes)"
+        git stash list 2>/dev/null | head -5 | __jwgit_indent_or__ "  (no stashes)"
         echo
         [ $# -eq 0 ] && return 1 || return 0
     fi
@@ -2093,7 +2093,7 @@ jwgit_reset() {
         fi
         echo
         echo "Recent commits:"
-        git log --oneline -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+        git log --oneline -5 2>/dev/null | __jwgit_indent_or__ "  (no commits)"
         echo
         [ $# -eq 0 ] && return 1 || return 0
     fi
@@ -2283,7 +2283,7 @@ jwgit_revert() {
         echo "  jwgit_revert --abort              # Abort the in-progress revert"
         echo
         echo "Recent commits:"
-        git log --oneline -10 2>/dev/null | sed 's/^/  /' || echo "  (no commits)"
+        git log --oneline -10 2>/dev/null | __jwgit_indent_or__ "  (no commits)"
         echo
         [ $# -eq 0 ] && return 1 || return 0
     fi
@@ -2471,7 +2471,7 @@ jwgit_push() {
             fi
         else
             echo "New branch - all commits will be pushed:"
-            git log --oneline "$BRANCH" | head -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+            git log --oneline "$BRANCH" 2>/dev/null | head -5 | __jwgit_indent_or__ "  (no commits)"
             local total_commits
             total_commits=$(git rev-list --count "$BRANCH" 2>/dev/null || echo "0")
             if [ "$total_commits" -gt 5 ]; then
@@ -2775,7 +2775,7 @@ jwgit_pull() {
         
         echo
         echo "Conflicted files:"
-        git diff --name-only --diff-filter=U | sed 's/^/  /' 2>/dev/null || echo "  (checking conflicts...)"
+        git diff --name-only --diff-filter=U 2>/dev/null | __jwgit_indent_or__ "  (checking conflicts...)"
         
         return 1
     fi
@@ -3131,6 +3131,19 @@ __jwgit_kv__() {
     printf "%-${3:-18}s%s\n" "$1" "$2"
 }
 
+# Indent stdin two spaces, or print $1 if stdin was empty. Replaces the
+# "cmd | sed 's/^/  /' || echo '(none)'" footgun, where the '||' never fired
+# because sed exits 0 on empty input — so the placeholder was dead code.
+__jwgit_indent_or__() {
+    local placeholder="$1" out
+    out=$(cat)
+    if [ -n "$out" ]; then
+        printf '%s\n' "$out" | sed 's/^/  /'
+    else
+        echo "$placeholder"
+    fi
+}
+
 # A section header "---[ Title ]---", rendered bold + yellow via jw_colors.sh's
 # jwpaintfg* helpers when that file is sourced; plain otherwise — so
 # jw_functions__git.sh works sourced standalone (no raw ANSI here, no hard
@@ -3318,7 +3331,7 @@ __jwgit_status__() {
     # Recent activity
     __jwgit_h__ "Recent Activity"
     echo "Recent commits (last 5):"
-    git log --oneline -5 | sed 's/^/  /' 2>/dev/null || echo "  (no commits)"
+    git log --oneline -5 2>/dev/null | __jwgit_indent_or__ "  (no commits)"
     echo
     
     # Remotes
@@ -3571,7 +3584,7 @@ jwgit_blame() {
         echo "❌ File '$FILE' not found"
         echo
         echo "Available files:"
-        git ls-files | grep -i "$(basename "$FILE")" | head -10 | sed 's/^/  /' || echo "  (no matching files)"
+        git ls-files | grep -i "$(basename "$FILE")" | head -10 | __jwgit_indent_or__ "  (no matching files)"
         return 1
     fi
     
@@ -3593,7 +3606,7 @@ jwgit_blame() {
     
     # Show recent commits affecting this file
     echo "Recent commits affecting this file:"
-    git log --oneline -5 -- "$FILE" | sed 's/^/  /' 2>/dev/null || echo "  (no commits found)"
+    git log --oneline -5 -- "$FILE" 2>/dev/null | __jwgit_indent_or__ "  (no commits found)"
     echo
     
     # Show blame with enhanced formatting

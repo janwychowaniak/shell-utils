@@ -2337,49 +2337,21 @@ jwgit_revert() {
 # ---------------------------------------------------------------------------------
 
 jwgit_push() {
-    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_push [remote] [branch] [options]"
         echo "Examples:"
-        echo "  jwgit_push                     # Push current branch to upstream"
+        echo "  jwgit_push                     # Push current branch to upstream (confirms first)"
         echo "  jwgit_push origin main         # Push main branch to origin"
         echo "  jwgit_push origin --all        # Push all branches"
         echo "  jwgit_push origin --tags       # Push all tags"
         echo "  jwgit_push --set-upstream origin feature  # Set upstream and push"
         echo "  jwgit_push --force-with-lease  # Force push safely"
-        echo
-        echo "Current branch info:"
-        local current_branch
-        current_branch=$(git branch --show-current 2>/dev/null)
-        if [ -n "$current_branch" ]; then
-            echo "Branch: $current_branch"
-            
-            local upstream=""
-            upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
-            if [ -n "$upstream" ]; then
-                echo "Upstream: $upstream"
-                
-                # Show ahead/behind status
-                local ahead_behind
-                ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
-                if [ -n "$ahead_behind" ]; then
-                    local ahead
-                    local behind
-                    ahead=$(echo "$ahead_behind" | cut -f1)
-                    behind=$(echo "$ahead_behind" | cut -f2)
-                    echo "Status: $ahead ahead, $behind behind"
-                fi
-            else
-                echo "Upstream: (not set)"
-            fi
-        else
-            echo "  (not on any branch)"
-        fi
-        echo
-        echo "Available remotes:"
-        git remote -v | sed 's/^/  /' || echo "  (no remotes configured)"
-        echo
-        [ $# -eq 0 ] && return 1 || return 0
+        return 0
     fi
+
+    # Bare invocation pushes the current branch to its upstream (the default the
+    # help documents); since no target was named, it confirms before the write.
+    local BARE=0; [ $# -eq 0 ] && BARE=1
 
     local REMOTE=""
     local BRANCH=""
@@ -2534,6 +2506,16 @@ jwgit_push() {
         CMD+=("$BRANCH")
     fi
 
+    # Bare no-arg → confirm before the network write (no explicit target given)
+    if [ "$BARE" -eq 1 ]; then
+        echo -n "Push $BRANCH to $REMOTE? [y/N] "
+        read -r response
+        if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+            echo "Push cancelled"
+            return 1
+        fi
+    fi
+
     # Execute push
     echo "Pushing..."
     git "${CMD[@]}"
@@ -2577,53 +2559,20 @@ jwgit_push() {
 
 
 jwgit_pull() {
-    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_pull [remote] [branch] [options]"
         echo "Examples:"
-        echo "  jwgit_pull                     # Pull current branch from upstream"
+        echo "  jwgit_pull                     # Pull current branch from upstream (confirms first)"
         echo "  jwgit_pull origin main         # Pull main branch from origin"
         echo "  jwgit_pull --rebase            # Pull with rebase instead of merge"
         echo "  jwgit_pull --no-commit         # Pull without auto-commit"
         echo "  jwgit_pull --all               # Fetch all remotes"
-        echo
-        echo "Current branch info:"
-        local current_branch
-        current_branch=$(git branch --show-current 2>/dev/null)
-        if [ -n "$current_branch" ]; then
-            echo "Branch: $current_branch"
-            
-            local upstream=""
-            upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
-            if [ -n "$upstream" ]; then
-                echo "Upstream: $upstream"
-                
-                # Show ahead/behind status
-                local ahead_behind
-                ahead_behind=$(git rev-list --left-right --count "$current_branch...$upstream" 2>/dev/null)
-                if [ -n "$ahead_behind" ]; then
-                    local ahead
-                    local behind
-                    ahead=$(echo "$ahead_behind" | cut -f1)
-                    behind=$(echo "$ahead_behind" | cut -f2)
-                    echo "Status: $ahead ahead, $behind behind"
-                    
-                    if [ "$behind" -eq 0 ]; then
-                        echo "💡 Branch is up to date"
-                    fi
-                fi
-            else
-                echo "Upstream: (not set)"
-                echo "💡 Set upstream with: git branch --set-upstream-to=origin/$current_branch"
-            fi
-        else
-            echo "  (not on any branch)"
-        fi
-        echo
-        echo "Available remotes:"
-        git remote -v | sed 's/^/  /' || echo "  (no remotes configured)"
-        echo
-        [ $# -eq 0 ] && return 1 || return 0
+        return 0
     fi
+
+    # Bare invocation pulls the current branch from its upstream (the default the
+    # help documents); since no target was named, it confirms before merging.
+    local BARE=0; [ $# -eq 0 ] && BARE=1
 
     local REMOTE=""
     local BRANCH=""
@@ -2772,6 +2721,16 @@ jwgit_pull() {
         CMD+=("$BRANCH")
     fi
 
+    # Bare no-arg → confirm before merging into the working tree (no target given)
+    if [ "$BARE" -eq 1 ]; then
+        echo -n "Pull $BRANCH from $REMOTE into $current_branch? [y/N] "
+        read -r response
+        if [ "$response" != "y" ] && [ "$response" != "Y" ]; then
+            echo "Pull cancelled"
+            return 1
+        fi
+    fi
+
     # Execute pull
     echo "Pulling changes..."
     git "${CMD[@]}"
@@ -2826,41 +2785,20 @@ jwgit_pull() {
 
 
 jwgit_fetch() {
-    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_fetch [remote] [options]"
         echo "Examples:"
-        echo "  jwgit_fetch                    # Fetch from all remotes"
+        echo "  jwgit_fetch                    # Fetch from origin (default remote)"
         echo "  jwgit_fetch origin             # Fetch from origin"
         echo "  jwgit_fetch --all              # Fetch from all remotes"
         echo "  jwgit_fetch --prune            # Fetch and prune deleted branches"
         echo "  jwgit_fetch --tags             # Fetch all tags"
         echo "  jwgit_fetch origin --dry-run   # Show what would be fetched"
-        echo
-        echo "Available remotes:"
-        if git remote | grep -q .; then
-            git remote -v | sed 's/^/  /'
-        else
-            echo "  (no remotes configured)"
-        fi
-        echo
-        echo "Current branch status:"
-        local current_branch
-        current_branch=$(git branch --show-current 2>/dev/null)
-        if [ -n "$current_branch" ]; then
-            local upstream=""
-            upstream=$(git rev-parse --abbrev-ref "$current_branch@{upstream}" 2>/dev/null)
-            if [ -n "$upstream" ]; then
-                echo "  Branch: $current_branch -> $upstream"
-            else
-                echo "  Branch: $current_branch (no upstream)"
-            fi
-        else
-            echo "  (not on any branch)"
-        fi
-        echo
-        [ $# -eq 0 ] && return 1 || return 0
+        return 0
     fi
 
+    # No args → fetch (safe: updates remote-tracking refs only, no working-tree
+    # change), so it runs without a confirmation prompt — like bare `git fetch`.
     local REMOTE=""
     local -a OPTS=()
     local FETCH_ALL=""

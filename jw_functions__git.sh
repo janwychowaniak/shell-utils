@@ -189,7 +189,7 @@ jwgit_clone() {
 
 
 jwgit_remote() {
-    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_remote [add|remove|set-url|show] [name] [url]"
         echo "Examples:"
         echo "  jwgit_remote                           # List all remotes"
@@ -197,22 +197,15 @@ jwgit_remote() {
         echo "  jwgit_remote add upstream <url>        # Add upstream remote"
         echo "  jwgit_remote remove origin             # Remove origin remote"
         echo "  jwgit_remote set-url origin <new_url>  # Change origin URL"
-        echo
-        echo "Current remotes:"
-        if git remote >/dev/null 2>&1; then
-            git remote -v | sed 's/^/  /'
-        else
-            echo "  (not in a git repository)"
-        fi
-        echo
-        [ $# -eq 0 ] && return 1 || return 0
+        return 0
     fi
 
+    # No args → fall through to the default '*)' lister below (📡 Git Remotes).
     local ACTION=$1
     local NAME=$2
     local URL=$3
-    
-    case $ACTION in
+
+    case "$ACTION" in
         add)
             if [ -z "$NAME" ] || [ -z "$URL" ]; then
                 echo "Usage: jwgit_remote add <name> <url>"
@@ -715,7 +708,7 @@ __jwgit_config_dump__() {
 # ---------------------------------------------------------------------------------
 
 jwgit_branch() {
-    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwgit_branch [list|create|delete|rename] [branch_name] [options]"
         echo "Examples:"
         echo "  jwgit_branch                    # List all branches"
@@ -723,23 +716,11 @@ jwgit_branch() {
         echo "  jwgit_branch create feature-x   # Create new branch"
         echo "  jwgit_branch delete old-branch  # Delete branch"
         echo "  jwgit_branch rename old new     # Rename branch"
-        echo
-        echo "Current branches:"
-        if git branch >/dev/null 2>&1; then
-            git branch --format="%(if)%(HEAD)%(then)* %(else)  %(end)%(refname:short)" | head -10
-            local total_branches
-            total_branches=$(git branch | wc -l)
-            if [ "$total_branches" -gt 10 ]; then
-                echo "  ... and $((total_branches - 10)) more branches"
-            fi
-        else
-            echo "  (not in a git repository)"
-        fi
-        echo
-        [ $# -eq 0 ] && return 1 || return 0
+        return 0
     fi
 
-    local ACTION=$1
+    # No args → list (the documented default); reaches the 'list|ls' branch below.
+    local ACTION="${1:-list}"
     local BRANCH_NAME=$2
     local OPTION=$3
     

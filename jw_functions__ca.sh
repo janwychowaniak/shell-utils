@@ -49,6 +49,7 @@ jwca_toc() {
     echo
     echo " -----------------------------  cross-store"
     __jwca_toc_row__ 🟢 jwca_stores "system/NSS/Java/certifi map"
+    __jwca_toc_row__ 🟢 jwca_nss    "browser (NSS) added CAs"
     echo
 }
 
@@ -522,6 +523,120 @@ jwca_stores() {
     else
         __jwca_kv__ "Node" "node not on PATH" 9
     fi
+    echo
+    return 0
+}
+
+# Parse `certutil -L` output into "  • <nickname>  [<trust>]  <category>" rows. stdin =
+# the listing; $1 = showall (0/1). Trust attrs are the last field (no internal spaces);
+# the nickname is the rest (may contain spaces). Header lines are skipped by CONTENT, not
+# line number (certutil prints a leading blank line before the header). Default keeps only
+# CA-trusted rows (the SSL group has a C/T flag) — the added-anchor signal; --all keeps
+# every row, categorised. Its own function so the awk stays out of a nested "$(…)".
+__jwca_nss_rows__() {
+    JWCA_ALL="$1" awk '
+        /Certificate Nickname/ { next }
+        /SSL,S\/MIME/          { next }
+        /^[[:space:]]*$/       { next }
+        {
+            trust = $NF
+            nick  = $0
+            sub(/[[:space:]]+[^[:space:]]+[[:space:]]*$/, "", nick)
+            sub(/[[:space:]]+$/, "", nick)
+            if (nick == "") next
+            split(trust, T, ",")
+            isca = (T[1] ~ /[CT]/)
+            if (!isca && ENVIRON["JWCA_ALL"] != "1") next
+            if (isca)              cat = "trusted CA ⚠️"
+            else if (trust ~ /u/)  cat = "user cert"
+            else if (trust ~ /P/)  cat = "trusted peer"
+            else                   cat = "no trust / cached"
+            printf "  • %s  [%s]  %s\n", nick, trust, cat
+        }'
+}
+
+# What the browser world (NSS) trusts BEYOND the stock Mozilla roots — the one trust
+# lane the system-store tools structurally cannot see. Firefox/Chromium/Thunderbird
+# ignore the system store for roots: their built-in roots live in libnssckbi.so, NOT in
+# the per-profile DB, so listing a DB shows only what was ADDED — imported/corporate
+# CAs, interception certs (mitmproxy/Burp/ZAP), and cached exceptions. Default keeps the
+# SIGNAL: entries the DB trusts as a CA (an SSL trust flag of C/T) — the browser-lane
+# counterpart to jwca_custom; --all shows every entry (incl. cached '/,,'/ peer / user
+# certs). Auto-discovers ~/.pki/nssdb + Firefox/Thunderbird profiles, or inspects one DB
+# dir if given. Needs certutil (libnss3-tools) to READ; when a DB exists but certutil is
+# absent it says so + prints the install. Per current user (per-$HOME DBs). Reads only.
+jwca_nss() {
+    local showall=0 target="" a
+    for a in "$@"; do
+        case "$a" in
+            -h|--help)
+                echo "Usage: jwca_nss [--all] [db-dir]"
+                echo "Examples:"
+                echo "  jwca_nss                 # discover browser NSS DBs, show ADDED CAs"
+                echo "  jwca_nss --all           # every entry (incl. cached / peer / user certs)"
+                echo "  jwca_nss ~/.pki/nssdb    # inspect one specific NSS database dir"
+                echo
+                echo "What NSS databases (Firefox/Chromium/Thunderbird) trust BEYOND the built-in"
+                echo "Mozilla roots — the added/imported CAs the system store cannot see. Needs"
+                echo "certutil (libnss3-tools) to read. Read-only, scoped to the current user."
+                return 0 ;;
+            --all) showall=1 ;;
+            -*)    echo "❌ unknown flag: $a (see: jwca_nss -h)" >&2; return 1 ;;
+            *)     target="$a" ;;
+        esac
+    done
+
+    local have_certutil=0
+    command -v certutil >/dev/null 2>&1 && have_certutil=1
+
+    # Build the DB list as "dir|label" entries.
+    local dbs=() db dir label
+    if [ -n "$target" ]; then
+        { [ -d "$target" ] && { [ -f "$target/cert9.db" ] || [ -f "$target/cert8.db" ]; }; } \
+            || { echo "❌ not an NSS database dir (no cert9.db/cert8.db): $target" >&2; return 1; }
+        dbs+=("$target|explicit")
+    else
+        [ -f "$HOME/.pki/nssdb/cert9.db" ] && dbs+=("$HOME/.pki/nssdb|Chromium/Chrome")
+        while IFS= read -r db; do
+            dir="$(dirname -- "$db")"
+            case "$dir" in
+                *"/.mozilla/firefox/"*) label="Firefox: $(basename -- "$dir")" ;;
+                *"/.thunderbird/"*)     label="Thunderbird: $(basename -- "$dir")" ;;
+                *)                      label="$(basename -- "$dir")" ;;
+            esac
+            dbs+=("$dir|$label")
+        done < <(find "$HOME/.mozilla/firefox" "$HOME/.thunderbird" -maxdepth 2 -name 'cert9.db' 2>/dev/null | sort)
+    fi
+
+    echo
+    if [ "$showall" -eq 1 ]; then __jwca_h__ "NSS trust — all entries"; else __jwca_h__ "NSS trust — added CAs"; fi
+    if [ "${#dbs[@]}" -eq 0 ]; then
+        echo "  (no NSS databases found — no browser trust on this host)"
+        echo
+        return 0
+    fi
+
+    local out rc rows
+    for db in "${dbs[@]}"; do
+        dir="${db%%|*}"; label="${db#*|}"
+        echo
+        echo "  $dir  ($label)"
+        if [ "$have_certutil" -eq 0 ]; then
+            echo "      certutil absent — sudo apt install libnss3-tools to inspect"
+            continue
+        fi
+        out="$(certutil -L -d "sql:$dir" 2>/dev/null)"; rc=$?
+        if [ "$rc" -ne 0 ]; then
+            echo "      (could not read — a running browser may hold a lock, or the DB is unreadable)"
+            continue
+        fi
+        rows="$(printf '%s\n' "$out" | __jwca_nss_rows__ "$showall")"
+        if [ -z "$rows" ]; then
+            if [ "$showall" -eq 1 ]; then echo "      (empty database)"; else echo "      (none added — stock roots only)"; fi
+        else
+            printf '%s\n' "$rows"
+        fi
+    done
     echo
     return 0
 }

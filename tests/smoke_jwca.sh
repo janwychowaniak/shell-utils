@@ -62,6 +62,19 @@ if ! { [ -s "$FX/ca.pem" ] && [ -s "$FX/leaf.pem" ] && [ -s "$FX/ca.der" ]; }; t
     echo "❌ fixture build failed"; exit 2
 fi
 
+# Optional NSS fixture — only when certutil (libnss3-tools) is installed. jwca_nss
+# degrades gracefully without it (reports "certutil absent"), so its discovery path is
+# always exercised; the explicit-DB path is tested only when we can build a real DB with
+# a trusted CA (C,,) + a no-trust leaf (,,) to prove the added-CA filter.
+NSS="$FX/nssdb"; HAVE_CU=0
+if command -v certutil >/dev/null 2>&1; then
+  mkdir -p "$NSS"
+  certutil -N -d "sql:$NSS" --empty-password 2>/dev/null
+  certutil -A -d "sql:$NSS" -n "JW Smoke Root CA" -t "C,," -i "$FX/ca.pem"  2>/dev/null
+  certutil -A -d "sql:$NSS" -n "smoke.example.com" -t ",,"  -i "$FX/leaf.pem" 2>/dev/null
+  [ -f "$NSS/cert9.db" ] && HAVE_CU=1
+fi
+
 # run <shell> <code> -> prints any shell-error signature lines on the run
 run() {
   local sh=$1 code=$2 out
@@ -99,7 +112,14 @@ B=(
   "jwca_inspect '$FX/leaf.key'"      # a KEY, not a cert -> error path
   "jwca_inspect '$FX/leaf.csr'"      # a CSR, not a cert -> error path
   "jwca_inspect /no/such/file"       # missing file -> error path
+  "jwca_nss"                         # discover live browser NSS DBs (graceful w/o certutil)
+  "jwca_nss --all"                   # discover, full listing
+  "jwca_nss /no/such/dir"            # not an NSS dir -> error path
+  "jwca_nss --bogus"                 # unknown flag -> error path
 )
+if [ "$HAVE_CU" -eq 1 ]; then
+  B+=( "jwca_nss '$NSS'" "jwca_nss --all '$NSS'" )   # explicit DB: added-CA + full
+fi
 for sh in "${SHELLS[@]}"; do
   n=0
   for inv in "${B[@]}"; do
@@ -128,7 +148,14 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwca_inspect '$FX/ca.der'"
     "jwca_inspect '$FX/leaf.key'"  # deterministic error line
     'jwca_inspect /no/such/file'   # deterministic error line
+    'jwca_nss -h'
+    'jwca_nss /no/such/dir'        # deterministic error line
   )
+  if [ "$HAVE_CU" -eq 1 ]; then
+    # fixed fixture DB -> byte-identical in both shells (the live discovery path is
+    # NOT parity-checked: real browser DBs can change between the two runs)
+    RO+=( "jwca_nss '$NSS'" "jwca_nss --all '$NSS'" )
+  fi
   n=0
   for inv in "${RO[@]}"; do
     b=$( timeout 20 bash -c "source '$LIB'; $inv" </dev/null 2>/dev/null )

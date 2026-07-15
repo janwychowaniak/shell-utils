@@ -26,6 +26,7 @@ if [ -n "$__jw_dir" ] && [ -d "$__jw_dir" ]; then
         jw_functions__web \
         jw_functions__fs \
         jw_functions__ps \
+        jw_functions__ca \
         jw_functions__media \
         jw_functions__mediaff \
         jw_functions__mediaim \

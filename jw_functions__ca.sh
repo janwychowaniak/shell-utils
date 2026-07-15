@@ -487,15 +487,16 @@ jwca_stores() {
     fi
     __jwca_kv__ "" "  own DB; reads system store only via the p11-kit-trust PKCS#11 module (if loaded)" 9
 
-    # Java — its own keystore, on Ubuntu kept in sync by ca-certificates-java.
+    # Java — its own cacerts keystore. Shown ONLY when keytool is present: keytool
+    # ships with every JRE, so its absence is a reliable proxy for "no Java on this
+    # host", and a Java-free box carries no Java row (no standing noise). Where a Java
+    # service DOES run, the row returns with a live count + the sync caveat.
     if command -v keytool >/dev/null 2>&1; then
         local jcount
         jcount="$(keytool -list -cacerts -storepass changeit 2>/dev/null | grep -c 'trustedCertEntry')"
-        __jwca_kv__ "Java" "keytool present · ${jcount:-?} cacerts entries" 9
-    else
-        __jwca_kv__ "Java" "keytool absent (no JRE detected)" 9
+        __jwca_kv__ "Java" "${jcount:-?} cacerts entries · keytool" 9
+        __jwca_kv__ "" "  separate keystore; ca-certificates-java syncs it from the system store" 9
     fi
-    __jwca_kv__ "" "  separate cacerts keystore; ca-certificates-java syncs it from the system store" 9
 
     # Python — stdlib ssl uses the system store; requests/certifi use certifi's bundle.
     if command -v python3 >/dev/null 2>&1; then

@@ -116,6 +116,12 @@ B=(
   "jwca_nss --all"                   # discover, full listing
   "jwca_nss /no/such/dir"            # not an NSS dir -> error path
   "jwca_nss --bogus"                 # unknown flag -> error path
+  "jwca_material"                    # curated sweep, beyond-distro (live dirs)
+  "jwca_material --all"              # + distro
+  "jwca_material '$FX'"              # add the fixture dir -> finds the fixture certs/keys
+  "jwca_material --bogus"            # unknown flag -> error path
+  "jwca_env"                         # override/proxy env (all likely unset)
+  "REQUESTS_CA_BUNDLE='$FX/ca.pem' CURL_CA_BUNDLE=/no/such HTTPS_PROXY=http://p:3128 jwca_env"  # override branches
 )
 if [ "$HAVE_CU" -eq 1 ]; then
   B+=( "jwca_nss '$NSS'" "jwca_nss --all '$NSS'" )   # explicit DB: added-CA + full
@@ -150,6 +156,10 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     'jwca_inspect /no/such/file'   # deterministic error line
     'jwca_nss -h'
     'jwca_nss /no/such/dir'        # deterministic error line
+    'jwca_material -h'
+    'jwca_material --bogus'        # deterministic error line
+    'jwca_env -h'
+    'jwca_env'                     # /etc/environment + inherited env identical to both shells
   )
   if [ "$HAVE_CU" -eq 1 ]; then
     # fixed fixture DB -> byte-identical in both shells (the live discovery path is

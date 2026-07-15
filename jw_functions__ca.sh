@@ -31,7 +31,7 @@
 # printf is byte-width (identical bash/zsh); the marker sits in a fixed slot on
 # every row, so the tagline column aligns regardless of emoji width.
 __jwca_toc_row__() {
-    printf " - %s %-17s%s\n" "$1" "$2" "$3"
+    printf " - %s %-18s%s\n" "$1" "$2" "$3"
 }
 
 jwca_toc() {
@@ -50,6 +50,10 @@ jwca_toc() {
     echo " -----------------------------  cross-store"
     __jwca_toc_row__ 🟢 jwca_stores "system/NSS/Java/certifi map"
     __jwca_toc_row__ 🟢 jwca_nss    "browser (NSS) added CAs"
+    echo
+    echo " -----------------------------  beyond-distro (server)"
+    __jwca_toc_row__ 🟢 jwca_material "on-disk cert/key, non-distro"
+    __jwca_toc_row__ 🟢 jwca_env      "CA-bundle + proxy env"
     echo
 }
 
@@ -310,6 +314,21 @@ jwca_store() {
     __jwca_kv__ "Local (added)" "$local_n"
     __jwca_kv__ "Disabled" "$disabled"
     __jwca_kv__ "Expired" "$([ "${expired:-0}" -gt 0 ] && echo "⚠️ $expired" || echo "✅ 0")"
+    # Integrity cross-check: the bundle should hold exactly one cert per declared source
+    # (active package entry + local file). A surplus = certs appended straight to the
+    # bundle bypassing /usr/local/share (or a multi-cert source file); a deficit = a
+    # declared source that never made it in (stale — needs update). A soft signal.
+    local note_int
+    if printf '%s' "$pkg" | grep -qE '^[0-9]+$'; then
+        local accounted=$(( pkg + local_n ))
+        if   [ "$trusted" -gt "$accounted" ]; then note_int="⚠️ $((trusted - accounted)) beyond declared sources (appended directly / multi-cert file?)"
+        elif [ "$trusted" -lt "$accounted" ]; then note_int="⚠️ $((accounted - trusted)) declared source(s) missing from bundle (stale — run update?)"
+        else                                       note_int="✅ matches declared sources ($accounted)"
+        fi
+    else
+        note_int="? (conf unreadable)"
+    fi
+    __jwca_kv__ "Integrity" "$note_int"
     echo
     __jwca_kv__ "Freshness" "$fresh_mark"
     if [ -n "$newer" ]; then
@@ -637,6 +656,193 @@ jwca_nss() {
             printf '%s\n' "$rows"
         fi
     done
+    echo
+    return 0
+}
+
+
+# ---------------------------------------------------------------------------------
+# beyond-distro (server)
+# ---------------------------------------------------------------------------------
+
+# Everything cert/key that was installed on this box BEYOND the distribution — the
+# server-side counterpart to jwca_custom/jwca_nss, and the answer to "what corporate
+# PKI is on this machine?". Two things surface here that no other tool shows: the box's
+# own mTLS/client IDENTITY (a cert + its private key, e.g. for an egress proxy or an
+# internal service), and corporate cert/bundle files dropped into /etc. Sweeps a curated,
+# server-safe set of dirs (bounded -maxdepth, never `find /`); an extra [dir] adds a site
+# location (e.g. /etc/mycorp). "Beyond distro" = NOT owned by any dpkg package AND not a
+# generated artifact (the /etc/ssl/certs bundle + its hash symlinks are skipped). Default
+# shows only the non-distro material; --all shows everything found. Per cert: CN, CA/leaf,
+# expiry, and whether it chains to the system trust (openssl verify). Per key: perms, with
+# a ⚠️ on any group/other-readable private key. /etc/ssl/private is root-only, so as a
+# normal user it is reported as present-but-unlistable rather than silently skipped. RO.
+jwca_material() {
+    local showall=0 target="" a
+    for a in "$@"; do
+        case "$a" in
+            -h|--help)
+                echo "Usage: jwca_material [--all] [extra-dir]"
+                echo "Examples:"
+                echo "  jwca_material                 # non-distro cert/key in the curated dirs"
+                echo "  jwca_material --all           # every cert/key found (incl. distro)"
+                echo "  jwca_material /etc/mycorp      # also sweep a site-specific dir"
+                echo
+                echo "Cert/key material installed BEYOND the distribution — the box's mTLS/client"
+                echo "identity + corporate certs/bundles in /etc. 'Beyond distro' = not owned by a"
+                echo "dpkg package. Curated, server-safe sweep (never find /). Read-only."
+                return 0 ;;
+            --all) showall=1 ;;
+            -*)    echo "❌ unknown flag: $a (see: jwca_material -h)" >&2; return 1 ;;
+            *)     target="$a" ;;
+        esac
+    done
+    command -v openssl >/dev/null 2>&1 || { echo "❌ openssl not available" >&2; return 1; }
+
+    local dirs=(/etc/ssl /etc/pki /usr/local/share/ca-certificates /etc/nginx /etc/apache2 /etc/haproxy /etc/postfix /etc/dovecot)
+    [ -n "$target" ] && dirs+=("$target")
+
+    local privnote=""
+    if [ -d /etc/ssl/private ] && [ ! -r /etc/ssl/private ]; then
+        privnote="/etc/ssl/private present but not listable as $(id -un 2>/dev/null) — needs root or the ssl-cert group"
+    fi
+
+    local files=() f
+    while IFS= read -r f; do files+=("$f"); done < <(
+        find "${dirs[@]}" -maxdepth 3 -type f \
+            \( -name '*.pem' -o -name '*.crt' -o -name '*.cer' -o -name '*.der' \
+               -o -name '*.key' -o -name '*.p12' -o -name '*.pfx' \) 2>/dev/null | sort -u)
+
+    local certs_out="" keys_out="" other_out=""
+    local base origin form der inform subj cn bc isca mark v tv iskey mode readable
+    for f in "${files[@]}"; do
+        base="$(basename -- "$f")"
+        [ "$f" = "$_jwca_bundle_" ] && continue          # generated bundle — not "installed"
+        [ "$base" = "ca-certificates.crt" ] && continue  # (same, under any path)
+
+        origin="ADDED"
+        if command -v dpkg >/dev/null 2>&1 && dpkg -S "$f" >/dev/null 2>&1; then origin="distro"; fi
+        [ "$showall" -eq 0 ] && [ "$origin" = "distro" ] && continue
+
+        form="$(__jwca_certform__ "$f")"
+        if [ -n "$form" ]; then
+            der=0; inform=()
+            [ "$form" = "der" ] && { der=1; inform=(-inform DER); }
+            subj="$(openssl x509 "${inform[@]}" -in "$f" -noout -subject 2>/dev/null | sed -n 's/^subject=//p')"
+            cn="$(__jwca_cn__ "$subj")"
+            bc="$(__jwca_x509_ext__ "$f" "$der" basicConstraints)"
+            case "$bc" in *CA:TRUE*) isca="CA" ;; *) isca="leaf" ;; esac
+            mark="$(__jwca_expiry_mark__ "$(openssl x509 "${inform[@]}" -in "$f" -noout -enddate 2>/dev/null | sed 's/^notAfter=//')")"
+            if [ "$der" = "1" ]; then
+                tv="(DER — chain check skipped)"
+            else
+                v="$(openssl verify "$f" 2>&1)"
+                case "$v" in
+                    *": OK")                              tv="chains to system trust ✅" ;;
+                    *"self-signed"*|*"self signed"*)      tv="self-signed (private root?)" ;;
+                    *"unable to get local issuer"*|*"unable to get issuer"*) tv="issuer not in system trust ⚠️" ;;
+                    *xpired*)                             tv="expired" ;;
+                    *)                                    tv="unverified" ;;
+                esac
+            fi
+            certs_out+="  • $f  · $origin"$'\n'
+            certs_out+="      [$isca] $cn — ${mark:-?} — trust: $tv"$'\n'
+            continue
+        fi
+
+        iskey=0
+        if grep -qa 'PRIVATE KEY' "$f" 2>/dev/null; then iskey=1
+        else case "$base" in *.key) iskey=1 ;; esac
+        fi
+        if [ "$iskey" -eq 1 ]; then
+            mode="$(stat -c '%a %U:%G' "$f" 2>/dev/null)"
+            if find "$f" -perm /044 2>/dev/null | grep -q .; then readable="⚠️ readable by group/other"; else readable="owner-only ✅"; fi
+            keys_out+="  • $f  · $origin  🔑 [$mode]  $readable"$'\n'
+        else
+            case "$base" in
+                *.p12|*.pfx) other_out+="  • $f  · $origin  (PKCS#12 bundle/keystore — password-protected, not inspected)"$'\n' ;;
+            esac
+        fi
+    done
+
+    echo
+    if [ "$showall" -eq 1 ]; then __jwca_h__ "PKI material on disk (all)"; else __jwca_h__ "PKI material on disk (beyond distro)"; fi
+    echo "  scanned: ${dirs[*]}"
+    [ -n "$privnote" ] && echo "  note: $privnote"
+    if [ -z "$certs_out" ] && [ -z "$keys_out" ] && [ -z "$other_out" ]; then
+        echo
+        if [ "$showall" -eq 1 ]; then echo "  (no cert/key material found)"; else echo "  (nothing installed beyond the distribution)"; fi
+        echo
+        return 0
+    fi
+    [ -n "$certs_out" ] && { echo; echo "  Certificates:"; printf '%s' "$certs_out"; }
+    [ -n "$keys_out" ]  && { echo; echo "  Private keys:"; printf '%s' "$keys_out"; }
+    [ -n "$other_out" ] && { echo; echo "  Other:"; printf '%s' "$other_out"; }
+    echo
+    return 0
+}
+
+# One env var row for jwca_env: name, value, kind (bundle|dir|proxy). Flags a CA-bundle
+# override that points anywhere other than the system store, and a path that doesn't exist.
+__jwca_env_row__() {
+    local name="$1" val="$2" kind="$3" extra=""
+    if [ -z "$val" ]; then __jwca_kv__ "$name" "(unset)" 22; return; fi
+    if [ "$kind" = "bundle" ] || [ "$kind" = "dir" ]; then
+        [ ! -e "$val" ] && extra=" ❌ path missing"
+        if [ "$val" != "$_jwca_bundle_" ] && [ "$val" != "/etc/ssl/certs" ]; then extra="$extra ⚠️ overrides system store"; fi
+    fi
+    __jwca_kv__ "$name" "$val$extra" 22
+}
+
+# The trust-override + egress-proxy surface: the env vars that redirect individual tools
+# away from the system store (openssl / requests / curl / node / git / pip / cargo / aws)
+# and route traffic through a proxy — the "curl trusts it but tool X uses the corporate
+# bundle / goes via the SSL-inspecting proxy" layer. Flags every CA-bundle var that points
+# off the system store, and surfaces machine-wide sets from /etc/environment. Honest scope:
+# these are the CURRENT shell's vars — a daemon's trust comes from its systemd unit
+# (Environment=/EnvironmentFile=), which this cannot see. Read-only.
+jwca_env() {
+    case "${1:-}" in
+        -h|--help)
+            echo "Usage: jwca_env"
+            echo "  CA-bundle / trust-override env vars (openssl/requests/curl/node/git/pip/"
+            echo "  cargo/aws) + egress-proxy vars, with ⚠️ on anything overriding the system"
+            echo "  store; plus machine-wide sets from /etc/environment. Current shell. Read-only."
+            return 0 ;;
+    esac
+
+    echo
+    __jwca_h__ "CA-bundle / trust overrides (current shell)"
+    __jwca_env_row__ SSL_CERT_FILE       "${SSL_CERT_FILE:-}"       bundle
+    __jwca_env_row__ SSL_CERT_DIR        "${SSL_CERT_DIR:-}"        dir
+    __jwca_env_row__ REQUESTS_CA_BUNDLE  "${REQUESTS_CA_BUNDLE:-}"  bundle
+    __jwca_env_row__ CURL_CA_BUNDLE      "${CURL_CA_BUNDLE:-}"      bundle
+    __jwca_env_row__ NODE_EXTRA_CA_CERTS "${NODE_EXTRA_CA_CERTS:-}" bundle
+    __jwca_env_row__ GIT_SSL_CAINFO      "${GIT_SSL_CAINFO:-}"      bundle
+    __jwca_env_row__ PIP_CERT            "${PIP_CERT:-}"            bundle
+    __jwca_env_row__ CARGO_HTTP_CAINFO   "${CARGO_HTTP_CAINFO:-}"   bundle
+    __jwca_env_row__ AWS_CA_BUNDLE       "${AWS_CA_BUNDLE:-}"       bundle
+
+    echo
+    __jwca_h__ "Egress proxy (current shell)"
+    __jwca_env_row__ HTTP_PROXY  "${HTTP_PROXY:-${http_proxy:-}}"    proxy
+    __jwca_env_row__ HTTPS_PROXY "${HTTPS_PROXY:-${https_proxy:-}}"  proxy
+    __jwca_env_row__ ALL_PROXY   "${ALL_PROXY:-${all_proxy:-}}"      proxy
+    __jwca_env_row__ NO_PROXY    "${NO_PROXY:-${no_proxy:-}}"        proxy
+
+    if [ -r /etc/environment ]; then
+        local envhits
+        envhits="$(grep -nE '^(export[[:space:]]+)?(SSL_CERT_FILE|SSL_CERT_DIR|REQUESTS_CA_BUNDLE|CURL_CA_BUNDLE|NODE_EXTRA_CA_CERTS|GIT_SSL_CAINFO|PIP_CERT|CARGO_HTTP_CAINFO|AWS_CA_BUNDLE|HTTPS?_PROXY|ALL_PROXY|NO_PROXY)=' /etc/environment 2>/dev/null)"
+        if [ -n "$envhits" ]; then
+            echo
+            __jwca_h__ "/etc/environment (machine-wide)"
+            printf '%s\n' "$envhits" | sed 's/^/  /'
+        fi
+    fi
+
+    echo
+    echo "  note: these are THIS shell's vars. A service's trust comes from its systemd"
+    echo "        unit (Environment=/EnvironmentFile=), not from here — check the unit."
     echo
     return 0
 }

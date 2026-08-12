@@ -15,7 +15,13 @@ command -v gitleaks >/dev/null 2>&1 || {
     exit 0
 }
 
-if ! gitleaks detect --no-git --source="$1" --redact -v; then
+# --config is REQUIRED, not optional: gitleaks auto-loads <source>/.gitleaks.toml only
+# when --source is a DIRECTORY. Here --source is a FILE ($1 lives in .git/), so without
+# --config this scan silently runs on the DEFAULT ruleset — our jw-* provider rules never
+# apply, and the default generic-api-key is stopword-suppressed for exactly the keys that
+# leaked here (sk-ant-… is invisible to defaults). Verified: a fake sk-ant key in a message
+# is MISSED without this flag, CAUGHT with it. The cwd is the repo root when git runs hooks.
+if ! gitleaks detect --no-git --source="$1" --config .gitleaks.toml --redact -v; then
     echo "❌ gitleaks: potential secret in the commit MESSAGE — commit blocked." >&2
     echo "   The message body carries what looks like a credential — strip it." >&2
     echo "   False positive? Add a regex/path to .gitleaks.toml -> [allowlist]." >&2

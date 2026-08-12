@@ -40,8 +40,12 @@ while read -r _ local_sha _ remote_sha; do
     fi
 
     # 2) commit MESSAGES across the pushed range (the vector git-mode detect misses)
+    #    --config is REQUIRED: --source here is a FILE, so gitleaks does NOT auto-load
+    #    .gitleaks.toml (autoload only fires for DIRECTORY sources) — without it this runs
+    #    on DEFAULT rules and our jw-* net (incl. sk-ant-, which defaults miss) never applies.
+    #    The content scan above uses --source=. (a directory) so it autoloads correctly.
     git log --format=%B "$@" > "$tmpd/msgs" 2>/dev/null
-    if [ -s "$tmpd/msgs" ] && ! gitleaks detect --no-git --source="$tmpd/msgs" --redact -v; then
+    if [ -s "$tmpd/msgs" ] && ! gitleaks detect --no-git --source="$tmpd/msgs" --config .gitleaks.toml --redact -v; then
         echo "❌ gitleaks: potential secret in a pushed commit MESSAGE ($*)" >&2
         fail=1
     fi

@@ -79,6 +79,11 @@ fi
 ```
 - To iterate a list, build an array (`items+=("$x")`) and loop with `for x in "${items[@]}"`, or read newline-separated text with `while IFS= read -r x; do ...; done <<< "$text"`. Never `for x in $scalar` — zsh treats the whole scalar as a single word.
 
+**Shell-specific parameter expansions — several have no portable meaning; use the neutral form:**
+- **`read -d ''` / `read -d <delim>` is bash-only** — zsh's `read` has no `-d`. To split a stream on a delimiter (e.g. a multi-cert PEM bundle where `openssl x509` reads only the first cert), accumulate with a `while IFS= read -r line` loop + a buffer and act on the boundary line (`case "$line" in *'-----END CERTIFICATE-----'*)`), never `read -r -d ''`.
+- **Indirect / dynamic-name expansion diverges: `${!var}` (bash) vs `${(P)var}` (zsh).** Neither works in the other shell — `${(P)…}` is a *bash* syntax error, and `${!var}` is not indirection in zsh. Don't look a variable up by a name held in another variable; reference each one explicitly (write the names out) or pass the value in as an argument. (Why `jwca_env` lists every `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE`/… by hand instead of looping over names.)
+- **Case modifiers `${x:u}` / `${x:l}` are zsh-only.** In bash `${x:u}` is parsed as substring-from-offset and *silently returns the string unchanged* (no error, wrong result — the worst kind). Uppercase/lowercase portably with `tr '[:lower:]' '[:upper:]'`.
+
 **zsh runtime gotchas (these PARSE fine — they only break when the function RUNS):**
 - **Reserved variable names:** never use `status`, `path`, `argv`, `options`, `pipestatus`, … as a `local`/`read`/loop variable. zsh makes them read-only/special (`status` mirrors `$?`), so it aborts at runtime with "read-only variable". Use `st`, `p`, etc.
 - **Bare `local x` re-prints in zsh:** a bare `local x` (no assignment) that re-declares an already-set variable *prints* `x=value` (it lists the var). Because `while read`/`for` loops run in the current shell in zsh, an in-loop `local x` reprints the previous iteration's value, and a second `local x` after an earlier one leaks the stale value to stdout. **Declare each local once (at the top, or before the loop), or initialize it (`local x=""`)** — never a bare re-declaration.

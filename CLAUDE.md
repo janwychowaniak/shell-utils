@@ -80,7 +80,7 @@ Add false positives to `[allowlist]`. Ad-hoc scans: `gitleaks detect -v` (histor
 | `jw_functions__media.sh` | Media notes/templates (sox, etc.) |
 | `jw_functions__mediaff.sh` | FFmpeg/ffprobe functions (`jwff*`) |
 | `jw_functions__mediaim.sh` | ImageMagick functions (`jwim*`) + `jwgetimageresolution` (image dimensions via exiftool) |
-| `jw_functions__misc.sh` | Uncategorized utilities (`jwpaste`, `jwai_jina`, etc.) |
+| `jw_functions__misc.sh` | Uncategorized utilities (`jwpaste`, `jwai_jina`, `jwai_sonar` — Perplexity Sonar via OpenRouter, ZDR-only, plain-text answer; key in `JWSONAR_OR_APIKEY`, kept off curl's argv; etc.) |
 | `jw_aliases.sh` | Shell aliases |
 | `jw_colors.sh` | ANSI color/style helpers (`jwpaintfg*`, `__jwStyle*`) |
 | `load.sh` | Loader — self-locating (bash `BASH_SOURCE` / zsh `$0`); sources every area file from an explicit, ordered list. Users source this ONE file from their rc. **Adding/removing an area = update this list too.** |

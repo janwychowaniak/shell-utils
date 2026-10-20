@@ -214,3 +214,87 @@ jwai_jina() {
     # ------------------------------------------------------------------
     printf 'Stored to %s\n' "$outfile"
 }
+
+
+# ------------------------------------------------------------
+# jwai_sonar – ask Perplexity Sonar (web-grounded) via OpenRouter, plain-text answer
+#
+#   Usage:
+#     jwai_sonar <question...>
+#
+#   • routed to Zero Data Retention endpoints only (provider.zdr)
+#   • answer printed as plain text: Markdown and [n] citation markers stripped
+#   • needs JWSONAR_OR_APIKEY (an OpenRouter API key) in the environment
+#
+#   Example:
+#     jwai_sonar what is the current stable Debian release?
+# ------------------------------------------------------------
+# `function` keyword on purpose: under zsh the alias below exists on a re-source,
+# and `jwai_sonar() {` would then hit "defining function based on alias".
+function jwai_sonar {
+    if [[ $# -eq 0 ]] || [[ "$1" = "-h" ]] || [[ "$1" = "--help" ]]; then
+        printf 'Usage: jwai_sonar <question...>\n'
+        printf '\n'
+        printf '  Ask Perplexity Sonar (web search) via OpenRouter, ZDR endpoints only.\n'
+        printf '  Prints a plain-text answer (no Markdown, no [n] citation markers),\n'
+        printf '  in the language of the question. Needs JWSONAR_OR_APIKEY.\n'
+        printf '  Quote the question if it contains shell syntax: quotes $ ; | & ( )\n'
+        printf '\n'
+        printf 'Examples:\n'
+        printf '  jwai_sonar what is the current stable Debian release?\n'
+        printf "  jwai_sonar \"what's new in curl 8.x?\"\n"
+        [[ $# -eq 0 ]] && return 1 || return 0
+    fi
+
+    local tool
+    for tool in curl jq; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            printf 'Error: %s is not installed.\n' "$tool" >&2
+            return 1
+        fi
+    done
+
+    if [[ -z "${JWSONAR_OR_APIKEY:-}" ]]; then
+        printf 'Error: JWSONAR_OR_APIKEY is not set in the environment.\n' >&2
+        printf 'Export an OpenRouter API key first, e.g.\n' >&2
+        printf '  export JWSONAR_OR_APIKEY="sk-or-v1-..."\n' >&2
+        return 1
+    fi
+
+    local sys payload resp rc msg answer
+    sys='Answer in plain text without Markdown: no asterisks, underscores, # headings, tables or code blocks. Write lists as lines starting with "- ". Do not insert footnote numbers or bracketed source references. Answer in the same language as the question.'
+    payload=$(jq -n --arg s "$sys" --arg q "$*" \
+        '{model: "perplexity/sonar", provider: {zdr: true},
+          messages: [{role: "system", content: $s}, {role: "user", content: $q}]}')
+
+    # The key goes in through a process-substitution header file, so it never
+    # appears in curl's argv (readable by every local user via ps / /proc).
+    resp=$(curl -sS --connect-timeout 10 --max-time 120 \
+        https://openrouter.ai/api/v1/chat/completions \
+        -H @<(printf 'Authorization: Bearer %s\n' "$JWSONAR_OR_APIKEY") \
+        -H 'Content-Type: application/json' \
+        -d "$payload")
+    rc=$?
+    if (( rc != 0 )); then
+        printf 'Error: request to OpenRouter failed (curl exit %d).\n' "$rc" >&2
+        return "$rc"
+    fi
+
+    if msg=$(jq -er '.error.message' <<< "$resp" 2>/dev/null); then
+        printf 'Error: OpenRouter: %s\n' "$msg" >&2
+        return 1
+    fi
+    if ! answer=$(jq -er '.choices[0].message.content' <<< "$resp" 2>/dev/null); then
+        printf 'Error: unexpected response from OpenRouter:\n%s\n' "$resp" >&2
+        return 1
+    fi
+
+    # Strip whatever Markdown / [n] citation markers slip past the system prompt
+    printf '%s\n' "$answer" | sed -E 's/\[[0-9]+(, ?[0-9]+)*\]//g; s/\*\*//g; s/^#+ +//; s/`//g'
+}
+
+# zsh: let `?` / `*` in an unquoted question reach the function instead of being
+# expanded as globs (`jwai_sonar what is X?` → "no matches found")
+if [ -n "${ZSH_VERSION:-}" ]; then
+    alias jwai_sonar='noglob jwai_sonar'
+fi

@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+
 # A collection of miscellaneous functions that are hard to categorize elsewhere
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -16,21 +18,24 @@ cat 1>&2 <<'EOF'
 
 EOF
 
-    local today=$(date +'%Y/%m/%d')
-    local yesterday=$(date --date='yesterday' +'%Y/%m/%d')
+    local today yesterday week_this week_last reference_day month_this month_last
+    local year_this year_last month_this_extended month_last_extended
 
-    local week_this=$(date --date='last Monday' +'%Y/%m/%d')
-    local week_last=$(date --date='last Monday -1 week' +'%Y/%m/%d')
+    today=$(date +'%Y/%m/%d')
+    yesterday=$(date --date='yesterday' +'%Y/%m/%d')
 
-    local reference_day=$(date +'%Y/%m/15')
-    local month_this=$(date --date="$reference_day" +'%Y/%m/01')
-    local month_last=$(date --date="$reference_day last month" +'%Y/%m/01')
+    week_this=$(date --date='last Monday' +'%Y/%m/%d')
+    week_last=$(date --date='last Monday -1 week' +'%Y/%m/%d')
 
-    local year_this=$(date +'%Y/01/01')
-    local year_last=$(date --date='last year' +'%Y/01/01')
+    reference_day=$(date +'%Y/%m/15')
+    month_this=$(date --date="$reference_day" +'%Y/%m/01')
+    month_last=$(date --date="$reference_day last month" +'%Y/%m/01')
 
-    local month_this_extended=$(date --date="$month_this +4 days" +'%Y/%m/%d')
-    local month_last_extended=$(date --date="$month_last -6 days" +'%Y/%m/%d')
+    year_this=$(date +'%Y/01/01')
+    year_last=$(date --date='last year' +'%Y/01/01')
+
+    month_this_extended=$(date --date="$month_this +4 days" +'%Y/%m/%d')
+    month_last_extended=$(date --date="$month_last -6 days" +'%Y/%m/%d')
 
     local argsstr="${*:+$*  }"  # Handle optional arguments more concisely
 
@@ -54,7 +59,7 @@ jwrandnumgen()
 {
     if [ $# -ne 1 ] || ! [[ $1 =~ ^[0-9]+$ ]] || [ "$1" -lt 1 ]; then
         echo
-        echo "$FUNCNAME  LIMIT"
+        echo "jwrandnumgen  LIMIT"
         echo
         echo "    A small convenience function for generating a pseudo-random integer number from the range of [1, LIMIT]."
         echo "    LIMIT must be a positive integer."

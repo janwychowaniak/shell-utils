@@ -78,9 +78,13 @@ keywords = ["fc-"]
 
 [[rules]]
 id = "jw-mailgun-key"
+# Keyword is "key", NOT "key-": the longer "key-" shadowed the built-in generic-api-key's
+# own "key" keyword, switching that rule off on lines like `deploy-key-prod = <secret>`.
+# Validated by corpus diff (2026-10-20, apt 8.16): "key-" lost generic-api-key on 3 such
+# fakes; "key" restores all 3, loses no finding, and still catches a bare key-<32 hex>.
 description = "Mailgun-style API key (key-)"
 regex = '''key-[0-9a-f]{32}'''
-keywords = ["key-"]
+keywords = ["key"]
 
 [[rules]]
 id = "jw-google-apikey"

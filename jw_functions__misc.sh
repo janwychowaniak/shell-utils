@@ -138,27 +138,26 @@ jwpaste() {
 #     jwai_jina https://opencode.ai/docs demo
 #     → Stored to /tmp/jina-dump-20251229-111313-demo.md
 # ------------------------------------------------------------
-jwai_jina() {
-    # ------------------------------------------------------------------
-    # Helper: print a short usage message
-    # ------------------------------------------------------------------
-    _jwai_jina_usage() {
-        printf 'Usage: %s <url> [suffix]\n' "${FUNCNAME[1]}"
-        printf '\n'
-        printf '  <url>    URL to fetch (required)\n'
-        printf '  suffix   optional text added before the .md extension\n'
-        printf '\n'
-        printf 'Example:\n'
-        printf '  %s https://opencode.ai/docs demo\n' "${FUNCNAME[1]}"
-        printf '  → Stored to /tmp/jina-dump-$(date +%%Y%%m%%d-%%H%%M%%S)-demo.md\n' "${FUNCNAME[1]}"
-    }
+__jwai_jina_usage__() {
+    printf 'Usage: jwai_jina <url> [suffix]\n'
+    printf '\n'
+    printf '  Fetch <url> as Markdown via Jina AI Reader and store it under /tmp.\n'
+    printf '\n'
+    printf '  <url>    URL to fetch (required)\n'
+    printf '  suffix   optional text added before the .md extension\n'
+    printf '\n'
+    printf 'Example:\n'
+    printf '  jwai_jina https://opencode.ai/docs demo\n'
+    printf '  → Stored to /tmp/jina-dump-<YYYYMMDD-hhmmss>-demo.md\n'
+}
 
+jwai_jina() {
     # ------------------------------------------------------------------
     # Validate arguments
     # ------------------------------------------------------------------
-    if [[ $# -eq 0 ]]; then
-        _jwai_jina_usage
-        return 1
+    if [[ $# -eq 0 ]] || [[ "$1" = "-h" ]] || [[ "$1" = "--help" ]]; then
+        __jwai_jina_usage__
+        [[ $# -eq 0 ]] && return 1 || return 0
     fi
 
     local url="${1}"
@@ -167,17 +166,17 @@ jwai_jina() {
     # Very light URL sanity‑check (just makes sure it starts with http(s)://)
     if [[ ! "$url" =~ ^https?:// ]]; then
         printf 'Error: "%s" does not look like a valid URL.\n' "$url" >&2
-        _jwai_jina_usage
+        __jwai_jina_usage__ >&2
         return 1
     fi
 
     # ------------------------------------------------------------------
-    # NEW: Ensure the JINA AI API key is present
+    # Ensure the JINA AI API key is present
     # ------------------------------------------------------------------
     if [[ -z "${JINA_AI_API_KEY:-}" ]]; then
         printf 'Error: JINA_AI_API_KEY is not set in the environment.\n' >&2
         printf 'Please export it before running jwai_jina, e.g.\n' >&2
-        printf '  export JINA_AI_API_KEY="your‑key‑here"\n' >&2
+        printf '  export JINA_AI_API_KEY="your-key-here"\n' >&2
         return 1
     fi
 
@@ -192,10 +191,12 @@ jwai_jina() {
     outfile+=".md"
 
     # ------------------------------------------------------------------
-    # Perform the request with curl
+    # Perform the request with curl. The key goes in through a
+    # process-substitution header file, so it never appears in curl's
+    # argv (readable by every local user via ps / /proc).
     # ------------------------------------------------------------------
     curl "https://r.jina.ai/${url}" \
-         -H "Authorization: Bearer ${JINA_AI_API_KEY}" \
+         -H @<(printf 'Authorization: Bearer %s\n' "$JINA_AI_API_KEY") \
          -H "X-Engine: browser" \
          -H "X-With-Generated-Alt: true" \
          -o "$outfile" \

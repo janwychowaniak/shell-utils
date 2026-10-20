@@ -103,7 +103,7 @@ jwcompressmp3sox_CMPR_FAC ()
     then
 cat 1>&2 <<EOF
 
-$FUNCNAME COMPR_FACTOR
+jwcompressmp3sox_CMPR_FAC COMPR_FACTOR
 
     A function for batch MP3 files compression. Does so by decreasing file quality to a level determined by COMPR_FACTOR.
     Processes all MP3 files at the current location.

@@ -71,7 +71,7 @@ jwimcompressjpg65 ()
     then
 cat 1>&2 <<EOF
 
-$FUNCNAME
+jwimcompressjpg65
 
     A convenience function for batch jpg files compression. Does so by decreasing file quality.
     Processes all jpg files at the current location.
@@ -89,7 +89,7 @@ jwimconvertbrightnesscontrast ()
     if [ $# -ne 1 ]; then
 cat 1>&2 <<EOF
 
-$FUNCNAME SRCFILE
+jwimconvertbrightnesscontrast SRCFILE
 
     A couple of versions of the input file specified by SRCFILE are generated,
     varying in the levels of brightness and contrast.
@@ -122,7 +122,7 @@ jwgetimageresolution ()
 {
     if [[ $# -lt 1 ]] || [[ $# -gt 2 ]] ; then
         echo
-        echo "$FUNCNAME EXT [min-mpix]"
+        echo "jwgetimageresolution EXT [min-mpix]"
         echo
         echo "    A simple function for telling the dimensions (resolution) of all the image files"
         echo "    with a given extension present at the current location."

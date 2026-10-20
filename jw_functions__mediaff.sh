@@ -12,7 +12,7 @@ jwffbitrateEXT()
     then
 cat 1>&2 <<EOF
 
-$FUNCNAME EXT
+jwffbitrateEXT EXT
 
     All files from the current location, that are of the type EXT, are examined in terms of their length and bitrate.
     Also total duration, total file size and average bitrate are presented.
@@ -79,7 +79,7 @@ jwffmeanbitrateEXT ()
     then
 cat 1>&2 <<EOF
 
-$FUNCNAME EXT
+jwffmeanbitrateEXT EXT
 
     All files from the current location, that are of the type EXT, are examined in terms of their bitrate.
     The average bitrate is presented.
@@ -127,7 +127,7 @@ jwffaudioparamsEXT()
     then
 cat 1>&2 <<EOF
 
-$FUNCNAME EXT
+jwffaudioparamsEXT EXT
 
     All files from the current location, that are of the type EXT, are examined in terms of their audio properties.
     Information like sample rate, number of channels and bitrate is presented for each file.
@@ -167,7 +167,7 @@ jwffvideoparamsEXT()
     then
 cat 1>&2 <<EOF
 
-$FUNCNAME EXT
+jwffvideoparamsEXT EXT
 
     All files from the current location, that are of the type EXT, are examined in terms of their video properties.
     Many bits of information are presented, including codec details, resolution, screen proportions, frame rate etc.
@@ -202,7 +202,7 @@ jwffprobe ()
     case $# in
     "0")
         echo ""
-        echo "$FUNCNAME arg1 [arg2 [...]]"
+        echo "jwffprobe arg1 [arg2 [...]]"
         echo ""
         echo "    The function uses the ffprobe tool to extract information regarding duration,"
         echo "    audio stream and video stream from the given argument (or set of arguments)."
@@ -231,7 +231,7 @@ jwffgetvideoresolution()
     then
 cat 1>&2 <<EOF
 
-$FUNCNAME  NAME  [DESIRED_WIDTH]
+jwffgetvideoresolution  NAME  [DESIRED_WIDTH]
 
     The function helps determining the resolution of a given video file.
     In addition, a second parameter can be given, a desired width that the file
@@ -449,7 +449,7 @@ jwffcutframe()
     if [ $# -ne 1 ]; then
 cat 1>&2 <<EOF
 
- ./$FUNCNAME  CLIP_NAME
+ jwffcutframe  CLIP_NAME
 
    Cuts frame from clip at 10s, 60s and 5m (if long enough).
    Saves the results as JPG images.
@@ -494,7 +494,7 @@ jwffcropfilter ()
     if [ $# -ne 4 ]; then
 cat 1>&2 <<EOF
 
-$FUNCNAME  RECT_WIDTH  RECT_HEIGHT  TOPLEFT_X  TOPLEFT_Y
+jwffcropfilter  RECT_WIDTH  RECT_HEIGHT  TOPLEFT_X  TOPLEFT_Y
 
     Crop filter for ffmpeg.
     For the video files that will be cropped this function generates the appropriate command fragment.
@@ -527,7 +527,7 @@ jwffcropclip ()
 {
     if [ $# -ne 3 ]; then
         echo
-        echo "$FUNCNAME  CLIPNAME  FROM  TO"
+        echo "jwffcropclip  CLIPNAME  FROM  TO"
         echo
         echo "    A small convenience function for trimming the length of a video file,"
         echo "    discarding some time from the beginning and the end."

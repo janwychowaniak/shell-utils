@@ -20,9 +20,15 @@ permissions:
 
 jobs:
   scan:
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: on 24.04 apt ships the same gitleaks as local
+    # (8.16 — `detect`/`protect`, singular [allowlist]); ubuntu-latest moves to
+    # Ubuntu 26 from 2026-10-19, whose gitleaks would differ. Bump deliberately.
+    runs-on: ubuntu-24.04
+    # The scan takes seconds; a hung apt mirror would otherwise hold the job for
+    # GitHub's 6 h default. Cap it so an outage is a quick, re-runnable red ✗.
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0            # full history for the content scan + git log --all
 

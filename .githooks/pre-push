@@ -12,6 +12,18 @@
 #
 # stdin: one line per ref being pushed:  <local_ref> <local_sha> <remote_ref> <remote_sha>
 
+# Advisory, never blocks: GitHub auto-disables the server-side scan workflow after
+# 60 days without repository activity (state "disabled_inactivity"), and a disabled
+# workflow ignores pushes too — so the push that ends a long pause goes unscanned
+# server-side. Warn when that is the case. Silent without gh, offline, or on error.
+if command -v gh >/dev/null 2>&1; then
+    wf_state=$(timeout 5 gh api 'repos/{owner}/{repo}/actions/workflows/gitleaks.yml' --jq .state </dev/null 2>/dev/null)
+    if [ -n "$wf_state" ] && [ "$wf_state" != "active" ]; then
+        echo "⚠️  server-side gitleaks workflow is '$wf_state' — this push will NOT be scanned on GitHub." >&2
+        echo "   Re-enable it: gh workflow enable gitleaks" >&2
+    fi
+fi
+
 command -v gitleaks >/dev/null 2>&1 || {
     echo "⚠️  gitleaks not installed — skipping pre-push secret scan (push allowed)" >&2
     exit 0

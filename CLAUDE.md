@@ -56,7 +56,11 @@ Local hooks are advisory — `--no-verify`, a `hooksPath`-ignoring tool, or a ma
 without gitleaks all skip them. The **non-bypassable** layer is
 `.github/workflows/gitleaks.yml`: it runs server-side on every push + PR + a weekly
 sweep, scanning full-history content *and* all commit messages, and fails the check
-on any finding.
+on any finding. **Caveat:** GitHub auto-disables that workflow after 60 days without
+repository activity (`gh workflow list` shows `disabled_inactivity`), and a disabled
+workflow ignores pushes too, not just the schedule — so the push that ends a long
+pause goes unscanned server-side. `.githooks/pre-push` warns (never blocks) when the
+workflow is not `active`; re-enable with `gh workflow enable gitleaks`.
 
 Config is `.gitleaks.toml` — `[extend] useDefault = true` keeps the full built-in
 ruleset and adds `jw-`prefixed provider rules on top (nothing built-in is disabled).

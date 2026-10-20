@@ -57,13 +57,17 @@ EOF
 
 jwrandnumgen()
 {
+    if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: jwrandnumgen LIMIT"
+        echo "  Print a pseudo-random integer from the range [1, LIMIT]."
+        echo "  LIMIT must be a positive integer."
+        echo "Examples:"
+        echo "  jwrandnumgen 6           # roll a die"
+        echo "  n=\$(jwrandnumgen 100)    # capture it; a fresh value on every call"
+        [ $# -eq 0 ] && return 1 || return 0
+    fi
     if [ $# -ne 1 ] || ! [[ $1 =~ ^[0-9]+$ ]] || [ "$1" -lt 1 ]; then
-        echo
-        echo "jwrandnumgen  LIMIT"
-        echo
-        echo "    A small convenience function for generating a pseudo-random integer number from the range of [1, LIMIT]."
-        echo "    LIMIT must be a positive integer."
-        echo
+        echo "Error: LIMIT must be a single positive integer (see: jwrandnumgen -h)" >&2
         return 1
     fi
 

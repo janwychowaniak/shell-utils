@@ -20,14 +20,15 @@ All function files should include `# shellcheck shell=bash` at the top.
 
 ## Testing
 
-Per-area smoke tests live in `tests/smoke_<area>.sh` (e.g. `smoke_jwgit.sh`,
-`smoke_web.sh`). Each builds a throwaway fixture, runs every function under
-**both bash and zsh**, scans for shell runtime-error signatures, and diffs
-bash-vs-zsh stdout of the deterministic read-only functions (cross-shell
-parity). Run after any change:
+Per-area smoke tests live in `tests/`, named after the area's function prefix
+(`smoke_jwgit.sh`, `smoke_jwdeb.sh`, …); two use the area name instead —
+`smoke_web.sh` (legacy) and `smoke_misc.sh` (misc has no common prefix). Each
+builds a throwaway fixture, runs every function under **both bash and zsh**, scans
+for shell runtime-error signatures, and diffs bash-vs-zsh stdout of the
+deterministic read-only functions (cross-shell parity). Run after any change:
 
 ```bash
-bash tests/smoke_<area>.sh
+bash tests/smoke_<name>.sh
 ```
 
 ## Secret scanning
@@ -56,11 +57,13 @@ Local hooks are advisory — `--no-verify`, a `hooksPath`-ignoring tool, or a ma
 without gitleaks all skip them. The **non-bypassable** layer is
 `.github/workflows/gitleaks.yml`: it runs server-side on every push + PR + a weekly
 sweep, scanning full-history content *and* all commit messages, and fails the check
-on any finding. **Caveat:** GitHub auto-disables that workflow after 60 days without
-repository activity (`gh workflow list` shows `disabled_inactivity`), and a disabled
-workflow ignores pushes too, not just the schedule — so the push that ends a long
-pause goes unscanned server-side. `.githooks/pre-push` warns (never blocks) when the
-workflow is not `active`; re-enable with `gh workflow enable gitleaks`.
+on any finding. It runs on a pinned `ubuntu-24.04` runner, whose apt gitleaks is the
+same 8.16 package as local (so CLI and config syntax match). **Caveat:** GitHub
+auto-disables that workflow after 60 days without repository activity (`gh workflow
+list` shows `disabled_inactivity`), and a disabled workflow ignores pushes too, not
+just the schedule — so the push that ends a long pause goes unscanned server-side.
+`.githooks/pre-push` warns (never blocks) when the workflow is not `active`;
+re-enable with `gh workflow enable gitleaks`.
 
 Config is `.gitleaks.toml` — `[extend] useDefault = true` keeps the full built-in
 ruleset and adds `jw-`prefixed provider rules on top (nothing built-in is disabled).

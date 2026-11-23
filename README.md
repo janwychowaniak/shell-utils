@@ -67,3 +67,7 @@ The blast-radius marker in each TOC says at a glance what a command does:
 
 (The media and misc files are older note / command-template collections — run one to
 print its cheat-sheet.)
+
+## License
+
+[MIT](LICENSE)

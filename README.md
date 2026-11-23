@@ -7,8 +7,8 @@ consistent, safety-conscious command.
 
 ## What's inside
 
-Every area is namespaced by a `jw…` prefix. The seven newer areas (Git through
-Processes/services) are self-documenting — each ships a table-of-contents function and
+Every area is namespaced by a `jw…` prefix. The eight newer areas (Git through
+Certificates/trust store) are self-documenting — each ships a table-of-contents function and
 per-command `-h` help; see [Using the functions](#using-the-functions).
 
 | Area | Prefix | What it does |
@@ -20,6 +20,7 @@ per-command `-h` help; see [Using the functions](#using-the-functions).
 | Web · API | `jwweb_*` | HTTP / TLS / DNS / connectivity diagnostics |
 | Filesystem | `jwfs_*` | Read-only orientation & profiling + guarded cwd mutators |
 | Processes · services | `jwps_*` | Live-runtime oversight — processes, ports, sockets, systemd units |
+| Certificates · trust store | `jwca_*` | Local trust-store & cert-file oversight — posture, added CAs, cross-store map |
 | Media | `jwff*` · `jwim*` · `jwsox` · … | ffmpeg / ImageMagick / sox cheat-sheets & batch helpers |
 | Misc | `jwpaste` · `jwai_jina` · … | Uncategorised odds and ends |
 
@@ -53,11 +54,11 @@ that one line at wherever `load.sh` lives.)
 
 ## Using the functions
 
-The seven newer areas are built to be self-documenting:
+The eight newer areas are built to be self-documenting:
 
 - **`<area>_toc`** — lists every command in that area with a one-line description and a
   blast-radius marker. One per area: `jwgit_toc` · `jwdocker_toc` · `jwdeb_toc` ·
-  `jwpy_toc` · `jwweb_toc` · `jwfs_toc` · `jwps_toc`.
+  `jwpy_toc` · `jwweb_toc` · `jwfs_toc` · `jwps_toc` · `jwca_toc`.
 - **`-h` / `--help`** — every command in these areas prints its own usage, options and examples.
 - **Tab-completion** — type a prefix (`jwps_`, `jwgit_`, …) and press Tab to browse.
 

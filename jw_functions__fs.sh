@@ -460,15 +460,33 @@ jwfs_ext() {
 # posture / attributes (read-only — these only report, never change anything)
 # ---------------------------------------------------------------------------------
 
+# Recency marker for one timestamp, both args in epoch seconds (<ts> <now>):
+# "  (< Nh ago)" when <ts> lies less than 24 h back, "  (in the future)" when it
+# lies ahead of <now>, nothing otherwise. N counts started hours (floor + 1), so
+# the bound always holds: 0-3599 s -> "< 1h", 3600-7199 s -> "< 2h", up to "< 24h".
+__jwfs_ago__() {
+    case "${1#-}" in ''|*[!0-9]*) return 0 ;; esac
+    case "${2#-}" in ''|*[!0-9]*) return 0 ;; esac
+    local age=$(( $2 - $1 ))
+    if [ "$age" -lt 0 ]; then
+        printf '  (in the future)'
+    elif [ "$age" -lt 86400 ]; then
+        printf '  (< %dh ago)' $(( age / 3600 + 1 ))
+    fi
+}
+
 # Rich, read-only metadata for one path (a single stat call, parsed field-wise):
 # type, symbolic+octal perms, owner/group (names + numeric), size, hard links,
-# inode, and access/modify/change times. Symlinks report the LINK itself (its
-# target is shown in the header), so a broken symlink still resolves.
+# inode, and access/modify/change times, each marked when it is recent (< 24 h)
+# or ahead of the clock. Symlinks report the LINK itself (its target is shown in
+# the header), so a broken symlink still resolves.
 jwfs_stat() {
     if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: jwfs_stat <path>"
         echo "  Rich read-only metadata for one path: type, perms (symbolic + octal),"
         echo "  owner/group, size, links, inode, and access/modify/change times."
+        echo "  A time less than 24 h old is marked \"(< Nh ago)\" (started hours);"
+        echo "  a time ahead of the clock is marked \"(in the future)\"."
         echo "Examples:"
         echo "  jwfs_stat ./report.pdf"
         echo "  jwfs_stat /etc/passwd"
@@ -479,9 +497,10 @@ jwfs_stat() {
         echo "❌ no such path: $p" >&2
         return 1
     fi
-    local ftype perms operm owner group uid gid size links inode atime mtime ctime
-    IFS='|' read -r ftype perms operm owner group uid gid size links inode atime mtime ctime \
-        < <(stat -c '%F|%A|%a|%U|%G|%u|%g|%s|%h|%i|%x|%y|%z' -- "$p" 2>/dev/null)
+    local ftype perms operm owner group uid gid size links inode atime mtime ctime ats mts cts now
+    IFS='|' read -r ftype perms operm owner group uid gid size links inode atime mtime ctime ats mts cts \
+        < <(stat -c '%F|%A|%a|%U|%G|%u|%g|%s|%h|%i|%x|%y|%z|%X|%Y|%Z' -- "$p" 2>/dev/null)
+    now=$(date +%s)
     echo
     __jwfs_h__ "$(stat -c '%N' -- "$p" 2>/dev/null)"
     __jwfs_kv__ "Type"   "$ftype"
@@ -490,9 +509,9 @@ jwfs_stat() {
     __jwfs_kv__ "Size"   "$size bytes  ($(numfmt --to=iec "$size" 2>/dev/null || echo "$size"))"
     __jwfs_kv__ "Links"  "$links"
     __jwfs_kv__ "Inode"  "$inode"
-    __jwfs_kv__ "Access" "$atime"
-    __jwfs_kv__ "Modify" "$mtime"
-    __jwfs_kv__ "Change" "$ctime"
+    __jwfs_kv__ "Access" "$atime$(__jwfs_ago__ "$ats" "$now")"
+    __jwfs_kv__ "Modify" "$mtime$(__jwfs_ago__ "$mts" "$now")"
+    __jwfs_kv__ "Change" "$ctime$(__jwfs_ago__ "$cts" "$now")"
     echo
 }
 

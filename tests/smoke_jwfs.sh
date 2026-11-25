@@ -56,6 +56,9 @@ printf '#\n'             > "$FIX/.hidden"
 printf 'spaced\n'          > "$FIX/with space.txt"
 printf 'z\n'               > "$FIX/weird\$name.txt" # shell-special char in name
 printf 'z\n'               > "$FIX/ąę.txt"          # non-ASCII name
+printf 'old\n'  > "$FIX/old.txt";    touch -d '3 days ago'    "$FIX/old.txt"     # jwfs_stat: no marker on atime/mtime
+printf 'hour\n' > "$FIX/hour.txt";   touch -d '90 minutes ago' "$FIX/hour.txt"  # jwfs_stat: "(< 2h ago)"
+printf 'fut\n'  > "$FIX/future.txt"; touch -d '+2 days'       "$FIX/future.txt" # jwfs_stat: "(in the future)"
 ln -s a.txt                  "$FIX/link_ok"        # valid symlink
 ln -s does_not_exist         "$FIX/link_broken"    # broken symlink
 
@@ -111,6 +114,9 @@ B=(
   "jwfs_stat '$FIX/a.txt'"
   "jwfs_stat '$FIX/link_broken'"         # broken symlink -> reports the link
   "jwfs_stat '$FIX'"                      # a directory
+  "jwfs_stat '$FIX/old.txt'"             # times > 24 h back -> no marker (ctime stays fresh)
+  "jwfs_stat '$FIX/hour.txt'"            # 90 min back -> "(< 2h ago)"
+  "jwfs_stat '$FIX/future.txt'"          # ahead of the clock -> "(in the future)"
   "jwfs_perms '$FIX'"
   "jwfs_owners '$FIX'"
   "jwfs_symlinks '$FIX'"
@@ -176,6 +182,10 @@ if [ "${#SHELLS[@]}" -ge 2 ]; then
     "jwfs_bigfiles -a '$FIX'"
     "jwfs_oldest '$FIX'"
     "jwfs_oldest -a '$FIX'"
+    "jwfs_stat '$FIX/a.txt'"
+    "jwfs_stat '$FIX/old.txt'"
+    "jwfs_stat '$FIX/hour.txt'"
+    "jwfs_stat '$FIX/future.txt'"
     "jwfs_perms '$FIX'"
     "jwfs_owners '$FIX'"
     "jwfs_symlinks '$FIX'"
